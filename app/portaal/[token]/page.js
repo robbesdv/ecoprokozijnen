@@ -210,6 +210,91 @@ function Phase0({ order, onRefresh, showToast }) {
     ? Math.ceil((new Date(order.quote_expires_at) - new Date()) / 86400000)
     : null
 
+  async function downloadPDF() {
+    if (!window.jspdf) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+        s.onload = resolve; s.onerror = reject; document.head.appendChild(s)
+      })
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script')
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'
+        s.onload = resolve; s.onerror = reject; document.head.appendChild(s)
+      })
+    }
+    const { jsPDF } = window.jspdf
+    const doc = new jsPDF()
+    const brand = [26, 58, 42]
+
+    // Header
+    doc.setFillColor(...brand)
+    doc.rect(0, 0, 210, 36, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+    doc.text('EcoPro Kozijnen', 14, 16)
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+    doc.setTextColor(200, 220, 205)
+    doc.text('OFFERTE', 14, 24)
+    doc.text('info@ecoprokozijnen.nl  |  053 - 000 00 00', 14, 30)
+
+    // Klant
+    doc.setTextColor(30, 30, 30)
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold')
+    doc.text(order.customer_name, 14, 50)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
+    if (order.customer_address) doc.text(order.customer_address, 14, 57)
+
+    // Datum
+    doc.setFontSize(9); doc.setTextColor(100, 100, 100)
+    doc.text('Offertedatum:', 130, 50)
+    doc.setTextColor(30, 30, 30); doc.setFont('helvetica', 'bold')
+    doc.text(new Date(order.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }), 130, 56)
+    if (order.quote_expires_at) {
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
+      doc.text('Geldig tot:', 130, 64)
+      doc.setTextColor(30, 30, 30); doc.setFont('helvetica', 'bold')
+      doc.text(new Date(order.quote_expires_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }), 130, 70)
+    }
+
+    // Tabel
+    doc.autoTable({
+      startY: 78,
+      head: [['Omschrijving', 'Aantal', 'Stukprijs', 'Totaal']],
+      body: items.map(i => [i.description, String(i.quantity), '\u20ac ' + Number(i.unit_price).toLocaleString('nl-NL', { minimumFractionDigits: 2 }), '\u20ac ' + Number(i.unit_price * i.quantity).toLocaleString('nl-NL', { minimumFractionDigits: 2 })]),
+      headStyles: { fillColor: brand, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      alternateRowStyles: { fillColor: [245, 248, 246] },
+      columnStyles: { 0: { cellWidth: 95 }, 1: { halign: 'center', cellWidth: 20 }, 2: { halign: 'right', cellWidth: 35 }, 3: { halign: 'right', cellWidth: 35, fontStyle: 'bold' } },
+      margin: { left: 14, right: 14 },
+    })
+
+    // Totaal
+    const y = doc.lastAutoTable.finalY
+    doc.setFillColor(235, 242, 236)
+    doc.rect(14, y, 182, 10, 'F')
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...brand)
+    doc.text('Totaal incl. btw', 16, y + 7)
+    const tot = '\u20ac ' + Number(order.total_amount).toLocaleString('nl-NL', { minimumFractionDigits: 2 })
+    doc.text(tot, 196 - doc.getTextWidth(tot), y + 7)
+
+    // Betalingsschema
+    const y2 = y + 20
+    doc.setFillColor(250, 243, 232); doc.rect(14, y2, 182, 20, 'F')
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
+    doc.text('BETALINGSSCHEMA', 16, y2 + 7)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+    doc.text('20% aanbetaling bij akkoord: \u20ac ' + Number(order.total_amount * 0.2).toLocaleString('nl-NL', { minimumFractionDigits: 2 }), 16, y2 + 13)
+    doc.text('80% restbetaling na montage (optioneel 70% + 10%): \u20ac ' + Number(order.total_amount * 0.8).toLocaleString('nl-NL', { minimumFractionDigits: 2 }), 16, y2 + 18)
+
+    // Footer
+    doc.setFontSize(7); doc.setTextColor(150, 150, 150)
+    doc.text('EcoPro Kozijnen  \u00b7  info@ecoprokozijnen.nl  \u00b7  053 - 000 00 00', 14, 285)
+
+    doc.save('Offerte EcoPro Kozijnen - ' + order.customer_name + '.pdf')
+  }
+
+
   async function acceptQuote() {
     setAccepting(true)
     await supabase.from('orders').update({ phase: 1, quote_accepted_at: new Date().toISOString() }).eq('id', order.id)
