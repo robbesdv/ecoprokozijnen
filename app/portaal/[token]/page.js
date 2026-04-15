@@ -412,6 +412,7 @@ function Phase0({ order, onRefresh, showToast }) {
           )}
         </div>
       )}
+      <OrderFiles order={order} />
     </div>
   )
 }
@@ -487,6 +488,7 @@ function Phase2({ order }) {
       <div><h1 style={S.title}>Aanbetaling bevestigd</h1></div>
       <div className="notice notice-success">✓ &nbsp;Uw aanbetaling van <strong>{formatEuro(calcDeposit(order.total_amount))}</strong> is ontvangen. Wij bestellen uw kozijnen bij de fabriek.</div>
       <StatusTimeline phase={2} order={order} />
+      <OrderFiles order={order} />
     </div>
   )
 }
