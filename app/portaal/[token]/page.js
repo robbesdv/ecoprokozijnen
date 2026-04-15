@@ -313,6 +313,9 @@ function Phase0({ order, onRefresh, showToast }) {
           <button className="btn btn-ghost btn-full" onClick={() => setShowContact(v => !v)}>
             Vraag stellen of aanpassen
           </button>
+          <button className="btn btn-secondary btn-full" onClick={downloadPDF}>
+            📄 &nbsp;Offerte downloaden als PDF
+          </button>
           {showContact && (
             <div className="notice notice-info animate-fade">
               Neem contact op via{' '}
@@ -386,6 +389,7 @@ function Phase1({ order, onRefresh, showToast }) {
       ) : (
         <div className="notice notice-success">✓ &nbsp;Uw betaling is gemeld. Wij bevestigen de ontvangst zo spoedig mogelijk.</div>
       )}
+      <OrderFiles order={order} />
     </div>
   )
 }
@@ -723,38 +727,46 @@ function Phase7({ order }) {
         <a href="tel:+31530000000" className="btn btn-ghost" style={{ flex: 1 }}>📞 Bel ons</a>
         <a href="mailto:info@ecoprokozijnen.nl" className="btn btn-ghost" style={{ flex: 1 }}>✉ E-mail</a>
       </div>
+      <OrderFiles order={order} />
     </div>
   )
 }
 
 // ─── Status tijdlijn ──────────────────────────────────────────────────────────
 
+
 // ─── Bestanden component ─────────────────────────────────────────────────────
 
 function OrderFiles({ order }) {
   const files = (order.order_files || []).filter(f => f.file_url)
-  if (files.length === 0) return null
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontWeight: 600, fontSize: 15 }}>Documenten & foto's</div>
+        {files.length > 0 && <span className="badge badge-productie">{files.length}</span>}
       </div>
-      <div style={{ padding: '8px 0' }}>
-        {files.map((f, idx) => {
-          const isImage = f.file_type?.startsWith('image/')
-          return (
-            <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', textDecoration: 'none', borderBottom: idx < files.length - 1 ? '1px solid var(--border)' : 'none', background: idx % 2 === 0 ? 'white' : '#FAFAF9' }}>
-              <span style={{ fontSize: 22, flexShrink: 0 }}>{isImage ? '🖼' : '📄'}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--brand)' }}>{f.filename}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>Openen / downloaden</div>
-              </div>
-              <span style={{ fontSize: 18, color: 'var(--text-light)' }}>›</span>
-            </a>
-          )
-        })}
-      </div>
+      {files.length === 0 ? (
+        <div style={{ padding: '16px 20px', fontSize: 13, color: 'var(--text-light)', fontStyle: 'italic' }}>
+          Nog geen documenten toegevoegd door EcoPro Kozijnen.
+        </div>
+      ) : (
+        <div style={{ padding: '4px 0' }}>
+          {files.map((f, idx) => {
+            const isImage = f.file_type?.startsWith('image/')
+            return (
+              <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', textDecoration: 'none', borderBottom: idx < files.length - 1 ? '1px solid var(--border)' : 'none', background: idx % 2 === 0 ? 'white' : '#FAFAF9' }}>
+                <span style={{ fontSize: 22, flexShrink: 0 }}>{isImage ? '🖼' : '📄'}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--brand)' }}>{f.filename}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>Openen / downloaden</div>
+                </div>
+                <span style={{ fontSize: 18, color: 'var(--text-light)' }}>›</span>
+              </a>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
