@@ -1,0 +1,4 @@
+{
+  "/portaal/[token]/page": "app/portaal/[token]/page.js",
+  "/beheer/page": "app/beheer/page.js"
+}
