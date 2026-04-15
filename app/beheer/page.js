@@ -244,6 +244,8 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
   const [tab,              setTab]              = useState('order')
   const [copied,           setCopied]           = useState(false)
   const [uploadingFile,    setUploadingFile]    = useState(false)
+  const [confirmDelete,    setConfirmDelete]    = useState(false)
+  const [deleting,         setDeleting]         = useState(false)
 
   const baseUrl   = typeof window !== 'undefined' ? window.location.origin : ''
   const portalUrl = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/portaal/${order.portal_token}`
@@ -293,6 +295,22 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
     showToast(`${file.name} geüpload`)
     onUpdate()
     e.target.value = ''
+  }
+
+  async function deleteOrder() {
+    setDeleting(true)
+    // Verwijder storage bestanden
+    const filePaths = (order.order_files || []).map(f => f.storage_path).filter(Boolean)
+    if (filePaths.length > 0) {
+      await supabase.storage.from('order-files').remove(filePaths)
+    }
+    // Verwijder order (cascade verwijdert order_items, defects, order_files, status_history)
+    const { error } = await supabase.from('orders').delete().eq('id', order.id)
+    setDeleting(false)
+    if (error) { showToast('Fout bij verwijderen: ' + error.message, 'error'); return }
+    showToast('Order verwijderd')
+    onClose()
+    onUpdate()
   }
 
   async function deleteFile(fileId, filePath) {
@@ -456,10 +474,42 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
         )}
       </div>
 
-      <div style={{ padding: 16, borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ padding: 16, borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
           {saving ? 'Opslaan…' : 'Opslaan & klant notificeren'}
         </button>
+
+        {!confirmDelete ? (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-light)', padding: '4px 0', fontFamily: 'inherit' }}
+          >
+            Order verwijderen
+          </button>
+        ) : (
+          <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 8, padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500, margin: 0 }}>
+              Weet je zeker dat je deze order wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="btn btn-secondary btn-sm"
+                style={{ flex: 1 }}
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={deleteOrder}
+                disabled={deleting}
+                className="btn btn-danger btn-sm"
+                style={{ flex: 1 }}
+              >
+                {deleting ? 'Verwijderen…' : 'Ja, verwijderen'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
