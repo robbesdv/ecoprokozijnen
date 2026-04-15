@@ -22,7 +22,7 @@ export default function PortaalPage({ params: paramsPromise }) {
   async function loadOrder() {
     const { data } = await supabase
       .from('orders')
-      .select('*, order_items(*), defects(*)')
+      .select('*, order_items(*), defects(*), order_files(*)')
       .eq('portal_token', token)
       .single()
     setLoading(false)
@@ -34,7 +34,7 @@ export default function PortaalPage({ params: paramsPromise }) {
   async function refresh() {
     const { data } = await supabase
       .from('orders')
-      .select('*, order_items(*), defects(*)')
+      .select('*, order_items(*), defects(*), order_files(*)')
       .eq('portal_token', token)
       .single()
     if (data) setOrder(data)
@@ -418,6 +418,7 @@ function Phase3({ order }) {
         </div>
       )}
       <StatusTimeline phase={3} order={order} />
+      <OrderFiles order={order} />
       <div className="notice notice-info">
         De gemiddelde productietijd is 7–8 weken. Wij nemen contact met u op zodra uw kozijnen geleverd zijn om een montagedatum in te plannen.
       </div>
@@ -433,6 +434,7 @@ function Phase4({ order }) {
       <div><h1 style={S.title}>Kozijnen geleverd</h1></div>
       <div className="notice notice-success">✓ &nbsp;Uw kozijnen zijn bij ons ontvangen en gecontroleerd. Wij nemen contact met u op voor de montagedatum.</div>
       <StatusTimeline phase={4} order={order} />
+      <OrderFiles order={order} />
     </div>
   )
 }
@@ -468,6 +470,7 @@ function Phase5({ order }) {
       )}
 
       <StatusTimeline phase={5} order={order} />
+      <OrderFiles order={order} />
     </div>
   )
 }
@@ -725,6 +728,36 @@ function Phase7({ order }) {
 }
 
 // ─── Status tijdlijn ──────────────────────────────────────────────────────────
+
+// ─── Bestanden component ─────────────────────────────────────────────────────
+
+function OrderFiles({ order }) {
+  const files = (order.order_files || []).filter(f => f.file_url)
+  if (files.length === 0) return null
+  return (
+    <div className="card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>Documenten & foto's</div>
+      </div>
+      <div style={{ padding: '8px 0' }}>
+        {files.map((f, idx) => {
+          const isImage = f.file_type?.startsWith('image/')
+          return (
+            <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', textDecoration: 'none', borderBottom: idx < files.length - 1 ? '1px solid var(--border)' : 'none', background: idx % 2 === 0 ? 'white' : '#FAFAF9' }}>
+              <span style={{ fontSize: 22, flexShrink: 0 }}>{isImage ? '🖼' : '📄'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--brand)' }}>{f.filename}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>Openen / downloaden</div>
+              </div>
+              <span style={{ fontSize: 18, color: 'var(--text-light)' }}>›</span>
+            </a>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
 
 function StatusTimeline({ phase, order }) {
   const steps = [
