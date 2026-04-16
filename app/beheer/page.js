@@ -13,7 +13,8 @@ async function notifyCustomer(order, type, extra = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ order, type, extra }),
     })
-    const data = await res.json()
+    const text = await res.text()
+    const data = text ? JSON.parse(text) : {}
     if (!res.ok) throw new Error(data.error || 'Onbekende fout')
     return { success: true }
   } catch (err) {
@@ -501,6 +502,13 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
             <InfoRow label="Adres"      value={order.customer_address || '—'} />
             <InfoRow label="Totaal"     value={<strong>{formatEuro(order.total_amount)}</strong>} />
             <InfoRow label="Aangemaakt" value={formatDate(order.created_at)} />
+            {order.signature_name && (
+              <div style={{ margin: '8px 0', padding: '10px 14px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>✓ Digitaal ondertekend</div>
+                <div style={{ fontSize: 15, fontFamily: 'Georgia, serif', color: 'var(--text)', letterSpacing: '0.02em' }}>{order.signature_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{formatDate(order.signature_at)}</div>
+              </div>
+            )}
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <a href={`mailto:${order.customer_email}`} className="btn btn-secondary btn-full" style={{ textDecoration: 'none' }}>✉ E-mail sturen</a>
               {order.customer_phone && <a href={`tel:${order.customer_phone}`} className="btn btn-secondary btn-full" style={{ textDecoration: 'none' }}>📞 Bellen</a>}
@@ -532,7 +540,8 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 }
 
 function NewOrderModal({ onClose, onCreated, showToast }) {
-  const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', quote_expires_at: '' })
+  const defaultExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', quote_expires_at: defaultExpiry })
   const [addr, setAddr] = useState({ street: '', number: '', postcode: '', city: '' })
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: '', sort_order: 0 }])
   const [files, setFiles] = useState([])
