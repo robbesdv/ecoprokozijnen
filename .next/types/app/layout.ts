@@ -1,4 +1,4 @@
-// File: C:\Users\robbe\Desktop\ecoprokozijnen\app\layout.js
+// File: C:\Users\HP\Desktop\EcoPro Dashboard\app\layout.js
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

@@ -1,4 +1,4 @@
-// File: C:\Users\robbe\Desktop\ecoprokozijnen\app\beheer\page.js
+// File: C:\Users\HP\Desktop\EcoPro Dashboard\app\beheer\page.js
 import * as entry from '../../../../app/beheer/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
