@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Afzender — verander naar info@ecoprokozijnen.nl zodra domein geverifieerd is
-const FROM = 'EcoPro Kozijnen <onboarding@resend.dev>'
+const FROM = 'EcoPro Kozijnen <onboarding@resend.dev>' // Wijzig naar info@ecoprokozijnen.nl na domeinverificatie
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app'
 
 // ─── E-mail templates per type ────────────────────────────────────────────────
@@ -178,7 +178,7 @@ function wrapEmail(body) {
           <p style="margin:0; font-size:12px; color:#9CA3AF; text-align:center;">
             EcoPro Kozijnen &nbsp;·&nbsp; 
             <a href="mailto:info@ecoprokozijnen.nl" style="color:#6B7280;">info@ecoprokozijnen.nl</a> &nbsp;·&nbsp; 
-            053 - 000 00 00
+            085 049 24 56
           </p>
           <p style="margin:8px 0 0; font-size:11px; color:#D1D5DB; text-align:center;">
             U ontvangt deze e-mail omdat u een order heeft bij EcoPro Kozijnen.
@@ -216,12 +216,17 @@ export async function POST(request) {
       return Response.json({ error: `Onbekend type: ${type}` }, { status: 400 })
     }
 
+    console.log('Sending email to:', order.customer_email, 'type:', type, 'from:', FROM)
+    console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY)
+
     const { data, error } = await resend.emails.send({
       from: FROM,
       to: order.customer_email,
       subject: template.subject,
       html: wrapEmail(template.body),
     })
+
+    console.log('Resend response - data:', JSON.stringify(data), 'error:', JSON.stringify(error))
 
     if (error) {
       console.error('Resend fout:', error)
