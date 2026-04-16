@@ -4,6 +4,29 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PHASES, getPhase, formatEuro, formatDate, formatDateShort, calcDeposit } from '@/lib/phases'
 
+// ─── E-mail notificaties ──────────────────────────────────────────────────────
+
+async function notifyCustomer(order, type, extra = {}) {
+  try {
+    const res = await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order, type, extra }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Onbekende fout')
+    return { success: true }
+  } catch (err) {
+    console.error('Notificatie fout:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+function getNotifyTypeForPhase(phase) {
+  const map = { 2: 'aanbetaling_bevestigd', 5: 'montage_gepland', 6: 'montage_klaar', 7: 'compleet' }
+  return map[phase] || 'status_update'
+}
+
 function PhaseBadge({ phase }) {
   const p = getPhase(phase)
   return <span className={`badge ${p.badgeClass}`}>{p.adminLabel}</span>
@@ -95,8 +118,6 @@ export default function BeheerPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
-
-      {/* Header */}
       <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
           <div>
@@ -107,13 +128,12 @@ export default function BeheerPage() {
         </div>
       </header>
 
-      {/* Statistieken */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         {[
-          { label: 'Actieve orders',     value: stats.actief,            onClick: () => { setFilterPhase(null); setFilterUrgent(false) } },
-          { label: 'Actie vereist',      value: stats.urgent,            warn: stats.urgent > 0,    onClick: () => setFilterUrgent(u => !u) },
-          { label: 'Montage inplannen',  value: stats.inplannen,         warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
-          { label: 'Openstaande omzet',  value: formatEuro(stats.omzet), isText: true },
+          { label: 'Actieve orders',    value: stats.actief,            onClick: () => { setFilterPhase(null); setFilterUrgent(false) } },
+          { label: 'Actie vereist',     value: stats.urgent,            warn: stats.urgent > 0,    onClick: () => setFilterUrgent(u => !u) },
+          { label: 'Montage inplannen', value: stats.inplannen,         warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
+          { label: 'Openstaande omzet', value: formatEuro(stats.omzet), isText: true },
         ].map(s => (
           <div key={s.label} onClick={s.onClick}
             style={{ padding: '14px 20px', borderRight: '1px solid var(--border)', cursor: s.onClick ? 'pointer' : 'default', transition: 'background 0.1s' }}
@@ -126,7 +146,6 @@ export default function BeheerPage() {
         ))}
       </div>
 
-      {/* Zoek + filter */}
       <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 14 }}>🔍</span>
@@ -150,10 +169,8 @@ export default function BeheerPage() {
         <span style={{ fontSize: 12, color: 'var(--text-light)', flexShrink: 0 }}>{visible.length} orders</span>
       </div>
 
-      {/* Lijst + detail */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
-          {/* Kolomkoppen */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 1.2fr 0.9fr 0.8fr 36px', padding: '7px 24px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
             {[
               { label: 'Klant', key: 'customer_name' }, { label: 'Fase', key: 'phase' },
@@ -229,8 +246,6 @@ export default function BeheerPage() {
   )
 }
 
-// ─── Detail paneel ────────────────────────────────────────────────────────────
-
 function DetailPanel({ order, onClose, onUpdate, showToast }) {
   const [phase,            setPhase]           = useState(order.phase)
   const [paymentSplit,     setPaymentSplit]     = useState(order.payment_split)
@@ -273,25 +288,53 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
       await supabase.from('status_history').insert({ order_id: order.id, from_phase: order.phase, to_phase: phase, changed_by: 'beheer' })
     }
     setSaving(false)
-    if (error) showToast('Fout: ' + error.message, 'error')
-    else { showToast('Opgeslagen'); onUpdate() }
+    if (error) {
+      showToast('Fout: ' + error.message, 'error')
+    } else {
+      if (phase !== order.phase) {
+        const type = getNotifyTypeForPhase(phase)
+        const phaseLabel = PHASES.find(p => p.id === phase)?.adminLabel || ''
+        const extra = {
+          phaseLabel,
+          installDate: installDate ? new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : null,
+        }
+        notifyCustomer(order, type, extra).then(r => {
+          if (!r.success) console.warn('E-mail niet verzonden:', r.error)
+        })
+      }
+      if (mainConf && !order.main_payment_confirmed) {
+        notifyCustomer(order, 'betaling_bevestigd', { amount: order.total_amount * (paymentSplit === 'split_70_10' ? 0.7 : 0.8), final: false })
+      }
+      if (finalConf && !order.final_payment_confirmed) {
+        notifyCustomer(order, 'betaling_bevestigd', { amount: order.total_amount * 0.1, final: true })
+      }
+      showToast('Opgeslagen & klant genotificeerd')
+      onUpdate()
+    }
   }
 
   async function resolveDefect(id) {
+    const defect = (order.defects || []).find(d => d.id === id)
     await supabase.from('defects').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id)
-    onUpdate(); showToast('Bevinding opgelost')
+    const remainingOpen = (order.defects || []).filter(d => d.id !== id && d.status === 'open').length
+    notifyCustomer(order, 'bevinding_opgelost', { defect: defect?.description || '', allResolved: remainingOpen === 0 })
+    onUpdate(); showToast('Bevinding opgelost & klant genotificeerd')
   }
 
   async function uploadFile(e) {
     const file = e.target.files[0]
     if (!file) return
     setUploadingFile(true)
-    const path = `${order.id}/${Date.now()}-${file.name}`
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${order.id}/${Date.now()}-${safeName}`
     const { error: upErr } = await supabase.storage.from('order-files').upload(path, file)
     if (upErr) { showToast('Upload mislukt: ' + upErr.message, 'error'); setUploadingFile(false); return }
     const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-    await supabase.from('order_files').insert({ order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type })
+    const { error: insertErr } = await supabase.from('order_files').insert({
+      order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type || 'application/octet-stream',
+    })
     setUploadingFile(false)
+    if (insertErr) { showToast('DB fout: ' + insertErr.message, 'error'); return }
     showToast(`${file.name} geüpload`)
     onUpdate()
     e.target.value = ''
@@ -299,18 +342,13 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 
   async function deleteOrder() {
     setDeleting(true)
-    // Verwijder storage bestanden
     const filePaths = (order.order_files || []).map(f => f.storage_path).filter(Boolean)
-    if (filePaths.length > 0) {
-      await supabase.storage.from('order-files').remove(filePaths)
-    }
-    // Verwijder order (cascade verwijdert order_items, defects, order_files, status_history)
+    if (filePaths.length > 0) await supabase.storage.from('order-files').remove(filePaths)
     const { error } = await supabase.from('orders').delete().eq('id', order.id)
     setDeleting(false)
     if (error) { showToast('Fout bij verwijderen: ' + error.message, 'error'); return }
     showToast('Order verwijderd')
-    onClose()
-    onUpdate()
+    onClose(); onUpdate()
   }
 
   async function deleteFile(fileId, filePath) {
@@ -355,7 +393,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
               <select value={phase} onChange={e => setPhase(Number(e.target.value))}>
                 {PHASES.map(p => <option key={p.id} value={p.id}>{p.id}. {p.adminLabel}</option>)}
               </select>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>De klant ziet de update direct in het portaal.</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>De klant ziet de update direct in het portaal én ontvangt een e-mail.</p>
             </Section>
             <Section title="Verwachte levering fabriek">
               <input type="date" value={deliveryExpected} onChange={e => setDeliveryExpected(e.target.value)} />
@@ -430,18 +468,15 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 
         {tab === 'bestanden' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Upload knop */}
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', border: '2px dashed var(--border)', borderRadius: 10, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)'; e.currentTarget.style.background = 'var(--brand-muted)' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'white' }}>
               <input type="file" onChange={uploadFile} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx" />
               {uploadingFile ? '⏳ Uploaden…' : '📎 Bestand of foto toevoegen'}
             </label>
-
             {files.length === 0 && !uploadingFile && (
               <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>Nog geen bestanden toegevoegd.</p>
             )}
-
             {files.map(f => {
               const isImage = f.file_type?.startsWith('image/')
               return (
@@ -478,35 +513,16 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
         <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
           {saving ? 'Opslaan…' : 'Opslaan & klant notificeren'}
         </button>
-
         {!confirmDelete ? (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-light)', padding: '4px 0', fontFamily: 'inherit' }}
-          >
+          <button onClick={() => setConfirmDelete(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-light)', padding: '4px 0', fontFamily: 'inherit' }}>
             Order verwijderen
           </button>
         ) : (
           <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 8, padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <p style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500, margin: 0 }}>
-              Weet je zeker dat je deze order wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
-            </p>
+            <p style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500, margin: 0 }}>Weet je zeker dat je deze order wilt verwijderen? Dit kan niet ongedaan worden gemaakt.</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="btn btn-secondary btn-sm"
-                style={{ flex: 1 }}
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={deleteOrder}
-                disabled={deleting}
-                className="btn btn-danger btn-sm"
-                style={{ flex: 1 }}
-              >
-                {deleting ? 'Verwijderen…' : 'Ja, verwijderen'}
-              </button>
+              <button onClick={() => setConfirmDelete(false)} className="btn btn-secondary btn-sm" style={{ flex: 1 }}>Annuleren</button>
+              <button onClick={deleteOrder} disabled={deleting} className="btn btn-danger btn-sm" style={{ flex: 1 }}>{deleting ? 'Verwijderen…' : 'Ja, verwijderen'}</button>
             </div>
           </div>
         )}
@@ -515,13 +531,11 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
   )
 }
 
-// ─── Nieuw order modal ────────────────────────────────────────────────────────
-
 function NewOrderModal({ onClose, onCreated, showToast }) {
   const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', quote_expires_at: '' })
   const [addr, setAddr] = useState({ street: '', number: '', postcode: '', city: '' })
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: '', sort_order: 0 }])
-  const [files, setFiles] = useState([])  // File objecten, nog niet geüpload
+  const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
 
   const total = items.reduce((s, i) => s + ((parseFloat(i.unit_price) || 0) * (parseInt(i.quantity) || 0)), 0)
@@ -546,23 +560,28 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
 
     if (error) { showToast('Fout: ' + error.message, 'error'); setSaving(false); return }
 
-    // Offerteregels opslaan
     const validItems = items.filter(i => i.description && i.unit_price).map((i, idx) => ({
       order_id: order.id, description: i.description, quantity: parseInt(i.quantity) || 1, unit_price: parseFloat(i.unit_price), sort_order: idx,
     }))
     if (validItems.length) await supabase.from('order_items').insert(validItems)
 
-    // Bestanden uploaden
     for (const file of files) {
-      const path = `${order.id}/${Date.now()}-${file.name}`
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${order.id}/${Date.now()}-${safeName}`
       const { error: upErr } = await supabase.storage.from('order-files').upload(path, file)
       if (!upErr) {
         const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-        await supabase.from('order_files').insert({ order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type })
+        const { error: dbErr } = await supabase.from('order_files').insert({
+          order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type || 'application/octet-stream',
+        })
+        if (dbErr) console.error('order_files insert fout:', dbErr.message)
       }
     }
 
     await supabase.from('status_history').insert({ order_id: order.id, to_phase: 0, note: 'Order aangemaakt', changed_by: 'beheer' })
+    notifyCustomer(order, 'nieuwe_offerte').then(r => {
+      if (!r.success) console.warn('Offerte e-mail niet verzonden:', r.error)
+    })
     setSaving(false)
     onCreated(order)
   }
@@ -570,16 +589,12 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
       <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '92vh', overflow: 'auto', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}>
-
-        {/* Header */}
         <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 17 }}>Nieuwe order</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--text-light)', lineHeight: 1 }}>✕</button>
         </div>
 
         <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Klantgegevens */}
           <Section title="Klantgegevens">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div><label>Naam *</label><input type="text" value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))} placeholder="Familie de Vries" /></div>
@@ -589,7 +604,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
             </div>
           </Section>
 
-          {/* Adres */}
           <Section title="Adres">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10, marginBottom: 10 }}>
               <div><label>Straat</label><input type="text" value={addr.street} onChange={e => setAddr(p => ({ ...p, street: e.target.value }))} placeholder="Gronausestraat" /></div>
@@ -602,7 +616,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
             {fullAddress && <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>📍 {fullAddress}</p>}
           </Section>
 
-          {/* Offerteregels */}
           <Section title="Offerteregels">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 100px 28px', gap: 6, marginBottom: 8 }}>
               {['Omschrijving', 'Aantal', 'Stukprijs', ''].map(h => (
@@ -625,7 +638,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
             {total > 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Aanbetaling 20%: <strong>{formatEuro(total * 0.2)}</strong></p>}
           </Section>
 
-          {/* Foto's & bestanden */}
           <Section title="Foto's & bestanden (optioneel)">
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', border: '2px dashed var(--border)', borderRadius: 10, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, transition: 'all 0.15s', marginBottom: 10 }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)'; e.currentTarget.style.background = 'var(--brand-muted)' }}
@@ -645,11 +657,10 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
                 ))}
               </div>
             )}
-            <p style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 8 }}>Afbeeldingen, PDF's of Word-bestanden. Worden geüpload na aanmaken.</p>
+            <p style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 8 }}>Afbeeldingen, PDF's of Word-bestanden.</p>
           </Section>
         </div>
 
-        {/* Footer */}
         <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, position: 'sticky', bottom: 0, background: 'white' }}>
           <button className="btn btn-secondary" onClick={onClose}>Annuleren</button>
           <button className="btn btn-primary" onClick={submit} disabled={saving}>
@@ -660,8 +671,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
     </div>
   )
 }
-
-// ─── Hulpcomponenten ──────────────────────────────────────────────────────────
 
 function Section({ title, children }) {
   return (
