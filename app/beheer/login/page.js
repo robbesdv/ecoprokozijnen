@@ -1,158 +1,242 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { formatEuro } from '@/lib/phases'
+import Link from 'next/link'
 
-export default function LoginPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
-  const router = useRouter()
+export default function RapportagePage() {
+  const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [year, setYear] = useState(new Date().getFullYear())
 
-  async function handleLogin(e) {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  useEffect(() => {
+    supabase
+      .from('orders')
+      .select('*')
+      .then(({ data }) => {
+        setOrders(data || [])
+        setLoading(false)
+      })
+  }, [])
 
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+  // ── Berekeningen ─────────────────────────────────────────────────────────
+
+  const MAANDEN = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
+
+  // Omzet per maand (op basis van aanmaakdatum)
+  const omzetPerMaand = MAANDEN.map((_, idx) => {
+    const maandOrders = orders.filter(o => {
+      const d = new Date(o.created_at)
+      return d.getFullYear() === year && d.getMonth() === idx
     })
-
-    if (res.ok) {
-      router.push('/beheer')
-      router.refresh()
-    } else {
-      const data = await res.json()
-      setError(data.error || 'Inloggen mislukt')
-      setLoading(false)
+    return {
+      label: MAANDEN[idx],
+      omzet: maandOrders.reduce((s, o) => s + (o.total_amount || 0), 0),
+      aantal: maandOrders.length,
     }
-  }
+  })
+
+  const maxOmzet = Math.max(...omzetPerMaand.map(m => m.omzet), 1)
+
+  // Totalen
+  const totaalOmzet     = orders.filter(o => new Date(o.created_at).getFullYear() === year).reduce((s, o) => s + (o.total_amount || 0), 0)
+  const totaalOffertes  = orders.filter(o => new Date(o.created_at).getFullYear() === year).length
+  const geaccordeerd    = orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase >= 1).length
+  const conversie       = totaalOffertes > 0 ? Math.round((geaccordeerd / totaalOffertes) * 100) : 0
+
+  // Openstaande betalingen
+  const openAanbetaling = orders.filter(o => o.phase >= 1 && !o.deposit_confirmed)
+  const openRestbetaling = orders.filter(o => o.phase >= 6 && !o.main_payment_confirmed)
+  const openSlot         = orders.filter(o => o.payment_split === 'split_70_10' && o.main_payment_confirmed && !o.final_payment_confirmed)
+
+  const totaalOpenstaand = [
+    ...openAanbetaling.map(o => o.total_amount * 0.2),
+    ...openRestbetaling.map(o => o.total_amount * (o.payment_split === 'split_70_10' ? 0.7 : 0.8)),
+    ...openSlot.map(o => o.total_amount * 0.1),
+  ].reduce((s, v) => s + v, 0)
+
+  // Recent (laatste 5 orders)
+  const recent = [...orders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5)
+
+  const beschikbareJaren = [...new Set(orders.map(o => new Date(o.created_at).getFullYear()))].sort((a, b) => b - a)
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)' }}>
+      Laden…
+    </div>
+  )
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: '#1A3A2A',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 20,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif',
-    }}>
-      <div style={{
-        position: 'fixed', inset: 0, zIndex: 0,
-        backgroundImage: `radial-gradient(circle at 20% 20%, rgba(200,169,110,0.08) 0%, transparent 50%),
-                          radial-gradient(circle at 80% 80%, rgba(255,255,255,0.03) 0%, transparent 50%)`,
-        pointerEvents: 'none',
-      }} />
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
 
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 380 }}>
+      {/* Header */}
+      <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Link href="/beheer" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+              ← Dashboard
+            </Link>
+            <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 16 }}>|</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
+              <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>Rapportage</span>
+            </div>
+          </div>
+          <select
+            value={year}
+            onChange={e => setYear(Number(e.target.value))}
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', width: 'auto' }}
+          >
+            {beschikbareJaren.map(y => <option key={y} value={y} style={{ color: 'black', background: 'white' }}>{y}</option>)}
+            {!beschikbareJaren.includes(year) && <option value={year} style={{ color: 'black', background: 'white' }}>{year}</option>}
+          </select>
+        </div>
+      </header>
 
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <img
-            src="/Logo_Vector_png_Dash.png"
-            alt="EcoPro Kozijnen"
-            style={{ width: 100, height: 100, objectFit: 'contain', margin: '0 auto 16px', display: 'block', background: 'white', borderRadius: 16, padding: 8 }}
-          />
-          <h1 style={{ color: 'white', fontSize: 22, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em' }}>
-            EcoPro Kozijnen
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-            Beheerdashboard
-          </p>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px' }}>
+
+        {/* KPI kaarten */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+          {[
+            { label: 'Totale omzet', value: formatEuro(totaalOmzet), sub: `${year}`, color: 'var(--brand)' },
+            { label: 'Offertes verstuurd', value: totaalOffertes, sub: `in ${year}` },
+            { label: 'Conversie', value: `${conversie}%`, sub: `${geaccordeerd} van ${totaalOffertes} geaccordeerd`, color: conversie >= 50 ? 'var(--success)' : 'var(--warn)' },
+            { label: 'Openstaand', value: formatEuro(totaalOpenstaand), sub: `${openAanbetaling.length + openRestbetaling.length + openSlot.length} betalingen`, color: totaalOpenstaand > 0 ? 'var(--warn)' : 'var(--success)' },
+          ].map(k => (
+            <div key={k.label} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{k.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: k.color || 'var(--text)', letterSpacing: '-0.02em' }}>{k.value}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{k.sub}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Kaart */}
-        <div style={{ background: 'white', borderRadius: 18, padding: '32px 28px', boxShadow: '0 32px 64px rgba(0,0,0,0.25)' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 6px', color: '#111827' }}>Inloggen</h2>
-          <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 24px' }}>Alleen toegankelijk voor EcoPro medewerkers</p>
+        {/* Omzet grafiek */}
+        <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', marginBottom: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Omzet per maand</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{year}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 160 }}>
+            {omzetPerMaand.map((m, idx) => {
+              const hoogte = m.omzet > 0 ? Math.max((m.omzet / maxOmzet) * 140, 4) : 0
+              const isHuidigeMaand = new Date().getMonth() === idx && new Date().getFullYear() === year
+              return (
+                <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  {m.omzet > 0 && (
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                      {formatEuro(m.omzet).replace('€\u00a0', '€').replace(',00', '')}
+                    </div>
+                  )}
+                  <div style={{
+                    width: '100%', height: hoogte || 3,
+                    background: isHuidigeMaand ? 'var(--brand)' : hoogte > 0 ? 'var(--brand-muted)' : '#F3F4F6',
+                    borderRadius: '4px 4px 0 0',
+                    border: isHuidigeMaand ? 'none' : hoogte > 0 ? '1px solid var(--brand-border)' : 'none',
+                    transition: 'height 0.3s',
+                    cursor: m.omzet > 0 ? 'default' : 'default',
+                  }} title={`${m.label}: ${formatEuro(m.omzet)}`} />
+                  <div style={{ fontSize: 10, color: isHuidigeMaand ? 'var(--brand)' : 'var(--text-muted)', fontWeight: isHuidigeMaand ? 700 : 400 }}>{m.label}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Twee kolommen: openstaand + funnnel */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Gebruikersnaam
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="Gebruikersnaam"
-                autoComplete="username"
-                autoFocus
-                required
-                style={{
-                  width: '100%', padding: '11px 14px', boxSizing: 'border-box',
-                  border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 15,
-                  fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s',
-                }}
-                onFocus={e => { e.target.style.borderColor = '#1A3A2A'; e.target.style.boxShadow = '0 0 0 3px rgba(26,58,42,0.1)' }}
-                onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Wachtwoord
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                required
-                style={{
-                  width: '100%', padding: '11px 14px', boxSizing: 'border-box',
-                  border: '1.5px solid #E5E7EB', borderRadius: 10, fontSize: 15,
-                  fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s',
-                }}
-                onFocus={e => { e.target.style.borderColor = '#1A3A2A'; e.target.style.boxShadow = '0 0 0 3px rgba(26,58,42,0.1)' }}
-                onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = 'none' }}
-              />
-            </div>
-
-            {error && (
-              <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#DC2626', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ flexShrink: 0 }}>✕</span> {error}
-              </div>
+          {/* Openstaande betalingen */}
+          <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Openstaande betalingen</div>
+            {openAanbetaling.length === 0 && openRestbetaling.length === 0 && openSlot.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>✓ Alles betaald</p>
+            ) : (
+              <>
+                {openAanbetaling.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Aanbetaling (20%)</div>
+                    {openAanbetaling.map(o => (
+                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
+                        <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * 0.2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {openRestbetaling.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Restbetaling</div>
+                    {openRestbetaling.map(o => (
+                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
+                        <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * (o.payment_split === 'split_70_10' ? 0.7 : 0.8))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {openSlot.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Slotbetaling (10%)</div>
+                    {openSlot.map(o => (
+                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
+                        <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * 0.1)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '2px solid var(--border)', fontWeight: 700 }}>
+                  <span>Totaal openstaand</span>
+                  <span style={{ color: 'var(--warn)' }}>{formatEuro(totaalOpenstaand)}</span>
+                </div>
+              </>
             )}
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading || !username || !password}
-              style={{
-                width: '100%', padding: '13px', marginTop: 4,
-                background: '#1A3A2A', color: 'white',
-                border: 'none', borderRadius: 10,
-                fontSize: 15, fontWeight: 600,
-                cursor: loading || !username || !password ? 'not-allowed' : 'pointer',
-                opacity: !username || !password ? 0.6 : 1,
-                transition: 'all 0.15s', fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-              onMouseEnter={e => { if (!loading && username && password) e.currentTarget.style.background = '#2D5C42' }}
-              onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#1A3A2A' }}
-            >
-              {loading ? (
-                <>
-                  <span style={{ width: 16, height: 16, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
-                  Inloggen…
-                </>
-              ) : 'Inloggen →'}
-            </button>
-          </form>
+          {/* Conversie funnel */}
+          <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Offerte funnel</div>
+            {[
+              { label: 'Offertes verstuurd', count: totaalOffertes, color: '#E5E7EB', pct: 100 },
+              { label: 'Geaccordeerd',       count: geaccordeerd, color: 'var(--brand-muted)', pct: totaalOffertes > 0 ? (geaccordeerd / totaalOffertes) * 100 : 0 },
+              { label: 'Aanbetaling ontvangen', count: orders.filter(o => new Date(o.created_at).getFullYear() === year && o.deposit_confirmed).length, color: '#C8E6C9', pct: totaalOffertes > 0 ? (orders.filter(o => new Date(o.created_at).getFullYear() === year && o.deposit_confirmed).length / totaalOffertes) * 100 : 0 },
+              { label: 'Volledig afgerond',  count: orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase === 7).length, color: 'var(--success-bg)', pct: totaalOffertes > 0 ? (orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase === 7).length / totaalOffertes) * 100 : 0 },
+            ].map((s, idx) => (
+              <div key={s.label} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>{s.label}</span>
+                  <span style={{ fontWeight: 600 }}>{s.count}</span>
+                </div>
+                <div style={{ background: '#F3F4F6', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                  <div style={{ width: `${s.pct}%`, height: '100%', background: idx === 0 ? '#D1D5DB' : 'var(--brand)', borderRadius: 4, transition: 'width 0.5s' }} />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <p style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
-          EcoPro Kozijnen B.V. · Plataanstraat 20H, Enschede
-        </p>
-      </div>
+        {/* Recente orders */}
+        <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Recente orders</div>
+          {recent.map((o, idx) => (
+            <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: idx < recent.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>{o.customer_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{o.customer_address}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 600 }}>{formatEuro(o.total_amount)}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {new Date(o.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
     </div>
   )
 }

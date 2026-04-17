@@ -128,7 +128,7 @@ export default function BeheerPage() {
       <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/Logo_Vector_png_Dash.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
+            <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
             <div>
               <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
               <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
