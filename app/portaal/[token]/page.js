@@ -258,15 +258,15 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.setFillColor(...gold)
     doc.rect(0, 40, W, 2, 'F')
 
-    // Logo
+    // Logo (klein, rechts uitgelijnd)
     try {
-      doc.addImage(LOGO_BASE64, 'PNG', M, 5, 28, 28)
+      doc.addImage(LOGO_BASE64, 'PNG', W - M - 28, 7, 22, 22)
     } catch(e) {}
 
-    // Bedrijfsnaam (rechts van logo)
+    // Bedrijfsnaam links
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(18); doc.setFont('helvetica', 'bold')
-    doc.text('EcoPro Kozijnen', M + 33, 17)
+    doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+    doc.text('EcoPro Kozijnen', M, 18)
 
     // Subtitel
     doc.setFontSize(8); doc.setFont('helvetica', 'normal')
