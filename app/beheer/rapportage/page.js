@@ -68,23 +68,27 @@ export default function RapportagePage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
 
       {/* Header */}
-      <header style={{ background: 'var(--brand)', color: 'white', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Link href="/beheer" style={{ color: 'rgba(255,255,255,0.6)', textDecoration: 'none', fontSize: 13 }}>← Dashboard</Link>
-          <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>Rapportage</span>
+      <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Link href="/beheer" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+              ← Dashboard
+            </Link>
+            <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 16 }}>|</span>
+            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>Rapportage</span>
+          </div>
+          <select
+            value={year}
+            onChange={e => setYear(Number(e.target.value))}
+            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            {beschikbareJaren.map(y => <option key={y} value={y} style={{ color: 'black', background: 'white' }}>{y}</option>)}
+            {!beschikbareJaren.includes(year) && <option value={year} style={{ color: 'black', background: 'white' }}>{year}</option>}
+          </select>
         </div>
-        <select
-          value={year}
-          onChange={e => setYear(Number(e.target.value))}
-          style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '5px 10px', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}
-        >
-          {beschikbareJaren.map(y => <option key={y} value={y} style={{ color: 'black', background: 'white' }}>{y}</option>)}
-          {!beschikbareJaren.includes(year) && <option value={year} style={{ color: 'black', background: 'white' }}>{year}</option>}
-        </select>
       </header>
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px' }}>
