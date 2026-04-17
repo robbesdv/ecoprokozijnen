@@ -80,6 +80,11 @@ export default function BeheerPage() {
     setTimeout(() => setToast(null), 3500)
   }
 
+  async function logout() {
+    await fetch('/api/login', { method: 'DELETE' })
+    window.location.href = '/beheer/login'
+  }
+
   const stats = {
     actief:    orders.filter(o => o.phase < 7).length,
     urgent:    orders.filter(o => o.phase < 7 && getPhase(o.phase).actionNeeded(o)).length,
@@ -125,7 +130,16 @@ export default function BeheerPage() {
             <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
             <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
           </div>
-          <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)}>+ Nieuwe order</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)}>+ Nieuwe order</button>
+            <button
+              onClick={logout}
+              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+              title="Uitloggen"
+            >
+              Uitloggen
+            </button>
+          </div>
         </div>
       </header>
 
