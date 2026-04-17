@@ -53,9 +53,9 @@ export default function LoginPage() {
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <img
-            src="/Beeldmerk_Vector_BGWIT.png"
+            src="/Logo_Vector_png_Dash.png"
             alt="EcoPro Kozijnen"
-            style={{ width: 80, height: 80, objectFit: 'contain', margin: '0 auto 16px', display: 'block' }}
+            style={{ width: 100, height: 100, objectFit: 'contain', margin: '0 auto 16px', display: 'block', background: 'white', borderRadius: 16, padding: 8 }}
           />
           <h1 style={{ color: 'white', fontSize: 22, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em' }}>
             EcoPro Kozijnen

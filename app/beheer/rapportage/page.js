@@ -79,7 +79,7 @@ export default function RapportagePage() {
             </Link>
             <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 16 }}>|</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src="/Beeldmerk_Vector_BGWIT.png" alt="EcoPro" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+              <img src="/Logo_Vector_png_Dash.png" alt="EcoPro" style={{ width: 34, height: 34, objectFit: 'contain', mixBlendMode: 'multiply', background: 'white', borderRadius: 8, padding: 2 }} />
               <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>Rapportage</span>
             </div>
           </div>
