@@ -63,7 +63,7 @@ export default function PortaalPage({ params: paramsPromise }) {
         <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 24 }}>
           Deze portaallink is ongeldig of verlopen. Neem contact op met EcoPro Kozijnen voor een nieuwe link.
         </p>
-        <a href="tel:+31530000000" className="btn btn-primary btn-lg btn-full" style={{ marginBottom: 10 }}>
+        <a href="tel:+31850492456" className="btn btn-primary btn-lg btn-full" style={{ marginBottom: 10 }}>
           📞 Bel ons
         </a>
         <a href="mailto:info@ecoprokozijnen.nl" className="btn btn-secondary btn-full">
@@ -132,7 +132,7 @@ function Shell({ children, customerName, phase }) {
       <footer style={{ borderTop: '1px solid var(--border)', background: 'white', padding: '20px', textAlign: 'center' }}>
         <p style={{ fontSize: 12, color: 'var(--text-light)', margin: 0 }}>
           EcoPro Kozijnen &nbsp;·&nbsp;
-          <a href="tel:+31530000000" style={{ color: 'var(--text-muted)' }}>053 - 000 00 00</a>
+          <a href="tel:+31850492456" style={{ color: 'var(--text-muted)' }}>085 049 24 56</a>
           &nbsp;·&nbsp;
           <a href="mailto:info@ecoprokozijnen.nl" style={{ color: 'var(--text-muted)' }}>info@ecoprokozijnen.nl</a>
         </p>
@@ -202,8 +202,11 @@ function PhaseContent({ order, onRefresh, showToast }) {
 // ─── Fase 0: Offerte ──────────────────────────────────────────────────────────
 
 function Phase0({ order, onRefresh, showToast }) {
-  const [accepting, setAccepting] = useState(false)
+  const [accepting, setAccepting]     = useState(false)
   const [showContact, setShowContact] = useState(false)
+  const [showSign, setShowSign]       = useState(false)
+  const [signName, setSignName]       = useState('')
+  const [signError, setSignError]     = useState('')
   const items = (order.order_items || []).sort((a, b) => a.sort_order - b.sort_order)
   const expired = order.quote_expires_at && new Date(order.quote_expires_at) < new Date()
   const daysLeft = order.quote_expires_at
@@ -236,7 +239,7 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.setFontSize(9); doc.setFont('helvetica', 'normal')
     doc.setTextColor(200, 220, 205)
     doc.text('OFFERTE', 14, 24)
-    doc.text('info@ecoprokozijnen.nl  |  053 - 000 00 00', 14, 30)
+    doc.text('info@ecoprokozijnen.nl  |  085 049 24 56', 14, 30)
 
     // Klant
     doc.setTextColor(30, 30, 30)
@@ -289,15 +292,33 @@ function Phase0({ order, onRefresh, showToast }) {
 
     // Footer
     doc.setFontSize(7); doc.setTextColor(150, 150, 150)
-    doc.text('EcoPro Kozijnen  \u00b7  info@ecoprokozijnen.nl  \u00b7  053 - 000 00 00', 14, 285)
+    doc.text('EcoPro Kozijnen  \u00b7  info@ecoprokozijnen.nl  \u00b7  085 049 24 56', 14, 285)
 
     doc.save('Offerte EcoPro Kozijnen - ' + order.customer_name + '.pdf')
   }
 
 
+  function handleAccordeer() {
+    setShowSign(true)
+    setSignError('')
+  }
+
   async function acceptQuote() {
+    if (!signName.trim()) {
+      setSignError('Vul uw naam in om te ondertekenen')
+      return
+    }
+    if (signName.trim().toLowerCase() !== order.customer_name.toLowerCase()) {
+      setSignError(`Vul uw volledige naam in zoals vermeld op de offerte: "${order.customer_name}"`)
+      return
+    }
     setAccepting(true)
-    await supabase.from('orders').update({ phase: 1, quote_accepted_at: new Date().toISOString() }).eq('id', order.id)
+    await supabase.from('orders').update({
+      phase: 1,
+      quote_accepted_at: new Date().toISOString(),
+      signature_name: signName.trim(),
+      signature_at: new Date().toISOString(),
+    }).eq('id', order.id)
     await supabase.from('status_history').insert({ order_id: order.id, from_phase: 0, to_phase: 1, changed_by: 'klant' })
     showToast('Akkoord bevestigd! Wij nemen spoedig contact op.')
     setAccepting(false)
@@ -406,7 +427,7 @@ function Phase0({ order, onRefresh, showToast }) {
               Neem contact op via{' '}
               <a href="mailto:info@ecoprokozijnen.nl" style={{ fontWeight: 600 }}>info@ecoprokozijnen.nl</a>
               {' '}of{' '}
-              <a href="tel:+31530000000" style={{ fontWeight: 600 }}>053 - 000 00 00</a>.
+              <a href="tel:+31850492456" style={{ fontWeight: 600 }}>085 049 24 56</a>.
               Wij passen de offerte graag aan.
             </div>
           )}
@@ -811,7 +832,7 @@ function Phase7({ order }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <a href="tel:+31530000000" className="btn btn-ghost" style={{ flex: 1 }}>📞 Bel ons</a>
+        <a href="tel:+31850492456" className="btn btn-ghost" style={{ flex: 1 }}>📞 Bel ons</a>
         <a href="mailto:info@ecoprokozijnen.nl" className="btn btn-ghost" style={{ flex: 1 }}>✉ E-mail</a>
       </div>
       <OrderFiles order={order} />

@@ -78,7 +78,10 @@ export default function RapportagePage() {
               ← Dashboard
             </Link>
             <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 16 }}>|</span>
-            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>Rapportage</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src="/Beeldmerk_Vector_BGWIT.png" alt="EcoPro" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+              <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>Rapportage</span>
+            </div>
           </div>
           <select
             value={year}

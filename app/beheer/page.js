@@ -127,9 +127,12 @@ export default function BeheerPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
       <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
-            <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/Beeldmerk_Vector_BGWIT.png" alt="EcoPro" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
+              <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             <Link href="/beheer/rapportage" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 10px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}>

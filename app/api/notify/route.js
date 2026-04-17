@@ -161,7 +161,8 @@ function wrapEmail(body) {
       <div style="max-width:560px; margin:32px auto; background:white; border-radius:14px; overflow:hidden; box-shadow:0 4px 20px rgba(0,0,0,0.08);">
         
         <!-- Header -->
-        <div style="background:#1A3A2A; padding:24px 32px; display:flex; align-items:center; justify-content:space-between;">
+        <div style="background:#1A3A2A; padding:20px 32px; display:flex; align-items:center; gap:14px;">
+          <img src="${BASE_URL}/Beeldmerk_Vector_BGWIT.png" alt="EcoPro Kozijnen" style="width:44px; height:44px; object-fit:contain;" />
           <div>
             <div style="color:white; font-size:18px; font-weight:700; letter-spacing:-0.01em;">EcoPro Kozijnen</div>
             <div style="color:rgba(255,255,255,0.5); font-size:11px; text-transform:uppercase; letter-spacing:0.1em; margin-top:2px;">Klantportaal notificatie</div>

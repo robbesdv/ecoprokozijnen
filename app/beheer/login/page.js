@@ -52,14 +52,11 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{
-            width: 68, height: 68,
-            background: 'rgba(200,169,110,0.15)',
-            border: '1px solid rgba(200,169,110,0.3)',
-            borderRadius: 18,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px', fontSize: 30,
-          }}>🏠</div>
+          <img
+            src="/Beeldmerk_Vector_BGWIT.png"
+            alt="EcoPro Kozijnen"
+            style={{ width: 80, height: 80, objectFit: 'contain', margin: '0 auto 16px', display: 'block' }}
+          />
           <h1 style={{ color: 'white', fontSize: 22, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em' }}>
             EcoPro Kozijnen
           </h1>
