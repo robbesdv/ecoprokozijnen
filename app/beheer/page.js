@@ -131,16 +131,17 @@ export default function BeheerPage() {
             <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
             <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Link href="/beheer/rapportage" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-              📊 Rapportage
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <Link href="/beheer/rapportage" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 10px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              📊
             </Link>
-            <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)} style={{ whiteSpace: 'nowrap' }}>+ Nieuwe order</button>
+            <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)} style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}>+ Order</button>
             <button
               onClick={logout}
-              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 10px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              title="Uitloggen"
             >
-              Uitloggen
+              ↩
             </button>
           </div>
         </div>
@@ -164,12 +165,12 @@ export default function BeheerPage() {
         ))}
       </div>
 
-      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 14 }}>🔍</span>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek op naam of adres…" style={{ width: 220, paddingLeft: 32, fontSize: 13 }} />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek op naam of adres…" style={{ width: 160, paddingLeft: 32, fontSize: 13, flexShrink: 0 }} />
         </div>
-        <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {[null, 0, 1, 2, 3, 4, 5, 6, 7].map(ph => {
             const active = !filterUrgent && filterPhase === ph
             return (
@@ -184,7 +185,7 @@ export default function BeheerPage() {
             ⚠ Actie nodig
           </button>
         </div>
-        <span style={{ fontSize: 12, color: 'var(--text-light)', flexShrink: 0 }}>{visible.length} orders</span>
+        <span style={{ fontSize: 12, color: 'var(--text-light)', flexShrink: 0, whiteSpace: 'nowrap' }}>{visible.length} orders</span>
       </div>
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
