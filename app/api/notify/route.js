@@ -26,15 +26,33 @@ function emailTemplates(order, type, extra = {}) {
       body: `
         <p>Beste ${order.customer_name},</p>
         <p>Bedankt voor uw interesse in EcoPro Kozijnen. Wij hebben een offerte voor u klaarstaan.</p>
-        <div style="background:#F4F6F4; border-radius:10px; padding:16px 20px; margin:20px 0;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <span style="color:#6B7280;">Totaalbedrag</span>
-            <strong style="color:#1A3A2A;">${formatEuro(order.total_amount)}</strong>
-          </div>
-          ${order.quote_expires_at ? `<div style="display:flex; justify-content:space-between;">
-            <span style="color:#6B7280;">Geldig tot</span>
-            <strong>${formatDate(order.quote_expires_at)}</strong>
-          </div>` : ''}
+        <div style="background:#F4F6F4; border-radius:12px; padding:22px 24px; margin:28px 0; border-left:4px solid #1A3A2A;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="padding-bottom:12px; padding-top:4px;">
+                <span style="color:#6B7280; font-size:13px; letter-spacing:0.02em;">Totaalbedrag</span>
+              </td>
+              <td align="right" style="padding-bottom:12px; padding-top:4px;">
+                <strong style="color:#1A3A2A; font-size:20px; letter-spacing:-0.01em;">${formatEuro(order.total_amount)}</strong>
+              </td>
+            </tr>
+            ${order.quote_expires_at ? `<tr>
+              <td style="border-top:1px solid #E5E7EB; padding-top:10px;">
+                <span style="color:#6B7280; font-size:13px;">Geldig tot</span>
+              </td>
+              <td align="right" style="border-top:1px solid #E5E7EB; padding-top:10px;">
+                <strong style="color:#374151; font-size:14px;">${formatDate(order.quote_expires_at)}</strong>
+              </td>
+            </tr>` : ''}
+            <tr>
+              <td style="border-top:1px solid #E5E7EB; padding-top:10px;">
+                <span style="color:#6B7280; font-size:12px;">Aanbetaling (20%)</span>
+              </td>
+              <td align="right" style="border-top:1px solid #E5E7EB; padding-top:10px;">
+                <span style="color:#6B7280; font-size:13px;">${formatEuro(order.total_amount * 0.2)}</span>
+              </td>
+            </tr>
+          </table>
         </div>
         <p>U kunt de offerte bekijken, accorderen en de aanbetaling regelen via uw persoonlijke portaal.</p>
         ${portalButton}
@@ -170,7 +188,7 @@ function wrapEmail(body) {
         </div>
 
         <!-- Body -->
-        <div style="padding:28px 32px; color:#111827; font-size:15px; line-height:1.7;">
+        <div style="padding:32px 32px 24px; color:#111827; font-size:15px; line-height:1.8;">
           ${body}
         </div>
 

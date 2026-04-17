@@ -114,9 +114,12 @@ function Shell({ children, customerName, phase }) {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
-            <div style={{ fontSize: 11, opacity: 0.5, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Mijn portaal</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 3 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
+              <div style={{ fontSize: 11, opacity: 0.5, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Mijn portaal</div>
+            </div>
           </div>
           {customerName && (
             <div style={{
@@ -257,13 +260,13 @@ function Phase0({ order, onRefresh, showToast }) {
 
     // Logo
     try {
-      doc.addImage(LOGO_BASE64, 'PNG', M, 4, 32, 32)
+      doc.addImage(LOGO_BASE64, 'PNG', M, 5, 28, 28)
     } catch(e) {}
 
-    // Bedrijfsnaam
+    // Bedrijfsnaam (rechts van logo)
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-    doc.text('EcoPro Kozijnen', M + 36, 18)
+    doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+    doc.text('EcoPro Kozijnen', M + 33, 17)
 
     // Subtitel
     doc.setFontSize(8); doc.setFont('helvetica', 'normal')
