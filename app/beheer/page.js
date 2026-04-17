@@ -275,7 +275,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
   const [paymentSplit,     setPaymentSplit]     = useState(order.payment_split)
   const [installDate,      setInstallDate]      = useState(order.installation_date || '')
   const [deliveryExpected, setDeliveryExpected] = useState(order.factory_delivery_expected || '')
-  const [notes,            setNotes]            = useState(order.internal_notes || '')
+  const [notes,            setNotes]            = useState(order.montage_notes || '')
   const [depositConf,      setDepositConf]      = useState(order.deposit_confirmed)
   const [mainConf,         setMainConf]         = useState(order.main_payment_confirmed)
   const [finalConf,        setFinalConf]        = useState(order.final_payment_confirmed)
@@ -286,8 +286,9 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
   const [confirmDelete,    setConfirmDelete]    = useState(false)
   const [deleting,         setDeleting]         = useState(false)
 
-  const baseUrl   = typeof window !== 'undefined' ? window.location.origin : ''
-  const portalUrl = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/portaal/${order.portal_token}`
+  const baseUrl    = typeof window !== 'undefined' ? window.location.origin : ''
+  const portalUrl  = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/portaal/${order.portal_token}`
+  const montageUrl = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/montage/${order.montage_token}`
   const defects   = order.defects || []
   const openDefs  = defects.filter(d => d.status === 'open')
   const files     = order.order_files || []
@@ -301,7 +302,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 
   async function save() {
     setSaving(true)
-    const updates = { phase, payment_split: paymentSplit, internal_notes: notes, deposit_confirmed: depositConf, main_payment_confirmed: mainConf, final_payment_confirmed: finalConf }
+    const updates = { phase, payment_split: paymentSplit, montage_notes: notes, deposit_confirmed: depositConf, main_payment_confirmed: mainConf, final_payment_confirmed: finalConf }
     if (installDate)      updates.installation_date = installDate
     if (deliveryExpected) updates.factory_delivery_expected = deliveryExpected
     if (phase >= 3 && !order.factory_ordered_at) updates.factory_ordered_at = new Date().toISOString()
@@ -425,15 +426,35 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
             <Section title="Montagedatum">
               <input type="date" value={installDate} onChange={e => setInstallDate(e.target.value)} />
             </Section>
-            <Section title="Interne notitie">
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Niet zichtbaar voor klant…" style={{ minHeight: 72 }} />
-            </Section>
-            <Section title="Portaallink">
+
+            <Section title="Portaallink klant">
               <div style={{ display: 'flex', gap: 8 }}>
                 <input type="text" readOnly value={portalUrl} style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1 }} />
                 <button onClick={copyPortalLink} className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }}>{copied ? '✓' : 'Kopieer'}</button>
               </div>
               {order.portal_accessed_at && <p style={{ fontSize: 11, color: 'var(--success)', marginTop: 6 }}>✓ Klant bezocht portaal op {formatDate(order.portal_accessed_at)}</p>}
+            </Section>
+            <Section title="Portaallink montageploeg">
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="text" readOnly value={montageUrl} style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1 }} />
+                <button
+                  onClick={() => { navigator.clipboard.writeText(montageUrl); showToast('Montagelink gekopieerd') }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ flexShrink: 0 }}
+                >
+                  Kopieer
+                </button>
+              </div>
+              {order.montage_accessed_at && <p style={{ fontSize: 11, color: 'var(--success)', marginTop: 6 }}>✓ Monteur bezocht portaal op {formatDate(order.montage_accessed_at)}</p>}
+            </Section>
+            <Section title="Notities voor montageploeg">
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Technische details, toegangsinstructies, bijzonderheden…"
+                style={{ minHeight: 72 }}
+              />
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Zichtbaar voor de montageploeg in hun portaal.</p>
             </Section>
           </div>
         )}
@@ -611,8 +632,10 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
     }
 
     await supabase.from('status_history').insert({ order_id: order.id, to_phase: 0, note: 'Order aangemaakt', changed_by: 'beheer' })
-    notifyCustomer(order, 'nieuwe_offerte').then(r => {
-      if (!r.success) console.warn('Offerte e-mail niet verzonden:', r.error)
+    // Slimme mail: welkomst als geen prijzen, offerte als wel prijzen
+    const mailType = (total > 0) ? 'nieuwe_offerte' : 'welkomst'
+    notifyCustomer(order, mailType).then(r => {
+      if (!r.success) console.warn('E-mail niet verzonden:', r.error)
     })
     setSaving(false)
     onCreated(order)
