@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PHASES, getPhase, formatEuro, formatDate, formatDateShort, calcDeposit } from '@/lib/phases'
 
@@ -131,11 +132,13 @@ export default function BeheerPage() {
             <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)}>+ Nieuwe order</button>
+            <Link href="/beheer/rapportage" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              📊 Rapportage
+            </Link>
+            <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)} style={{ whiteSpace: 'nowrap' }}>+ Nieuwe order</button>
             <button
               onClick={logout}
-              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
-              title="Uitloggen"
+              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
             >
               Uitloggen
             </button>
@@ -143,7 +146,7 @@ export default function BeheerPage() {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         {[
           { label: 'Actieve orders',    value: stats.actief,            onClick: () => { setFilterPhase(null); setFilterUrgent(false) } },
           { label: 'Actie vereist',     value: stats.urgent,            warn: stats.urgent > 0,    onClick: () => setFilterUrgent(u => !u) },
@@ -186,10 +189,11 @@ export default function BeheerPage() {
 
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 1.2fr 0.9fr 0.8fr 36px', padding: '7px 24px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '7px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
             {[
-              { label: 'Klant', key: 'customer_name' }, { label: 'Fase', key: 'phase' },
-              { label: 'Actie nodig', key: null }, { label: 'Bedrag', key: 'total_amount' }, { label: 'Datum', key: 'created_at' },
+              { label: 'Klant', key: 'customer_name' },
+              { label: 'Fase', key: 'phase' },
+              { label: 'Bedrag', key: 'total_amount' },
             ].map(col => (
               <div key={col.label} onClick={col.key ? () => toggleSort(col.key) : undefined}
                 style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', cursor: col.key ? 'pointer' : 'default', userSelect: 'none', display: 'flex', alignItems: 'center' }}>
@@ -218,18 +222,19 @@ export default function BeheerPage() {
             const hasAction  = !!getPhase(order.phase).actionNeeded(order)
             return (
               <div key={order.id} onClick={() => setSelected(isSelected ? null : order)}
-                style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 1.2fr 0.9fr 0.8fr 36px', padding: '12px 24px', borderBottom: '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid var(--warn)' : '3px solid transparent' }}
+                style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid var(--warn)' : '3px solid transparent' }}
                 onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F9FAFB' }}
                 onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white' }}
               >
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{order.customer_name}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {order.customer_name}
+                    {!!getPhase(order.phase).actionNeeded(order) && <span style={{ fontSize: 10, background: 'var(--warn-bg)', color: 'var(--warn)', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>!</span>}
+                  </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{order.customer_address}</div>
                 </div>
                 <div><PhaseBadge phase={order.phase} /></div>
-                <div><ActionNeeded order={order} /></div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{formatEuro(order.total_amount)}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDateShort(order.created_at)}</div>
                 <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center' }}>›</div>
               </div>
             )
