@@ -153,6 +153,25 @@ function emailTemplates(order, type, extra = {}) {
       `,
     },
 
+    // ── Welkomst (zonder prijs) ──────────────────────────────────────────────
+    welkomst: {
+      subject: `Welkom bij EcoPro Kozijnen — uw persoonlijke portaal`,
+      body: `
+        <p>Beste ${order.customer_name},</p>
+        <p>Bedankt voor uw interesse in EcoPro Kozijnen! Wij gaan graag voor u aan de slag.</p>
+        <p>Wij stellen een offerte op maat voor u op. U ontvangt binnenkort de offerte via uw persoonlijke portaal.</p>
+        <p>In dit portaal kunt u:</p>
+        <ul style="color:#374151; line-height:2.2; margin:12px 0;">
+          <li>Uw offerte bekijken en accorderen</li>
+          <li>De voortgang van uw order volgen</li>
+          <li>Documenten en foto's inzien</li>
+          <li>Betalingen regelen</li>
+        </ul>
+        ${portalButton}
+        <p style="font-size:13px; color:#6B7280;">Heeft u vragen? Bel ons op <a href="tel:+31850492456" style="color:#1A3A2A;">085 049 24 56</a> of mail naar <a href="mailto:info@ecoprokozijnen.nl" style="color:#1A3A2A;">info@ecoprokozijnen.nl</a>.</p>
+      `,
+    },
+
     // ── Oplevering compleet ───────────────────────────────────────────────────
     compleet: {
       subject: `Oplevering compleet — bedankt voor uw vertrouwen!`,
