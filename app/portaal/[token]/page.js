@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { supabase } from '@/lib/supabase'
+import { LOGO_BASE64 } from '@/lib/logo-base64'
 import {
   CUSTOMER_STEPS, getCustomerStep,
   calcDeposit, calcMain, calcFinal,
@@ -254,10 +255,15 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.setFillColor(...gold)
     doc.rect(0, 40, W, 2, 'F')
 
+    // Logo
+    try {
+      doc.addImage(LOGO_BASE64, 'PNG', M, 4, 32, 32)
+    } catch(e) {}
+
     // Bedrijfsnaam
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-    doc.text('EcoPro Kozijnen', M, 18)
+    doc.text('EcoPro Kozijnen', M + 36, 18)
 
     // Subtitel
     doc.setFontSize(8); doc.setFont('helvetica', 'normal')
