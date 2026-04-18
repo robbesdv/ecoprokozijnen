@@ -1,381 +1,54 @@
-'use client'
+import { NextResponse } from 'next/server'
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import { PHASES, getPhase, formatDate, formatDateShort } from '@/lib/phases'
+const USERS = [
+  { username: 'ecopro',   passwordEnv: 'ADMIN_PASSWORD',           role: 'admin',   name: 'EcoPro Admin'   },
+  { username: 'rudy',     passwordEnv: 'MONTEUR_PASSWORD_RUDY',    role: 'monteur', name: 'Rudy'           },
+  { username: 'vida',     passwordEnv: 'MONTEUR_PASSWORD_VIDA',    role: 'monteur', name: 'Vida Kozijnen'  },
+  { username: 'matthew',  passwordEnv: 'MONTEUR_PASSWORD_MATTHEW', role: 'monteur', name: 'Matthew'        },
+  { username: 'kay',      passwordEnv: 'MONTEUR_PASSWORD_KAY',     role: 'monteur', name: 'Kay'            },
+]
 
-const FASE_LABELS = {
-  4: 'Geleverd bij EcoPro',
-  5: 'Montage ingepland',
-  6: 'Montage afgerond',
-}
+export async function POST(request) {
+  try {
+    const { username, password } = await request.json()
+    const user = USERS.find(u => u.username === username)
 
-export default function MonteurPage() {
-  const [orders, setOrders]         = useState([])
-  const [selected, setSelected]     = useState(null)
-  const [loading, setLoading]       = useState(true)
-  const [user, setUser]             = useState(null)
-  const [uploading, setUploading]   = useState(false)
-  const [toast, setToast]           = useState(null)
-  const [filter, setFilter]         = useState('actief') // actief | compleet
+    if (!user) {
+      return NextResponse.json({ error: 'Gebruikersnaam of wachtwoord onjuist' }, { status: 401 })
+    }
 
-  useEffect(() => {
-    // Haal user info op uit cookie via API
-    fetch('/api/me').then(r => r.json()).then(d => setUser(d)).catch(() => {})
-  }, [])
+    const expectedPassword = process.env[user.passwordEnv]
+    if (!expectedPassword || password !== expectedPassword) {
+      return NextResponse.json({ error: 'Gebruikersnaam of wachtwoord onjuist' }, { status: 401 })
+    }
 
-  const loadOrders = useCallback(async () => {
-    if (!user) return
-    const { data } = await supabase
-      .from('orders')
-      .select('*, order_items(*), order_files(*), montage_files(*), defects(*)')
-      .eq('assigned_monteur', user.username)
-      .order('installation_date', { ascending: true })
-    setOrders(data || [])
-    setLoading(false)
-  }, [user])
-
-  useEffect(() => { loadOrders() }, [loadOrders])
-
-  function showToast(msg, type = 'success') {
-    setToast({ msg, type })
-    setTimeout(() => setToast(null), 4000)
-  }
-
-  async function logout() {
-    await fetch('/api/login', { method: 'DELETE' })
-    window.location.href = '/beheer/login'
-  }
-
-  async function updatePhase(orderId, newPhase) {
-    const { error } = await supabase.from('orders').update({ 
-      phase: newPhase,
-      ...(newPhase === 6 ? { installation_done_at: new Date().toISOString() } : {}),
-    }).eq('id', orderId)
-    if (error) { showToast('Fout: ' + error.message, 'error'); return }
-    await supabase.from('status_history').insert({ 
-      order_id: orderId, to_phase: newPhase, changed_by: user?.name || 'monteur' 
+    const response = NextResponse.json({
+      success: true,
+      role: user.role,
+      redirect: user.role === 'admin' ? '/beheer' : '/monteur',
     })
-    showToast('Status bijgewerkt')
-    loadOrders()
-    if (selected?.id === orderId) {
-      const { data } = await supabase.from('orders').select('*, order_items(*), order_files(*), montage_files(*), defects(*)').eq('id', orderId).single()
-      if (data) setSelected(data)
-    }
+
+    response.cookies.set('ecopro-auth', JSON.stringify({
+      ok: true,
+      role: user.role,
+      username: user.username,
+      name: user.name,
+    }), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    })
+
+    return response
+  } catch (err) {
+    return NextResponse.json({ error: 'Serverfout: ' + err.message }, { status: 500 })
   }
-
-  async function uploadPhoto(e, orderId) {
-    const files = Array.from(e.target.files)
-    if (!files.length) return
-    setUploading(true)
-    for (const file of files) {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `montage/${orderId}/${Date.now()}-${safeName}`
-      const { error: upErr } = await supabase.storage.from('order-files').upload(path, file)
-      if (upErr) { showToast('Upload mislukt: ' + upErr.message, 'error'); continue }
-      const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-      await supabase.from('montage_files').insert({
-        order_id: orderId, filename: file.name, storage_path: path,
-        file_url: publicUrl, file_type: file.type, uploaded_by: user?.username || 'monteur',
-      })
-    }
-    setUploading(false)
-    showToast(`${files.length} bestand${files.length !== 1 ? 'en' : ''} geüpload`)
-    loadOrders()
-    if (selected?.id === orderId) {
-      const { data } = await supabase.from('orders').select('*, order_items(*), order_files(*), montage_files(*), defects(*)').eq('id', orderId).single()
-      if (data) setSelected(data)
-    }
-    e.target.value = ''
-  }
-
-  const actief    = orders.filter(o => o.phase < 7)
-  const compleet  = orders.filter(o => o.phase >= 7)
-  const visible   = filter === 'actief' ? actief : compleet
-
-  if (!user) return (
-    <div style={{ minHeight: '100vh', background: '#1A3A2A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ width: 32, height: 32, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  )
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0F2318', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif', overflow: 'hidden' }}>
-
-      {/* Header */}
-      <header style={{ background: '#1A3A2A', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 56 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <img src="/logo.png" alt="EcoPro" style={{ width: 32, height: 32, objectFit: 'contain', background: 'white', borderRadius: 6, padding: 3 }} />
-            <div>
-              <div style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>EcoPro Kozijnen</div>
-              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Montage Dashboard</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ background: 'rgba(200,169,110,0.2)', border: '1px solid rgba(200,169,110,0.3)', borderRadius: 20, padding: '4px 14px', color: '#C8A96E', fontSize: 13, fontWeight: 600 }}>
-              {user.name}
-            </div>
-            <button onClick={logout} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
-              Uitloggen
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Stats balk */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', background: '#1A3A2A', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-        {[
-          { label: 'Actieve opdrachten', value: actief.length },
-          { label: 'Ingepland', value: actief.filter(o => o.installation_date).length },
-          { label: 'Afgerond', value: compleet.length },
-        ].map(s => (
-          <div key={s.label} style={{ padding: '12px 20px', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ color: 'white', fontSize: 22, fontWeight: 700 }}>{s.value}</div>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filter tabs */}
-      <div style={{ display: 'flex', background: '#1A3A2A', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
-        {[
-          { key: 'actief', label: `Actief (${actief.length})` },
-          { key: 'compleet', label: `Afgerond (${compleet.length})` },
-        ].map(t => (
-          <button key={t.key} onClick={() => setFilter(t.key)}
-            style={{ padding: '10px 20px', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: filter === t.key ? 700 : 400, background: 'none', color: filter === t.key ? '#C8A96E' : 'rgba(255,255,255,0.4)', borderBottom: filter === t.key ? '2px solid #C8A96E' : '2px solid transparent', fontFamily: 'inherit' }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Lijst + detail */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-
-        {/* Orderlijst */}
-        <div style={{ width: selected ? 320 : '100%', flexShrink: 0, overflowY: 'auto', background: '#1A3A2A' }}>
-          {loading && (
-            <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>Laden…</div>
-          )}
-          {!loading && visible.length === 0 && (
-            <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.4)' }}>
-              {filter === 'actief' ? 'Geen actieve opdrachten.' : 'Nog geen afgeronde opdrachten.'}
-            </div>
-          )}
-          {visible.map(order => {
-            const isSelected = selected?.id === order.id
-            const openDefs = (order.defects || []).filter(d => d.status === 'open').length
-            return (
-              <div key={order.id}
-                onClick={() => setSelected(isSelected ? null : order)}
-                style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', background: isSelected ? 'rgba(200,169,110,0.1)' : 'transparent', borderLeft: isSelected ? '3px solid #C8A96E' : '3px solid transparent', transition: 'all 0.1s' }}
-                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(200,169,110,0.1)' : 'transparent' }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: 'white', fontWeight: 600, fontSize: 15 }}>{order.customer_name}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 2 }}>📍 {order.customer_address}</div>
-                  </div>
-                  <PhaseBadgeMonteur phase={order.phase} />
-                </div>
-                {order.installation_date && (
-                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12, color: '#C8A96E' }}>📅</span>
-                    <span style={{ fontSize: 12, color: '#C8A96E', fontWeight: 500 }}>
-                      {new Date(order.installation_date).toLocaleDateString('nl-NL', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    </span>
-                  </div>
-                )}
-                {openDefs > 0 && (
-                  <div style={{ marginTop: 6, fontSize: 11, color: '#FCD34D', fontWeight: 500 }}>⚠ {openDefs} open bevinding{openDefs !== 1 ? 'en' : ''}</div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Detail paneel */}
-        {selected && (
-          <div style={{ flex: 1, overflowY: 'auto', background: '#0F2318', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
-            <OrderDetail
-              order={selected}
-              onClose={() => setSelected(null)}
-              onUpdatePhase={updatePhase}
-              onUploadPhoto={uploadPhoto}
-              uploading={uploading}
-              showToast={showToast}
-              user={user}
-            />
-          </div>
-        )}
-      </div>
-
-      {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? '#DC2626' : '#1A1A1A', color: 'white', padding: '12px 20px', borderRadius: 10, fontSize: 14, fontWeight: 500, zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap' }}>
-          {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
-        </div>
-      )}
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-    </div>
-  )
 }
 
-function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhoto, uploading, showToast, user }) {
-  const items       = (order.order_items || []).sort((a, b) => a.sort_order - b.sort_order)
-  const orderFiles  = order.order_files || []
-  const montageFiles = order.montage_files || []
-  const defects     = order.defects || []
-  const openDefs    = defects.filter(d => d.status === 'open')
-
-  const canAdvance = order.phase === 5
-  const canComplete = order.phase === 6
-
-  return (
-    <div style={{ padding: '20px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-        <div>
-          <h2 style={{ color: 'white', fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>{order.customer_name}</h2>
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>📍 {order.customer_address}</div>
-          {order.customer_phone && <a href={`tel:${order.customer_phone}`} style={{ color: '#C8A96E', fontSize: 13, textDecoration: 'none', marginTop: 4, display: 'block' }}>📞 {order.customer_phone}</a>}
-        </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>✕</button>
-      </div>
-
-      {/* Montagedatum */}
-      {order.installation_date && (
-        <div style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.3)', borderRadius: 10, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 24 }}>📅</span>
-          <div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Montagedatum</div>
-            <div style={{ color: '#C8A96E', fontSize: 17, fontWeight: 700, marginTop: 2 }}>
-              {new Date(order.installation_date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Status actie knoppen */}
-      {canAdvance && (
-        <button
-          onClick={() => onUpdatePhase(order.id, 6)}
-          style={{ width: '100%', padding: '14px', background: '#C8A96E', color: '#1A3A2A', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 16, fontFamily: 'inherit' }}>
-          ✓ Montage afgerond markeren
-        </button>
-      )}
-      {canComplete && (
-        <button
-          onClick={() => onUpdatePhase(order.id, 7)}
-          style={{ width: '100%', padding: '14px', background: '#16A34A', color: 'white', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: 'pointer', marginBottom: 16, fontFamily: 'inherit' }}>
-          ✓ Oplevering compleet
-        </button>
-      )}
-
-      {/* Open bevindingen */}
-      {openDefs.length > 0 && (
-        <MSection title="Open bevindingen" icon="⚠">
-          {openDefs.map(d => (
-            <div key={d.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>
-              {d.description}
-            </div>
-          ))}
-        </MSection>
-      )}
-
-      {/* Notities van EcoPro */}
-      {order.montage_notes && (
-        <MSection title="Notities van EcoPro" icon="📝">
-          <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{order.montage_notes}</p>
-        </MSection>
-      )}
-
-      {/* Kozijnen specificaties — ZONDER PRIJZEN */}
-      <MSection title="Kozijnen & specificaties" icon="🪟">
-        {items.length === 0 ? (
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontStyle: 'italic', margin: 0 }}>Nog geen specificaties.</p>
-        ) : items.map((item, idx) => (
-          <div key={item.id} style={{ padding: '10px 0', borderBottom: idx < items.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-            <div style={{ color: 'white', fontWeight: 500, fontSize: 14 }}>{item.description}</div>
-            {item.quantity > 1 && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>Aantal: {item.quantity}</div>}
-          </div>
-        ))}
-      </MSection>
-
-      {/* Tekeningen & documenten van EcoPro */}
-      {orderFiles.length > 0 && (
-        <MSection title="Tekeningen & documenten" icon="📐">
-          {orderFiles.map((f, idx) => {
-            const isImage = f.file_type?.startsWith('image/')
-            return (
-              <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: idx < orderFiles.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', textDecoration: 'none' }}>
-                <span style={{ fontSize: 22 }}>{isImage ? '🖼' : '📄'}</span>
-                <div>
-                  <div style={{ color: 'white', fontWeight: 500, fontSize: 13 }}>{f.filename}</div>
-                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 1 }}>Openen →</div>
-                </div>
-              </a>
-            )
-          })}
-        </MSection>
-      )}
-
-      {/* Foto's uploaden */}
-      <MSection title="Foto's uploaden" icon="📷">
-        <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '14px', border: '2px dashed rgba(255,255,255,0.2)', borderRadius: 10, cursor: 'pointer', color: 'rgba(255,255,255,0.5)', fontSize: 14, marginBottom: 14 }}>
-          <input type="file" onChange={e => onUploadPhoto(e, order.id)} style={{ display: 'none' }} accept="image/*,.pdf" multiple />
-          {uploading ? '⏳ Uploaden…' : '📎 Foto\'s toevoegen'}
-        </label>
-
-        {montageFiles.length === 0 ? (
-          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13, fontStyle: 'italic', textAlign: 'center', margin: 0 }}>Nog geen foto's geüpload.</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8 }}>
-            {montageFiles.map(f => {
-              const isImage = f.file_type?.startsWith('image/')
-              return (
-                <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'block', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, overflow: 'hidden', textDecoration: 'none' }}>
-                  {isImage
-                    ? <img src={f.file_url} alt={f.filename} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
-                    : <div style={{ width: '100%', height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28 }}>📄</div>
-                  }
-                  <div style={{ padding: '6px 8px', color: 'rgba(255,255,255,0.6)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</div>
-                </a>
-              )
-            })}
-          </div>
-        )}
-      </MSection>
-    </div>
-  )
-}
-
-function PhaseBadgeMonteur({ phase }) {
-  const colors = {
-    4: { bg: 'rgba(59,130,246,0.15)', color: '#93C5FD', label: 'Geleverd' },
-    5: { bg: 'rgba(245,158,11,0.15)', color: '#FCD34D', label: 'Ingepland' },
-    6: { bg: 'rgba(16,185,129,0.15)', color: '#6EE7B7', label: 'Afgerond' },
-    7: { bg: 'rgba(22,163,74,0.15)', color: '#86EFAC', label: 'Compleet' },
-  }
-  const c = colors[phase] || { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', label: getPhase(phase).adminLabel }
-  return (
-    <span style={{ background: c.bg, color: c.color, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {c.label}
-    </span>
-  )
-}
-
-function MSection({ title, icon, children }) {
-  return (
-    <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: '16px 18px', marginBottom: 14 }}>
-      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span>{icon}</span> {title}
-      </div>
-      {children}
-    </div>
-  )
+export async function DELETE() {
+  const response = NextResponse.json({ success: true })
+  response.cookies.delete('ecopro-auth')
+  return response
 }
