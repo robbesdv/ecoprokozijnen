@@ -250,18 +250,39 @@ function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhoto, uploading, 
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 22, cursor: 'pointer', padding: '0 4px' }}>✕</button>
       </div>
 
-      {/* Montagedatum */}
-      {order.installation_date && (
-        <div style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.3)', borderRadius: 10, padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 24 }}>📅</span>
-          <div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Montagedatum</div>
-            <div style={{ color: '#C8A96E', fontSize: 17, fontWeight: 700, marginTop: 2 }}>
-              {new Date(order.installation_date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+      {/* Montagedatum + Google Maps */}
+      <div style={{ display: 'grid', gridTemplateColumns: order.installation_date ? '1fr auto' : '1fr', gap: 10, marginBottom: 16 }}>
+        {order.installation_date && (
+          <div style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.3)', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>📅</span>
+            <div>
+              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Montagedatum</div>
+              <div style={{ color: '#C8A96E', fontSize: 16, fontWeight: 700, marginTop: 2 }}>
+                {new Date(order.installation_date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+        {order.customer_address && (
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.customer_address)}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 10, padding: '14px 18px', textDecoration: 'none', minWidth: 80 }}>
+            <span style={{ fontSize: 24 }}>🗺</span>
+            <span style={{ color: '#93C5FD', fontSize: 11, fontWeight: 600 }}>Route</span>
+          </a>
+        )}
+      </div>
+
+      {/* WhatsApp EcoPro */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <a href="tel:+31850492456" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'white', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+          📞 EcoPro bellen
+        </a>
+        <a href="https://wa.me/31850492456" target="_blank" rel="noopener noreferrer" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10, color: '#6EE7B7', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+          💬 WhatsApp
+        </a>
+      </div>
 
       {/* Status actie knoppen */}
       {canAdvance && (
@@ -296,6 +317,26 @@ function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhoto, uploading, 
           <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', margin: 0 }}>{order.montage_notes}</p>
         </MSection>
       )}
+
+      {/* Checklist */}
+      <MSection title="Werkchecklist" icon="✅">
+        {[
+          'Gereedschap en materialen aanwezig',
+          'Klant op de hoogte gesteld van aankomst',
+          'Situatie voor montage gefotografeerd',
+          'Oude kozijnen verwijderd',
+          'Nieuwe kozijnen geplaatst en waterpas',
+          'Afdichting en kitwerk afgerond',
+          'Schoongemaakt en afval afgevoerd',
+          'Klant akkoord gegeven na inspectie',
+        ].map((item, idx) => (
+          <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', fontSize: 13 }}>
+            <input type="checkbox" style={{ width: 16, height: 16, accentColor: '#C8A96E', cursor: 'pointer' }} />
+            <span style={{ color: 'rgba(255,255,255,0.8)' }}>{item}</span>
+          </label>
+        ))}
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 8 }}>Checklist wordt lokaal bijgehouden</p>
+      </MSection>
 
       {/* Kozijnen specificaties — ZONDER PRIJZEN */}
       <MSection title="Kozijnen & specificaties" icon="🪟">

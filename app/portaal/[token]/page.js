@@ -133,13 +133,19 @@ function Shell({ children, customerName, phase }) {
         </div>
       </header>
       <div style={{ flex: 1 }}>{children}</div>
-      <footer style={{ borderTop: '1px solid var(--border)', background: 'white', padding: '20px', textAlign: 'center' }}>
-        <p style={{ fontSize: 12, color: 'var(--text-light)', margin: 0 }}>
-          EcoPro Kozijnen &nbsp;·&nbsp;
-          <a href="tel:+31850492456" style={{ color: 'var(--text-muted)' }}>085 049 24 56</a>
-          &nbsp;·&nbsp;
-          <a href="mailto:info@ecoprokozijnen.nl" style={{ color: 'var(--text-muted)' }}>info@ecoprokozijnen.nl</a>
-        </p>
+      <footer style={{ borderTop: '1px solid var(--border)', background: 'white', padding: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+          <a href="tel:+31850492456" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', color: 'var(--text-muted)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            📞 085 049 24 56
+          </a>
+          <a href="https://wa.me/31850492456" target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 8, padding: '8px 14px', color: '#15803D', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            💬 WhatsApp
+          </a>
+          <a href="mailto:info@ecoprokozijnen.nl" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', color: 'var(--text-muted)', textDecoration: 'none', fontSize: 13, fontWeight: 500 }}>
+            ✉ E-mail
+          </a>
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text-light)', margin: 0, textAlign: 'center' }}>EcoPro Kozijnen · Plataanstraat 20H, Enschede</p>
       </footer>
     </div>
   )
@@ -199,7 +205,7 @@ function PhaseContent({ order, onRefresh, showToast }) {
   if (p === 4) return <Phase4 order={order} />
   if (p === 5) return <Phase5 order={order} />
   if (p === 6) return <Phase6 order={order} onRefresh={onRefresh} showToast={showToast} />
-  if (p === 7) return <Phase7 order={order} />
+  if (p === 7) return <Phase7 order={order} showToast={showToast} />
   return null
 }
 
@@ -960,7 +966,19 @@ function Phase6({ order, onRefresh, showToast }) {
 
 // ─── Fase 7: Compleet ─────────────────────────────────────────────────────────
 
-function Phase7({ order }) {
+function Phase7({ order, showToast }) {
+  const [rating, setRating]     = useState(order.satisfaction_rating || 0)
+  const [hovered, setHovered]   = useState(0)
+  const [submitted, setSubmitted] = useState(!!order.satisfaction_rating)
+  const [feedback, setFeedback] = useState(order.satisfaction_feedback || '')
+
+  async function submitRating(stars) {
+    setRating(stars)
+    await supabase.from('orders').update({ satisfaction_rating: stars, satisfaction_feedback: feedback }).eq('id', order.id)
+    setSubmitted(true)
+    showToast('Bedankt voor uw beoordeling!')
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, textAlign: 'center' }}>
       <div style={{ padding: '10px 0' }}>

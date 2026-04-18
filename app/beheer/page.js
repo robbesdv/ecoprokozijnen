@@ -200,8 +200,8 @@ export default function BeheerPage() {
         <span style={{ fontSize: 12, color: 'var(--text-light)', flexShrink: 0, whiteSpace: 'nowrap' }}>{visible.length} orders</span>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{ height: '100%', overflowY: 'auto', background: 'white' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '7px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
             {[
               { label: 'Klant', key: 'customer_name' },
@@ -253,17 +253,18 @@ export default function BeheerPage() {
                 </div>
                 <div><PhaseBadge phase={order.phase} /></div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{formatEuro(order.total_amount)}</div>
-                <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center' }}>›</div>
+                <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center', transition: 'transform 0.2s', transform: isSelected ? 'rotate(90deg)' : 'rotate(0)' }}>›</div>
               </div>
+              {isSelected && (
+                <div className="animate-fade" style={{ borderTop: '1px solid var(--border)', background: '#FAFBFA' }}>
+                  <DetailPanel order={order} onClose={() => setSelected(null)} onUpdate={loadOrders} showToast={showToast} inline />
+                </div>
+              )}
             )
           })}
         </div>
 
-        {selected && (
-          <div className="animate-slide" style={{ width: 360, flexShrink: 0, borderLeft: '1px solid var(--border)', background: 'white', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <DetailPanel order={selected} onClose={() => setSelected(null)} onUpdate={loadOrders} showToast={showToast} />
-          </div>
-        )}
+
       </div>
 
       {showNewModal && (
@@ -284,7 +285,7 @@ export default function BeheerPage() {
   )
 }
 
-function DetailPanel({ order, onClose, onUpdate, showToast }) {
+function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
   const [phase,            setPhase]           = useState(order.phase)
   const [paymentSplit,     setPaymentSplit]     = useState(order.payment_split)
   const [installDate,      setInstallDate]      = useState(order.installation_date || '')
@@ -413,7 +414,8 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{order.customer_address}</div>
           <div style={{ marginTop: 6 }}><PhaseBadge phase={order.phase} /></div>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: '0 2px', lineHeight: 1 }}>✕</button>
+        {!inline && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: '0 2px', lineHeight: 1 }}>✕</button>}
+        {inline && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-light)', padding: '4px 8px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>Sluiten ↑</button>}
       </div>
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto' }}>
