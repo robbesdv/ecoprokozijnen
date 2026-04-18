@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 const MONTEURS = ['rudy', 'vida', 'matthew', 'kay']
 const MONTEUR_NAMEN = { rudy: 'Rudy en team', vida: 'Vida Kozijnen', matthew: 'Matthew', kay: 'Kay' }
@@ -234,32 +234,34 @@ export default function BeheerPage() {
             const isSelected = selected?.id === order.id
             const hasAction  = !!getPhase(order.phase).actionNeeded(order)
             return (
-              <div key={order.id} onClick={() => setSelected(isSelected ? null : order)}
-                style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid var(--warn)' : '3px solid transparent' }}
-                onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F9FAFB' }}
-                onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white' }}
-              >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {order.customer_name}
-                    {!!getPhase(order.phase).actionNeeded(order) && <span style={{ fontSize: 10, background: 'var(--warn-bg)', color: 'var(--warn)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>Actie</span>}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>📍 {order.customer_address}</div>
-                  {order.installation_date && (
-                    <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2, fontWeight: 500 }}>
-                      📅 {new Date(order.installation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+              <React.Fragment key={order.id}>
+                <div onClick={() => setSelected(isSelected ? null : order)}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '12px 16px', borderBottom: isSelected ? 'none' : '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid var(--warn)' : '3px solid transparent' }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F9FAFB' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white' }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {order.customer_name}
+                      {!!getPhase(order.phase).actionNeeded(order) && <span style={{ fontSize: 10, background: 'var(--warn-bg)', color: 'var(--warn)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>Actie</span>}
                     </div>
-                  )}
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>📍 {order.customer_address}</div>
+                    {order.installation_date && (
+                      <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2, fontWeight: 500 }}>
+                        📅 {new Date(order.installation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+                  <div><PhaseBadge phase={order.phase} /></div>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{formatEuro(order.total_amount)}</div>
+                  <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center', transition: 'transform 0.2s', transform: isSelected ? 'rotate(90deg)' : 'rotate(0)' }}>›</div>
                 </div>
-                <div><PhaseBadge phase={order.phase} /></div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{formatEuro(order.total_amount)}</div>
-                <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center', transition: 'transform 0.2s', transform: isSelected ? 'rotate(90deg)' : 'rotate(0)' }}>›</div>
-              </div>
-              {isSelected && (
-                <div className="animate-fade" style={{ borderTop: '1px solid var(--border)', background: '#FAFBFA' }}>
-                  <DetailPanel order={order} onClose={() => setSelected(null)} onUpdate={loadOrders} showToast={showToast} inline />
-                </div>
-              )}
+                {isSelected && (
+                  <div className="animate-fade" style={{ borderBottom: '1px solid var(--border)', background: '#FAFBFA' }}>
+                    <DetailPanel order={order} onClose={() => setSelected(null)} onUpdate={loadOrders} showToast={showToast} inline />
+                  </div>
+                )}
+              </React.Fragment>
             )
           })}
         </div>
