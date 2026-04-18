@@ -21,12 +21,12 @@ export default function LoginPage() {
       body: JSON.stringify({ username, password }),
     })
 
+    const text = await res.text()
+    const data = text ? JSON.parse(text) : {}
     if (res.ok) {
-      const data = await res.json()
       router.push(data.redirect || '/beheer')
       router.refresh()
     } else {
-      const data = await res.json()
       setError(data.error || 'Inloggen mislukt')
       setLoading(false)
     }
