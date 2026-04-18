@@ -582,14 +582,20 @@ function OpleverBon({ order, showToast }) {
   )
 }
 
-
+function PhaseBadgeMonteur({ phase }) {
   const colors = {
     4: { bg: 'rgba(59,130,246,0.15)', color: '#93C5FD', label: 'Geleverd' },
     5: { bg: 'rgba(245,158,11,0.15)', color: '#FCD34D', label: 'Ingepland' },
     6: { bg: 'rgba(16,185,129,0.15)', color: '#6EE7B7', label: 'Afgerond' },
     7: { bg: 'rgba(22,163,74,0.15)', color: '#86EFAC', label: 'Compleet' },
   }
-  const c = colors[phase] || { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', label: getPhase(phase).adminLabel }
+
+  const c = colors[phase] || {
+    bg: 'rgba(255,255,255,0.08)',
+    color: 'rgba(255,255,255,0.5)',
+    label: getPhase(phase).adminLabel,
+  }
+
   return (
     <span style={{ background: c.bg, color: c.color, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
       {c.label}
