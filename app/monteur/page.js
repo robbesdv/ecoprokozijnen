@@ -20,8 +20,13 @@ export default function MonteurPage() {
   const [filter, setFilter]         = useState('actief') // actief | compleet
 
   useEffect(() => {
-    // Haal user info op uit cookie via API
-    fetch('/api/me').then(r => r.json()).then(d => setUser(d)).catch(() => {})
+    fetch('/api/me')
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) setUser(d)
+        else window.location.href = '/beheer/login'
+      })
+      .catch(() => window.location.href = '/beheer/login')
   }, [])
 
   const loadOrders = useCallback(async () => {
