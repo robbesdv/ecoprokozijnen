@@ -561,9 +561,7 @@ function Phase0({ order, onRefresh, showToast }) {
           <PayPlanRow icon="1" pct="20%" label="Aanbetaling bij akkoord" amount={formatEuro(calcDeposit(order.total_amount))} />
           <PayPlanRow icon="2" pct="80%" label="Restbetaling na succesvolle montage" amount={formatEuro(order.total_amount * 0.8)} last />
         </div>
-        <p style={{ fontSize: 12, color: 'var(--text-light)', marginTop: 12 }}>
-          * De 80% kan ook worden gesplitst in 70% na montage en 10% na oplevering — u kiest dit zelf na de montage.
-        </p>
+
       </div>
 
       {/* Actieknoppen */}
@@ -1010,6 +1008,55 @@ function Phase7({ order, showToast }) {
         <a href="tel:+31850492456" className="btn btn-ghost" style={{ flex: 1 }}>📞 Bel ons</a>
         <a href="mailto:info@ecoprokozijnen.nl" className="btn btn-ghost" style={{ flex: 1 }}>✉ E-mail</a>
       </div>
+
+      {/* Opleverbon */}
+      {order.oplevering_signed_at && (
+        <div className="card" style={{ padding: '18px 22px', background: 'var(--success-bg)', border: '1px solid var(--success-border)' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--success)', marginBottom: 12 }}>📋 Opleverbon</div>
+          {order.oplevering_punten && JSON.parse(order.oplevering_punten).map((punt, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', fontSize: 13, borderBottom: '1px solid var(--success-border)' }}>
+              <span style={{ color: 'var(--success)', fontWeight: 700, flexShrink: 0 }}>✓</span>
+              <span style={{ color: 'var(--text)' }}>{punt}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--success-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Akkoord gegeven door</div>
+              <div style={{ fontSize: 16, fontFamily: 'Georgia, serif', marginTop: 3, color: 'var(--text)' }}>{order.oplevering_naam}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                {new Date(order.oplevering_signed_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tevredenheidscheck */}
+      <div className="card" style={{ padding: '18px 22px', textAlign: 'center' }}>
+        {!submitted ? (
+          <>
+            <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>Hoe tevreden bent u met het resultaat?</div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+              {[1,2,3,4,5].map(star => (
+                <button key={star}
+                  onClick={() => submitRating(star)}
+                  onMouseEnter={() => setHovered(star)}
+                  onMouseLeave={() => setHovered(0)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 36, lineHeight: 1, padding: '4px', transition: 'transform 0.1s', transform: hovered >= star ? 'scale(1.2)' : 'scale(1)' }}>
+                  {hovered >= star || rating >= star ? '⭐' : '☆'}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Klik op een ster om uw beoordeling te geven</p>
+          </>
+        ) : (
+          <div style={{ background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 10, padding: '16px' }}>
+            <div style={{ fontSize: 24, marginBottom: 8 }}>{'⭐'.repeat(rating)}</div>
+            <p style={{ color: 'var(--success)', fontWeight: 600, margin: 0 }}>Bedankt voor uw beoordeling!</p>
+          </div>
+        )}
+      </div>
+
       <OrderFiles order={order} />
     </div>
   )

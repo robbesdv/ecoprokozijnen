@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PHASES, getPhase, formatDate, formatDateShort } from '@/lib/phases'
 
@@ -396,11 +396,193 @@ function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhoto, uploading, 
           </div>
         )}
       </MSection>
+
+      {/* Opleverbon */}
+      <OpleverBon order={order} showToast={showToast} />
     </div>
   )
 }
 
-function PhaseBadgeMonteur({ phase }) {
+function OpleverBon({ order, showToast }) {
+  const PUNTEN = [
+    'Alle kozijnen zijn geplaatst conform de opdracht',
+    'Kozijnen zijn waterpas en haaks geplaatst',
+    'Afdichting en kitwerk is correct aangebracht',
+    'Hang- en sluitwerk functioneert correct',
+    'Glas is vrij van beschadigingen en krassen',
+    'Vensterbanken en dorpels zijn correct geplaatst',
+    'Werkplek is schoongemaakt en afval afgevoerd',
+    'Klant heeft de kozijnen geïnspecteerd en akkoord bevonden',
+  ]
+
+  const [checked,   setChecked]   = useState({})
+  const [naam,      setNaam]      = useState('')
+  const [signed,    setSigned]    = useState(false)
+  const [saving,    setSaving]    = useState(false)
+  const [done,      setDone]      = useState(!!order.oplevering_signed_at)
+  const canvasRef                 = useRef(null)
+  const drawing                   = useRef(false)
+  const lastPos                   = useRef(null)
+
+  const allChecked = PUNTEN.every((_, i) => checked[i])
+
+  function toggleCheck(i) {
+    setChecked(p => ({ ...p, [i]: !p[i] }))
+  }
+
+  function startDraw(e) {
+    drawing.current = true
+    const pos = getPos(e)
+    lastPos.current = pos
+  }
+
+  function draw(e) {
+    if (!drawing.current) return
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const pos = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(lastPos.current.x, lastPos.current.y)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.strokeStyle = '#C8A96E'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.stroke()
+    lastPos.current = pos
+  }
+
+  function stopDraw() { drawing.current = false }
+
+  function getPos(e) {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const touch = e.touches?.[0] || e
+    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+  }
+
+  function clearCanvas() {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    setSigned(false)
+  }
+
+  function checkSigned() {
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data
+    const hasPixels = Array.from(data).some((v, i) => i % 4 === 3 && v > 0)
+    setSigned(hasPixels)
+    return hasPixels
+  }
+
+  async function submit() {
+    if (!allChecked) { showToast('Vink alle punten af', 'error'); return }
+    if (!naam.trim()) { showToast('Vul de naam van de klant in', 'error'); return }
+    if (!checkSigned()) { showToast('Handtekening ontbreekt', 'error'); return }
+    setSaving(true)
+    const canvas = canvasRef.current
+    const sigData = canvas.toDataURL('image/png')
+    const now = new Date().toISOString()
+    await supabase.from('orders').update({
+      oplevering_naam: naam,
+      oplevering_signed_at: now,
+      oplevering_punten: JSON.stringify(PUNTEN),
+      phase: 7,
+      completed_at: now,
+    }).eq('id', order.id)
+    // Upload handtekening als bestand
+    const blob = await fetch(sigData).then(r => r.blob())
+    const path = `${order.id}/opleverbon-handtekening.png`
+    const { error: upErr } = await supabase.storage.from('order-files').upload(path, blob, { upsert: true })
+    if (!upErr) {
+      const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
+      await supabase.from('order_files').upsert({
+        order_id: order.id,
+        filename: 'Opleverbon – handtekening.png',
+        storage_path: path,
+        file_url: publicUrl,
+        file_type: 'image/png',
+      }, { onConflict: 'storage_path' })
+    }
+    setSaving(false)
+    setDone(true)
+    showToast('Opleverbon opgeslagen & order afgerond!')
+  }
+
+  if (done || order.oplevering_signed_at) {
+    return (
+      <MSection title="Opleverbon" icon="📋">
+        <div style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 10, padding: '16px', textAlign: 'center' }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
+          <div style={{ color: '#6EE7B7', fontWeight: 700, fontSize: 15 }}>Opleverbon ondertekend</div>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 4 }}>
+            {order.oplevering_naam} · {order.oplevering_signed_at ? new Date(order.oplevering_signed_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 4 }}>Zichtbaar voor klant in het portaal</div>
+        </div>
+      </MSection>
+    )
+  }
+
+  return (
+    <MSection title="Opleverbon" icon="📋">
+      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 14, lineHeight: 1.5 }}>
+        Loop samen met de klant de punten door. Vink alles af, laat de klant tekenen en sla op. De bon verschijnt automatisch in het klantportaal.
+      </p>
+
+      {/* Checklist */}
+      <div style={{ marginBottom: 18 }}>
+        {PUNTEN.map((punt, i) => (
+          <label key={i} onClick={() => toggleCheck(i)}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', marginBottom: 6, borderRadius: 8, border: `1px solid ${checked[i] ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.08)'}`, background: checked[i] ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)', cursor: 'pointer', transition: 'all 0.15s' }}>
+            <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${checked[i] ? '#6EE7B7' : 'rgba(255,255,255,0.2)'}`, background: checked[i] ? '#10B981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'all 0.15s' }}>
+              {checked[i] && <span style={{ color: 'white', fontSize: 13, fontWeight: 700 }}>✓</span>}
+            </div>
+            <span style={{ color: checked[i] ? '#6EE7B7' : 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.4 }}>{punt}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* Naam klant */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Naam klant</div>
+        <input
+          type="text"
+          value={naam}
+          onChange={e => setNaam(e.target.value)}
+          placeholder="Volledige naam klant…"
+          style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '10px 14px', color: 'white', fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      {/* Handtekening */}
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Handtekening klant</div>
+          <button onClick={clearCanvas} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Wissen</button>
+        </div>
+        <canvas
+          ref={canvasRef}
+          width={400} height={140}
+          onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+          onTouchStart={e => { e.preventDefault(); startDraw(e) }}
+          onTouchMove={e => { e.preventDefault(); draw(e) }}
+          onTouchEnd={stopDraw}
+          style={{ width: '100%', height: 140, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,169,110,0.3)', borderRadius: 8, cursor: 'crosshair', touchAction: 'none', display: 'block' }}
+        />
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 6 }}>Laat de klant hier tekenen met de vinger of stylus</p>
+      </div>
+
+      <button onClick={submit} disabled={saving || !allChecked}
+        style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: allChecked ? 'linear-gradient(135deg, #C8A96E, #B8956A)' : 'rgba(255,255,255,0.08)', color: allChecked ? 'white' : 'rgba(255,255,255,0.3)', fontSize: 15, fontWeight: 700, cursor: allChecked ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'all 0.2s' }}>
+        {saving ? 'Opslaan…' : '📋 Opleverbon opslaan & order afronden'}
+      </button>
+    </MSection>
+  )
+}
+
+
   const colors = {
     4: { bg: 'rgba(59,130,246,0.15)', color: '#93C5FD', label: 'Geleverd' },
     5: { bg: 'rgba(245,158,11,0.15)', color: '#FCD34D', label: 'Ingepland' },
