@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react'
 import { supabase } from '@/lib/supabase'
+import { LOGO_BASE64 } from '@/lib/logo-base64'
 import {
   CUSTOMER_STEPS, getCustomerStep,
   calcDeposit, calcMain, calcFinal,
@@ -63,7 +64,7 @@ export default function PortaalPage({ params: paramsPromise }) {
         <p style={{ color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 24 }}>
           Deze portaallink is ongeldig of verlopen. Neem contact op met EcoPro Kozijnen voor een nieuwe link.
         </p>
-        <a href="tel:+31530000000" className="btn btn-primary btn-lg btn-full" style={{ marginBottom: 10 }}>
+        <a href="tel:+31850492456" className="btn btn-primary btn-lg btn-full" style={{ marginBottom: 10 }}>
           📞 Bel ons
         </a>
         <a href="mailto:info@ecoprokozijnen.nl" className="btn btn-secondary btn-full">
@@ -113,9 +114,12 @@ function Shell({ children, customerName, phase }) {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
-            <div style={{ fontSize: 11, opacity: 0.5, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Mijn portaal</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 3 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
+              <div style={{ fontSize: 11, opacity: 0.5, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Mijn portaal</div>
+            </div>
           </div>
           {customerName && (
             <div style={{
@@ -132,7 +136,7 @@ function Shell({ children, customerName, phase }) {
       <footer style={{ borderTop: '1px solid var(--border)', background: 'white', padding: '20px', textAlign: 'center' }}>
         <p style={{ fontSize: 12, color: 'var(--text-light)', margin: 0 }}>
           EcoPro Kozijnen &nbsp;·&nbsp;
-          <a href="tel:+31530000000" style={{ color: 'var(--text-muted)' }}>053 - 000 00 00</a>
+          <a href="tel:+31850492456" style={{ color: 'var(--text-muted)' }}>085 049 24 56</a>
           &nbsp;·&nbsp;
           <a href="mailto:info@ecoprokozijnen.nl" style={{ color: 'var(--text-muted)' }}>info@ecoprokozijnen.nl</a>
         </p>
@@ -202,8 +206,11 @@ function PhaseContent({ order, onRefresh, showToast }) {
 // ─── Fase 0: Offerte ──────────────────────────────────────────────────────────
 
 function Phase0({ order, onRefresh, showToast }) {
-  const [accepting, setAccepting] = useState(false)
+  const [accepting, setAccepting]     = useState(false)
   const [showContact, setShowContact] = useState(false)
+  const [showSign, setShowSign]       = useState(false)
+  const [signName, setSignName]       = useState('')
+  const [signError, setSignError]     = useState('')
   const items = (order.order_items || []).sort((a, b) => a.sort_order - b.sort_order)
   const expired = order.quote_expires_at && new Date(order.quote_expires_at) < new Date()
   const daysLeft = order.quote_expires_at
@@ -225,79 +232,250 @@ function Phase0({ order, onRefresh, showToast }) {
     }
     const { jsPDF } = window.jspdf
     const doc = new jsPDF()
-    const brand = [26, 58, 42]
+    const brand  = [26, 58, 42]
+    const gold   = [200, 169, 110]
+    const light  = [235, 242, 236]
+    const gray   = [100, 100, 100]
+    const dark   = [30, 30, 30]
+    const W = 210
+    const M = 14  // margin
 
-    // Header
+    // Helper: euro format
+    const eur = v => '\u20ac\u00a0' + Number(v).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const dateStr = d => new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    // Offertenummer op basis van order ID
+    const offerteNr = '2026-' + order.id.slice(0,4).toUpperCase()
+    const inclBTW = order.total_amount
+    const exclBTW = Math.round((inclBTW / 1.21) * 100) / 100
+    const btwBedrag = Math.round((inclBTW - exclBTW) * 100) / 100
+
+    // ── HEADER BALK ──────────────────────────────────────────────────────────
     doc.setFillColor(...brand)
-    doc.rect(0, 0, 210, 36, 'F')
+    doc.rect(0, 0, W, 42, 'F')
+
+    // Gouden accent lijn onderaan header
+    doc.setFillColor(...gold)
+    doc.rect(0, 40, W, 2, 'F')
+
+    // Logo (klein, rechts uitgelijnd)
+    try {
+      doc.addImage(LOGO_BASE64, 'PNG', W - M - 28, 7, 22, 22)
+    } catch(e) {}
+
+    // Bedrijfsnaam links
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(18); doc.setFont('helvetica', 'bold')
-    doc.text('EcoPro Kozijnen', 14, 16)
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal')
-    doc.setTextColor(200, 220, 205)
-    doc.text('OFFERTE', 14, 24)
-    doc.text('info@ecoprokozijnen.nl  |  053 - 000 00 00', 14, 30)
+    doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+    doc.text('EcoPro Kozijnen', M, 18)
 
-    // Klant
-    doc.setTextColor(30, 30, 30)
-    doc.setFontSize(13); doc.setFont('helvetica', 'bold')
-    doc.text(order.customer_name, 14, 50)
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10)
-    if (order.customer_address) doc.text(order.customer_address, 14, 57)
+    // Subtitel
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal')
+    doc.setTextColor(180, 210, 185)
+    doc.text('Plataanstraat 20H  \u00b7  7545MX Enschede  \u00b7  085 049 24 56  \u00b7  info@ecoprokozijnen.nl', M, 26)
 
-    // Datum
-    doc.setFontSize(9); doc.setTextColor(100, 100, 100)
-    doc.text('Offertedatum:', 130, 50)
-    doc.setTextColor(30, 30, 30); doc.setFont('helvetica', 'bold')
-    doc.text(new Date(order.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }), 130, 56)
-    if (order.quote_expires_at) {
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
-      doc.text('Geldig tot:', 130, 64)
-      doc.setTextColor(30, 30, 30); doc.setFont('helvetica', 'bold')
-      doc.text(new Date(order.quote_expires_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }), 130, 70)
+    // OFFERTE label rechts
+    doc.setFontSize(22); doc.setFont('helvetica', 'bold')
+    doc.setTextColor(255, 255, 255)
+    const offLabel = 'OFFERTE'
+    doc.text(offLabel, W - M - doc.getTextWidth(offLabel), 22)
+
+    // ── OFFERTE INFO BLOK ────────────────────────────────────────────────────
+    let y = 54
+
+    // Klantgegevens links
+    doc.setTextColor(...dark)
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold')
+    doc.text(order.customer_name, M, y)
+    doc.setFont('helvetica', 'normal')
+    if (order.customer_address) {
+      const parts = order.customer_address.split(',')
+      parts.forEach((p, i) => doc.text(p.trim(), M, y + 5 + i * 5))
     }
+    doc.text('Nederland', M, y + 5 + ((order.customer_address?.split(',').length || 0)) * 5)
 
-    // Tabel
-    doc.autoTable({
-      startY: 78,
-      head: [['Omschrijving', 'Aantal', 'Stukprijs', 'Totaal']],
-      body: items.map(i => [i.description, String(i.quantity), '\u20ac ' + Number(i.unit_price).toLocaleString('nl-NL', { minimumFractionDigits: 2 }), '\u20ac ' + Number(i.unit_price * i.quantity).toLocaleString('nl-NL', { minimumFractionDigits: 2 })]),
-      headStyles: { fillColor: brand, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
-      bodyStyles: { fontSize: 9 },
-      alternateRowStyles: { fillColor: [245, 248, 246] },
-      columnStyles: { 0: { cellWidth: 95 }, 1: { halign: 'center', cellWidth: 20 }, 2: { halign: 'right', cellWidth: 35 }, 3: { halign: 'right', cellWidth: 35, fontStyle: 'bold' } },
-      margin: { left: 14, right: 14 },
+    // Meta info rechts
+    const metaX = 130
+    const metaItems = [
+      ['Offertenummer', offerteNr],
+      ['Offertedatum', dateStr(order.created_at)],
+      ['Debiteurnummer', order.id.slice(0,6).toUpperCase()],
+      ...(order.quote_expires_at ? [['Verloopdatum', dateStr(order.quote_expires_at)]] : []),
+    ]
+    metaItems.forEach((m, i) => {
+      doc.setFontSize(8); doc.setTextColor(...gray); doc.setFont('helvetica', 'normal')
+      doc.text(m[0], metaX, y + i * 6)
+      doc.setTextColor(...dark); doc.setFont('helvetica', 'bold')
+      doc.text(m[1], metaX + 38, y + i * 6)
     })
 
-    // Totaal
-    const y = doc.lastAutoTable.finalY
-    doc.setFillColor(235, 242, 236)
-    doc.rect(14, y, 182, 10, 'F')
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...brand)
-    doc.text('Totaal incl. btw', 16, y + 7)
-    const tot = '\u20ac ' + Number(order.total_amount).toLocaleString('nl-NL', { minimumFractionDigits: 2 })
-    doc.text(tot, 196 - doc.getTextWidth(tot), y + 7)
+    y += 36
 
-    // Betalingsschema
-    const y2 = y + 20
-    doc.setFillColor(250, 243, 232); doc.rect(14, y2, 182, 20, 'F')
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
-    doc.text('BETALINGSSCHEMA', 16, y2 + 7)
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
-    doc.text('20% aanbetaling bij akkoord: \u20ac ' + Number(order.total_amount * 0.2).toLocaleString('nl-NL', { minimumFractionDigits: 2 }), 16, y2 + 13)
-    doc.text('80% restbetaling na montage (optioneel 70% + 10%): \u20ac ' + Number(order.total_amount * 0.8).toLocaleString('nl-NL', { minimumFractionDigits: 2 }), 16, y2 + 18)
+    // ── AANHEF ───────────────────────────────────────────────────────────────
+    doc.setFontSize(9.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...dark)
+    doc.text('Geachte ' + (order.customer_name || 'heer/mevrouw') + ',', M, y)
+    y += 6
+    const aanhefText = 'Hartelijk dank voor uw interesse in EcoPro Kozijnen. Hierbij bieden wij u onze offerte aan voor het leveren en monteren van hoogwaardige kunststof kozijnen van het merk Schüco, inclusief bijbehorende waterslagen en afwerkingen.'
+    const aanhefLines = doc.splitTextToSize(aanhefText, W - 2 * M)
+    doc.setFontSize(9); doc.setTextColor(60, 60, 60)
+    doc.text(aanhefLines, M, y)
+    y += aanhefLines.length * 5 + 6
 
-    // Footer
-    doc.setFontSize(7); doc.setTextColor(150, 150, 150)
-    doc.text('EcoPro Kozijnen  \u00b7  info@ecoprokozijnen.nl  \u00b7  053 - 000 00 00', 14, 285)
+    // ── PRODUCTTABEL ─────────────────────────────────────────────────────────
+    doc.autoTable({
+      startY: y,
+      head: [['Hoeveelheid', 'Omschrijving', 'Prijs excl. btw', 'Btw', 'Totaal incl. btw']],
+      body: items.map(i => {
+        const excl = i.unit_price * i.quantity / 1.21
+        const btw  = i.unit_price * i.quantity - excl
+        return [
+          String(i.quantity),
+          i.description,
+          eur(excl),
+          '21%',
+          eur(i.unit_price * i.quantity),
+        ]
+      }),
+      headStyles: {
+        fillColor: brand,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 8.5,
+        cellPadding: 4,
+      },
+      bodyStyles: { fontSize: 9, cellPadding: 3.5 },
+      alternateRowStyles: { fillColor: [247, 250, 248] },
+      columnStyles: {
+        0: { cellWidth: 18, halign: 'center' },
+        1: { cellWidth: 82 },
+        2: { cellWidth: 30, halign: 'right' },
+        3: { cellWidth: 14, halign: 'center' },
+        4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' },
+      },
+      margin: { left: M, right: M },
+    })
 
-    doc.save('Offerte EcoPro Kozijnen - ' + order.customer_name + '.pdf')
+    y = doc.lastAutoTable.finalY
+
+    // ── BTW OVERZICHT + TOTALEN ───────────────────────────────────────────────
+    const totW = 90
+    const totX = W - M - totW
+    y += 4
+
+    // BTW tabel
+    const btwRows = [
+      ['21,00', eur(exclBTW), eur(btwBedrag)],
+    ]
+    doc.autoTable({
+      startY: y,
+      head: [['Btw %', 'Basisbedrag', 'Btw-bedrag']],
+      body: btwRows,
+      headStyles: { fillColor: [245, 245, 245], textColor: gray, fontSize: 8, fontStyle: 'bold', cellPadding: 2.5 },
+      bodyStyles: { fontSize: 8.5, cellPadding: 2.5 },
+      columnStyles: {
+        0: { cellWidth: 22, halign: 'center' },
+        1: { cellWidth: 34, halign: 'right' },
+        2: { cellWidth: 34, halign: 'right' },
+      },
+      margin: { left: M, right: W - M - 90 },
+      tableWidth: 90,
+    })
+
+    // Totalen rechts
+    const totY = y
+    doc.setDrawColor(220, 220, 220)
+
+    // Excl BTW
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...gray)
+    doc.text('Totaal (excl. btw)', totX, totY + 6)
+    doc.setTextColor(...dark)
+    doc.text(eur(exclBTW), W - M - doc.getTextWidth(eur(exclBTW)), totY + 6)
+
+    // BTW
+    doc.setTextColor(...gray)
+    doc.text('Btw', totX, totY + 12)
+    doc.setTextColor(...dark)
+    doc.text(eur(btwBedrag), W - M - doc.getTextWidth(eur(btwBedrag)), totY + 12)
+
+    // Lijn
+    doc.setDrawColor(...gold); doc.setLineWidth(0.5)
+    doc.line(totX, totY + 14, W - M, totY + 14)
+
+    // Totaal incl BTW
+    doc.setFillColor(...light)
+    doc.rect(totX, totY + 15, W - M - totX, 10, 'F')
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...brand)
+    doc.text('Totaal', totX + 2, totY + 22)
+    const totStr = eur(inclBTW)
+    doc.text(totStr, W - M - doc.getTextWidth(totStr), totY + 22)
+
+    y = Math.max(doc.lastAutoTable.finalY, totY + 28) + 8
+
+    // ── BETALINGSSCHEMA ───────────────────────────────────────────────────────
+    doc.setFillColor(250, 243, 232)
+    doc.rect(M, y, W - 2 * M, 20, 'F')
+    doc.setDrawColor(...gold); doc.setLineWidth(0.3)
+    doc.rect(M, y, W - 2 * M, 20)
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...gray)
+    doc.text('BETALINGSSCHEMA', M + 3, y + 5)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setFontSize(8.5)
+    doc.text('20% aanbetaling bij akkoord: ' + eur(inclBTW * 0.2), M + 3, y + 11)
+    doc.text('80% restbetaling na succesvolle montage: ' + eur(inclBTW * 0.8) + '  (optioneel: 70% na montage + 10% na oplevering)', M + 3, y + 17)
+
+    y += 26
+
+    // ── SLOTTEKST ─────────────────────────────────────────────────────────────
+    const slotLines = doc.splitTextToSize('Wij vertrouwen erop u met deze offerte een helder en compleet voorstel te hebben gedaan. Mocht u nog vragen hebben of aanvullende wensen willen bespreken, dan staan wij uiteraard graag voor u klaar.' + (order.quote_expires_at ? ' Deze offerte is geldig tot ' + dateStr(order.quote_expires_at) + '.' : ''), W - 2 * M)
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+    doc.text(slotLines, M, y)
+    y += slotLines.length * 5 + 8
+
+    // ── HANDTEKENING ──────────────────────────────────────────────────────────
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...dark)
+    doc.text('Met vriendelijke groet,', M, y)
+    y += 5
+    doc.text('EcoPro Kozijnen B.V.', M, y)
+    y += 5
+    doc.setFont('helvetica', 'bold')
+    doc.text('Matthew van Delden', M, y)
+    y += 4
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(...gray); doc.setFontSize(8)
+    doc.text('Account Manager', M, y)
+    doc.text('085 049 24 56  \u00b7  info@ecoprokozijnen.nl', M, y + 4)
+
+    // ── FOOTER ────────────────────────────────────────────────────────────────
+    doc.setFillColor(...brand)
+    doc.rect(0, 282, W, 15, 'F')
+    doc.setFillColor(...gold)
+    doc.rect(0, 282, W, 1.5, 'F')
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 220, 205)
+    const footerText = 'EcoPro Kozijnen B.V.  \u00b7  Plataanstraat 20H, 7545MX Enschede  \u00b7  info@ecoprokozijnen.nl  \u00b7  085 049 24 56  \u00b7  KVK: 91269458'
+    doc.text(footerText, W / 2 - doc.getTextWidth(footerText) / 2, 291)
+
+    doc.save('Offerte EcoPro Kozijnen - ' + order.customer_name + ' ' + offerteNr + '.pdf')
   }
 
 
+  function handleAccordeer() {
+    setShowSign(true)
+    setSignError('')
+  }
+
   async function acceptQuote() {
+    if (!signName.trim()) {
+      setSignError('Vul uw naam in om te ondertekenen')
+      return
+    }
+    if (signName.trim().toLowerCase() !== order.customer_name.toLowerCase()) {
+      setSignError(`Vul uw volledige naam in zoals vermeld op de offerte: "${order.customer_name}"`)
+      return
+    }
     setAccepting(true)
-    await supabase.from('orders').update({ phase: 1, quote_accepted_at: new Date().toISOString() }).eq('id', order.id)
+    await supabase.from('orders').update({
+      phase: 1,
+      quote_accepted_at: new Date().toISOString(),
+      signature_name: signName.trim(),
+      signature_at: new Date().toISOString(),
+    }).eq('id', order.id)
     await supabase.from('status_history').insert({ order_id: order.id, from_phase: 0, to_phase: 1, changed_by: 'klant' })
     showToast('Akkoord bevestigd! Wij nemen spoedig contact op.')
     setAccepting(false)
@@ -406,7 +584,7 @@ function Phase0({ order, onRefresh, showToast }) {
               Neem contact op via{' '}
               <a href="mailto:info@ecoprokozijnen.nl" style={{ fontWeight: 600 }}>info@ecoprokozijnen.nl</a>
               {' '}of{' '}
-              <a href="tel:+31530000000" style={{ fontWeight: 600 }}>053 - 000 00 00</a>.
+              <a href="tel:+31850492456" style={{ fontWeight: 600 }}>085 049 24 56</a>.
               Wij passen de offerte graag aan.
             </div>
           )}
@@ -811,7 +989,7 @@ function Phase7({ order }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <a href="tel:+31530000000" className="btn btn-ghost" style={{ flex: 1 }}>📞 Bel ons</a>
+        <a href="tel:+31850492456" className="btn btn-ghost" style={{ flex: 1 }}>📞 Bel ons</a>
         <a href="mailto:info@ecoprokozijnen.nl" className="btn btn-ghost" style={{ flex: 1 }}>✉ E-mail</a>
       </div>
       <OrderFiles order={order} />

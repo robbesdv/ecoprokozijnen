@@ -1,8 +1,33 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { PHASES, getPhase, formatEuro, formatDate, formatDateShort, calcDeposit } from '@/lib/phases'
+
+// ─── E-mail notificaties ──────────────────────────────────────────────────────
+
+async function notifyCustomer(order, type, extra = {}) {
+  try {
+    const res = await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order, type, extra }),
+    })
+    const text = await res.text()
+    const data = text ? JSON.parse(text) : {}
+    if (!res.ok) throw new Error(data.error || 'Onbekende fout')
+    return { success: true }
+  } catch (err) {
+    console.error('Notificatie fout:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+function getNotifyTypeForPhase(phase) {
+  const map = { 2: 'aanbetaling_bevestigd', 5: 'montage_gepland', 6: 'montage_klaar', 7: 'compleet' }
+  return map[phase] || 'status_update'
+}
 
 function PhaseBadge({ phase }) {
   const p = getPhase(phase)
@@ -56,6 +81,11 @@ export default function BeheerPage() {
     setTimeout(() => setToast(null), 3500)
   }
 
+  async function logout() {
+    await fetch('/api/login', { method: 'DELETE' })
+    window.location.href = '/beheer/login'
+  }
+
   const stats = {
     actief:    orders.filter(o => o.phase < 7).length,
     urgent:    orders.filter(o => o.phase < 7 && getPhase(o.phase).actionNeeded(o)).length,
@@ -95,25 +125,37 @@ export default function BeheerPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
-
-      {/* Header */}
       <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
-            <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
+              <div style={{ fontSize: 10, opacity: 0.45, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Beheerdashboard</div>
+            </div>
           </div>
-          <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)}>+ Nieuwe order</button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <Link href="/beheer/rapportage" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 10px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              📊
+            </Link>
+            <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)} style={{ whiteSpace: 'nowrap', padding: '6px 12px' }}>+ Order</button>
+            <button
+              onClick={logout}
+              style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.8)', padding: '6px 10px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              title="Uitloggen"
+            >
+              ↩
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* Statistieken */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
         {[
-          { label: 'Actieve orders',     value: stats.actief,            onClick: () => { setFilterPhase(null); setFilterUrgent(false) } },
-          { label: 'Actie vereist',      value: stats.urgent,            warn: stats.urgent > 0,    onClick: () => setFilterUrgent(u => !u) },
-          { label: 'Montage inplannen',  value: stats.inplannen,         warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
-          { label: 'Openstaande omzet',  value: formatEuro(stats.omzet), isText: true },
+          { label: 'Actieve orders',    value: stats.actief,            onClick: () => { setFilterPhase(null); setFilterUrgent(false) } },
+          { label: 'Actie vereist',     value: stats.urgent,            warn: stats.urgent > 0,    onClick: () => setFilterUrgent(u => !u) },
+          { label: 'Montage inplannen', value: stats.inplannen,         warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
+          { label: 'Openstaande omzet', value: formatEuro(stats.omzet), isText: true },
         ].map(s => (
           <div key={s.label} onClick={s.onClick}
             style={{ padding: '14px 20px', borderRight: '1px solid var(--border)', cursor: s.onClick ? 'pointer' : 'default', transition: 'background 0.1s' }}
@@ -126,13 +168,12 @@ export default function BeheerPage() {
         ))}
       </div>
 
-      {/* Zoek + filter */}
-      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '10px 24px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' }}>
+      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 14 }}>🔍</span>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek op naam of adres…" style={{ width: 220, paddingLeft: 32, fontSize: 13 }} />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek op naam of adres…" style={{ width: 160, paddingLeft: 32, fontSize: 13, flexShrink: 0 }} />
         </div>
-        <div style={{ display: 'flex', gap: 6, flex: 1, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           {[null, 0, 1, 2, 3, 4, 5, 6, 7].map(ph => {
             const active = !filterUrgent && filterPhase === ph
             return (
@@ -147,17 +188,16 @@ export default function BeheerPage() {
             ⚠ Actie nodig
           </button>
         </div>
-        <span style={{ fontSize: 12, color: 'var(--text-light)', flexShrink: 0 }}>{visible.length} orders</span>
+        <span style={{ fontSize: 12, color: 'var(--text-light)', flexShrink: 0, whiteSpace: 'nowrap' }}>{visible.length} orders</span>
       </div>
 
-      {/* Lijst + detail */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', background: 'white' }}>
-          {/* Kolomkoppen */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 1.2fr 0.9fr 0.8fr 36px', padding: '7px 24px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '7px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
             {[
-              { label: 'Klant', key: 'customer_name' }, { label: 'Fase', key: 'phase' },
-              { label: 'Actie nodig', key: null }, { label: 'Bedrag', key: 'total_amount' }, { label: 'Datum', key: 'created_at' },
+              { label: 'Klant', key: 'customer_name' },
+              { label: 'Fase', key: 'phase' },
+              { label: 'Bedrag', key: 'total_amount' },
             ].map(col => (
               <div key={col.label} onClick={col.key ? () => toggleSort(col.key) : undefined}
                 style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', cursor: col.key ? 'pointer' : 'default', userSelect: 'none', display: 'flex', alignItems: 'center' }}>
@@ -186,18 +226,19 @@ export default function BeheerPage() {
             const hasAction  = !!getPhase(order.phase).actionNeeded(order)
             return (
               <div key={order.id} onClick={() => setSelected(isSelected ? null : order)}
-                style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 1.2fr 0.9fr 0.8fr 36px', padding: '12px 24px', borderBottom: '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid var(--warn)' : '3px solid transparent' }}
+                style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid var(--warn)' : '3px solid transparent' }}
                 onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F9FAFB' }}
                 onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white' }}
               >
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{order.customer_name}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {order.customer_name}
+                    {!!getPhase(order.phase).actionNeeded(order) && <span style={{ fontSize: 10, background: 'var(--warn-bg)', color: 'var(--warn)', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>!</span>}
+                  </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 1 }}>{order.customer_address}</div>
                 </div>
                 <div><PhaseBadge phase={order.phase} /></div>
-                <div><ActionNeeded order={order} /></div>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{formatEuro(order.total_amount)}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDateShort(order.created_at)}</div>
                 <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center' }}>›</div>
               </div>
             )
@@ -229,14 +270,12 @@ export default function BeheerPage() {
   )
 }
 
-// ─── Detail paneel ────────────────────────────────────────────────────────────
-
 function DetailPanel({ order, onClose, onUpdate, showToast }) {
   const [phase,            setPhase]           = useState(order.phase)
   const [paymentSplit,     setPaymentSplit]     = useState(order.payment_split)
   const [installDate,      setInstallDate]      = useState(order.installation_date || '')
   const [deliveryExpected, setDeliveryExpected] = useState(order.factory_delivery_expected || '')
-  const [notes,            setNotes]            = useState(order.internal_notes || '')
+  const [notes,            setNotes]            = useState(order.montage_notes || '')
   const [depositConf,      setDepositConf]      = useState(order.deposit_confirmed)
   const [mainConf,         setMainConf]         = useState(order.main_payment_confirmed)
   const [finalConf,        setFinalConf]        = useState(order.final_payment_confirmed)
@@ -247,8 +286,9 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
   const [confirmDelete,    setConfirmDelete]    = useState(false)
   const [deleting,         setDeleting]         = useState(false)
 
-  const baseUrl   = typeof window !== 'undefined' ? window.location.origin : ''
-  const portalUrl = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/portaal/${order.portal_token}`
+  const baseUrl    = typeof window !== 'undefined' ? window.location.origin : ''
+  const portalUrl  = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/portaal/${order.portal_token}`
+  const montageUrl = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/montage/${order.montage_token}`
   const defects   = order.defects || []
   const openDefs  = defects.filter(d => d.status === 'open')
   const files     = order.order_files || []
@@ -262,7 +302,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 
   async function save() {
     setSaving(true)
-    const updates = { phase, payment_split: paymentSplit, internal_notes: notes, deposit_confirmed: depositConf, main_payment_confirmed: mainConf, final_payment_confirmed: finalConf }
+    const updates = { phase, payment_split: paymentSplit, montage_notes: notes, deposit_confirmed: depositConf, main_payment_confirmed: mainConf, final_payment_confirmed: finalConf }
     if (installDate)      updates.installation_date = installDate
     if (deliveryExpected) updates.factory_delivery_expected = deliveryExpected
     if (phase >= 3 && !order.factory_ordered_at) updates.factory_ordered_at = new Date().toISOString()
@@ -273,25 +313,53 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
       await supabase.from('status_history').insert({ order_id: order.id, from_phase: order.phase, to_phase: phase, changed_by: 'beheer' })
     }
     setSaving(false)
-    if (error) showToast('Fout: ' + error.message, 'error')
-    else { showToast('Opgeslagen'); onUpdate() }
+    if (error) {
+      showToast('Fout: ' + error.message, 'error')
+    } else {
+      if (phase !== order.phase) {
+        const type = getNotifyTypeForPhase(phase)
+        const phaseLabel = PHASES.find(p => p.id === phase)?.adminLabel || ''
+        const extra = {
+          phaseLabel,
+          installDate: installDate ? new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : null,
+        }
+        notifyCustomer(order, type, extra).then(r => {
+          if (!r.success) console.warn('E-mail niet verzonden:', r.error)
+        })
+      }
+      if (mainConf && !order.main_payment_confirmed) {
+        notifyCustomer(order, 'betaling_bevestigd', { amount: order.total_amount * (paymentSplit === 'split_70_10' ? 0.7 : 0.8), final: false })
+      }
+      if (finalConf && !order.final_payment_confirmed) {
+        notifyCustomer(order, 'betaling_bevestigd', { amount: order.total_amount * 0.1, final: true })
+      }
+      showToast('Opgeslagen & klant genotificeerd')
+      onUpdate()
+    }
   }
 
   async function resolveDefect(id) {
+    const defect = (order.defects || []).find(d => d.id === id)
     await supabase.from('defects').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id)
-    onUpdate(); showToast('Bevinding opgelost')
+    const remainingOpen = (order.defects || []).filter(d => d.id !== id && d.status === 'open').length
+    notifyCustomer(order, 'bevinding_opgelost', { defect: defect?.description || '', allResolved: remainingOpen === 0 })
+    onUpdate(); showToast('Bevinding opgelost & klant genotificeerd')
   }
 
   async function uploadFile(e) {
     const file = e.target.files[0]
     if (!file) return
     setUploadingFile(true)
-    const path = `${order.id}/${Date.now()}-${file.name}`
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const path = `${order.id}/${Date.now()}-${safeName}`
     const { error: upErr } = await supabase.storage.from('order-files').upload(path, file)
     if (upErr) { showToast('Upload mislukt: ' + upErr.message, 'error'); setUploadingFile(false); return }
     const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-    await supabase.from('order_files').insert({ order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type })
+    const { error: insertErr } = await supabase.from('order_files').insert({
+      order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type || 'application/octet-stream',
+    })
     setUploadingFile(false)
+    if (insertErr) { showToast('DB fout: ' + insertErr.message, 'error'); return }
     showToast(`${file.name} geüpload`)
     onUpdate()
     e.target.value = ''
@@ -299,18 +367,13 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 
   async function deleteOrder() {
     setDeleting(true)
-    // Verwijder storage bestanden
     const filePaths = (order.order_files || []).map(f => f.storage_path).filter(Boolean)
-    if (filePaths.length > 0) {
-      await supabase.storage.from('order-files').remove(filePaths)
-    }
-    // Verwijder order (cascade verwijdert order_items, defects, order_files, status_history)
+    if (filePaths.length > 0) await supabase.storage.from('order-files').remove(filePaths)
     const { error } = await supabase.from('orders').delete().eq('id', order.id)
     setDeleting(false)
     if (error) { showToast('Fout bij verwijderen: ' + error.message, 'error'); return }
     showToast('Order verwijderd')
-    onClose()
-    onUpdate()
+    onClose(); onUpdate()
   }
 
   async function deleteFile(fileId, filePath) {
@@ -355,7 +418,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
               <select value={phase} onChange={e => setPhase(Number(e.target.value))}>
                 {PHASES.map(p => <option key={p.id} value={p.id}>{p.id}. {p.adminLabel}</option>)}
               </select>
-              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>De klant ziet de update direct in het portaal.</p>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>De klant ziet de update direct in het portaal én ontvangt een e-mail.</p>
             </Section>
             <Section title="Verwachte levering fabriek">
               <input type="date" value={deliveryExpected} onChange={e => setDeliveryExpected(e.target.value)} />
@@ -363,15 +426,35 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
             <Section title="Montagedatum">
               <input type="date" value={installDate} onChange={e => setInstallDate(e.target.value)} />
             </Section>
-            <Section title="Interne notitie">
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Niet zichtbaar voor klant…" style={{ minHeight: 72 }} />
-            </Section>
-            <Section title="Portaallink">
+
+            <Section title="Portaallink klant">
               <div style={{ display: 'flex', gap: 8 }}>
                 <input type="text" readOnly value={portalUrl} style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1 }} />
                 <button onClick={copyPortalLink} className="btn btn-secondary btn-sm" style={{ flexShrink: 0 }}>{copied ? '✓' : 'Kopieer'}</button>
               </div>
               {order.portal_accessed_at && <p style={{ fontSize: 11, color: 'var(--success)', marginTop: 6 }}>✓ Klant bezocht portaal op {formatDate(order.portal_accessed_at)}</p>}
+            </Section>
+            <Section title="Portaallink montageploeg">
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="text" readOnly value={montageUrl} style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1 }} />
+                <button
+                  onClick={() => { navigator.clipboard.writeText(montageUrl); showToast('Montagelink gekopieerd') }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ flexShrink: 0 }}
+                >
+                  Kopieer
+                </button>
+              </div>
+              {order.montage_accessed_at && <p style={{ fontSize: 11, color: 'var(--success)', marginTop: 6 }}>✓ Monteur bezocht portaal op {formatDate(order.montage_accessed_at)}</p>}
+            </Section>
+            <Section title="Notities voor montageploeg">
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Technische details, toegangsinstructies, bijzonderheden…"
+                style={{ minHeight: 72 }}
+              />
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Zichtbaar voor de montageploeg in hun portaal.</p>
             </Section>
           </div>
         )}
@@ -430,18 +513,15 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 
         {tab === 'bestanden' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Upload knop */}
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', border: '2px dashed var(--border)', borderRadius: 10, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, transition: 'all 0.15s' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)'; e.currentTarget.style.background = 'var(--brand-muted)' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'white' }}>
               <input type="file" onChange={uploadFile} style={{ display: 'none' }} accept="image/*,.pdf,.doc,.docx" />
               {uploadingFile ? '⏳ Uploaden…' : '📎 Bestand of foto toevoegen'}
             </label>
-
             {files.length === 0 && !uploadingFile && (
               <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>Nog geen bestanden toegevoegd.</p>
             )}
-
             {files.map(f => {
               const isImage = f.file_type?.startsWith('image/')
               return (
@@ -466,6 +546,13 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
             <InfoRow label="Adres"      value={order.customer_address || '—'} />
             <InfoRow label="Totaal"     value={<strong>{formatEuro(order.total_amount)}</strong>} />
             <InfoRow label="Aangemaakt" value={formatDate(order.created_at)} />
+            {order.signature_name && (
+              <div style={{ margin: '8px 0', padding: '10px 14px', background: 'var(--success-bg)', border: '1px solid var(--success-border)', borderRadius: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>✓ Digitaal ondertekend</div>
+                <div style={{ fontSize: 15, fontFamily: 'Georgia, serif', color: 'var(--text)', letterSpacing: '0.02em' }}>{order.signature_name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{formatDate(order.signature_at)}</div>
+              </div>
+            )}
             <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
               <a href={`mailto:${order.customer_email}`} className="btn btn-secondary btn-full" style={{ textDecoration: 'none' }}>✉ E-mail sturen</a>
               {order.customer_phone && <a href={`tel:${order.customer_phone}`} className="btn btn-secondary btn-full" style={{ textDecoration: 'none' }}>📞 Bellen</a>}
@@ -478,35 +565,16 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
         <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
           {saving ? 'Opslaan…' : 'Opslaan & klant notificeren'}
         </button>
-
         {!confirmDelete ? (
-          <button
-            onClick={() => setConfirmDelete(true)}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-light)', padding: '4px 0', fontFamily: 'inherit' }}
-          >
+          <button onClick={() => setConfirmDelete(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-light)', padding: '4px 0', fontFamily: 'inherit' }}>
             Order verwijderen
           </button>
         ) : (
           <div style={{ background: 'var(--danger-bg)', border: '1px solid var(--danger-border)', borderRadius: 8, padding: '12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <p style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500, margin: 0 }}>
-              Weet je zeker dat je deze order wilt verwijderen? Dit kan niet ongedaan worden gemaakt.
-            </p>
+            <p style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500, margin: 0 }}>Weet je zeker dat je deze order wilt verwijderen? Dit kan niet ongedaan worden gemaakt.</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="btn btn-secondary btn-sm"
-                style={{ flex: 1 }}
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={deleteOrder}
-                disabled={deleting}
-                className="btn btn-danger btn-sm"
-                style={{ flex: 1 }}
-              >
-                {deleting ? 'Verwijderen…' : 'Ja, verwijderen'}
-              </button>
+              <button onClick={() => setConfirmDelete(false)} className="btn btn-secondary btn-sm" style={{ flex: 1 }}>Annuleren</button>
+              <button onClick={deleteOrder} disabled={deleting} className="btn btn-danger btn-sm" style={{ flex: 1 }}>{deleting ? 'Verwijderen…' : 'Ja, verwijderen'}</button>
             </div>
           </div>
         )}
@@ -515,13 +583,12 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
   )
 }
 
-// ─── Nieuw order modal ────────────────────────────────────────────────────────
-
 function NewOrderModal({ onClose, onCreated, showToast }) {
-  const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', quote_expires_at: '' })
+  const defaultExpiry = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const [form, setForm] = useState({ customer_name: '', customer_email: '', customer_phone: '', quote_expires_at: defaultExpiry })
   const [addr, setAddr] = useState({ street: '', number: '', postcode: '', city: '' })
   const [items, setItems] = useState([{ description: '', quantity: 1, unit_price: '', sort_order: 0 }])
-  const [files, setFiles] = useState([])  // File objecten, nog niet geüpload
+  const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
 
   const total = items.reduce((s, i) => s + ((parseFloat(i.unit_price) || 0) * (parseInt(i.quantity) || 0)), 0)
@@ -546,23 +613,30 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
 
     if (error) { showToast('Fout: ' + error.message, 'error'); setSaving(false); return }
 
-    // Offerteregels opslaan
     const validItems = items.filter(i => i.description && i.unit_price).map((i, idx) => ({
       order_id: order.id, description: i.description, quantity: parseInt(i.quantity) || 1, unit_price: parseFloat(i.unit_price), sort_order: idx,
     }))
     if (validItems.length) await supabase.from('order_items').insert(validItems)
 
-    // Bestanden uploaden
     for (const file of files) {
-      const path = `${order.id}/${Date.now()}-${file.name}`
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${order.id}/${Date.now()}-${safeName}`
       const { error: upErr } = await supabase.storage.from('order-files').upload(path, file)
       if (!upErr) {
         const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-        await supabase.from('order_files').insert({ order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type })
+        const { error: dbErr } = await supabase.from('order_files').insert({
+          order_id: order.id, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type || 'application/octet-stream',
+        })
+        if (dbErr) console.error('order_files insert fout:', dbErr.message)
       }
     }
 
     await supabase.from('status_history').insert({ order_id: order.id, to_phase: 0, note: 'Order aangemaakt', changed_by: 'beheer' })
+    // Slimme mail: welkomst als geen prijzen, offerte als wel prijzen
+    const mailType = (total > 0) ? 'nieuwe_offerte' : 'welkomst'
+    notifyCustomer(order, mailType).then(r => {
+      if (!r.success) console.warn('E-mail niet verzonden:', r.error)
+    })
     setSaving(false)
     onCreated(order)
   }
@@ -570,16 +644,12 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
       <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '92vh', overflow: 'auto', display: 'flex', flexDirection: 'column', boxShadow: 'var(--shadow-lg)' }}>
-
-        {/* Header */}
         <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 17 }}>Nieuwe order</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, color: 'var(--text-light)', lineHeight: 1 }}>✕</button>
         </div>
 
         <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-          {/* Klantgegevens */}
           <Section title="Klantgegevens">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div><label>Naam *</label><input type="text" value={form.customer_name} onChange={e => setForm(p => ({ ...p, customer_name: e.target.value }))} placeholder="Familie de Vries" /></div>
@@ -589,7 +659,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
             </div>
           </Section>
 
-          {/* Adres */}
           <Section title="Adres">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10, marginBottom: 10 }}>
               <div><label>Straat</label><input type="text" value={addr.street} onChange={e => setAddr(p => ({ ...p, street: e.target.value }))} placeholder="Gronausestraat" /></div>
@@ -602,7 +671,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
             {fullAddress && <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>📍 {fullAddress}</p>}
           </Section>
 
-          {/* Offerteregels */}
           <Section title="Offerteregels">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 56px 100px 28px', gap: 6, marginBottom: 8 }}>
               {['Omschrijving', 'Aantal', 'Stukprijs', ''].map(h => (
@@ -625,7 +693,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
             {total > 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 0' }}>Aanbetaling 20%: <strong>{formatEuro(total * 0.2)}</strong></p>}
           </Section>
 
-          {/* Foto's & bestanden */}
           <Section title="Foto's & bestanden (optioneel)">
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', border: '2px dashed var(--border)', borderRadius: 10, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, transition: 'all 0.15s', marginBottom: 10 }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)'; e.currentTarget.style.background = 'var(--brand-muted)' }}
@@ -645,11 +712,10 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
                 ))}
               </div>
             )}
-            <p style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 8 }}>Afbeeldingen, PDF's of Word-bestanden. Worden geüpload na aanmaken.</p>
+            <p style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 8 }}>Afbeeldingen, PDF's of Word-bestanden.</p>
           </Section>
         </div>
 
-        {/* Footer */}
         <div style={{ padding: '14px 22px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10, position: 'sticky', bottom: 0, background: 'white' }}>
           <button className="btn btn-secondary" onClick={onClose}>Annuleren</button>
           <button className="btn btn-primary" onClick={submit} disabled={saving}>
@@ -660,8 +726,6 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
     </div>
   )
 }
-
-// ─── Hulpcomponenten ──────────────────────────────────────────────────────────
 
 function Section({ title, children }) {
   return (

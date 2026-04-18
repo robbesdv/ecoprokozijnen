@@ -1,38 +1,22 @@
 import { NextResponse } from 'next/server'
 
 export function middleware(request) {
-  // Alleen /beheer routes beschermen
-  if (!request.nextUrl.pathname.startsWith('/beheer')) {
+  const path = request.nextUrl.pathname
+
+  if (path === '/beheer/login' || path.startsWith('/api/login')) {
     return NextResponse.next()
   }
 
-  const authHeader = request.headers.get('authorization')
-
-  if (authHeader && authHeader.startsWith('Basic ')) {
-    // Edge Runtime heeft geen Buffer — gebruik atob()
-    const base64 = authHeader.slice(6)
-    const decoded = atob(base64)
-    // Gebruik indexOf zodat een ':' in het wachtwoord geen probleem geeft
-    const colonIndex = decoded.indexOf(':')
-    const username = decoded.slice(0, colonIndex)
-    const password = decoded.slice(colonIndex + 1)
-
-    if (
-      username === process.env.ADMIN_USERNAME &&
-      password === process.env.ADMIN_PASSWORD
-    ) {
-      return NextResponse.next()
+  if (path.startsWith('/beheer')) {
+    const auth = request.cookies.get('ecopro-auth')
+    if (auth?.value !== 'ok') {
+      return NextResponse.redirect(new URL('/beheer/login', request.url))
     }
   }
 
-  return new NextResponse('Toegang geweigerd', {
-    status: 401,
-    headers: {
-      'WWW-Authenticate': 'Basic realm="EcoPro Beheer"',
-    },
-  })
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/beheer/:path*'],
+  matcher: ['/beheer/:path*', '/api/login'],
 }
