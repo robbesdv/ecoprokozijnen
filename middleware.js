@@ -3,20 +3,31 @@ import { NextResponse } from 'next/server'
 export function middleware(request) {
   const path = request.nextUrl.pathname
 
-  if (path === '/beheer/login' || path.startsWith('/api/login')) {
+  // Login en API routes altijd doorlaten
+  if (path === '/beheer/login' || path.startsWith('/api/')) {
     return NextResponse.next()
   }
 
+  const cookieVal = request.cookies.get('ecopro-auth')?.value
+  let auth = null
+  try { auth = cookieVal ? JSON.parse(cookieVal) : null } catch {}
+
+  // /beheer alleen voor admin
   if (path.startsWith('/beheer')) {
-    const auth = request.cookies.get('ecopro-auth')
-    if (auth?.value !== 'ok') {
-      return NextResponse.redirect(new URL('/beheer/login', request.url))
-    }
+    if (!auth?.ok) return NextResponse.redirect(new URL('/beheer/login', request.url))
+    if (auth.role !== 'admin') return NextResponse.redirect(new URL('/monteur', request.url))
+    return NextResponse.next()
+  }
+
+  // /monteur alleen voor monteurs (en admins mogen ook meekijken)
+  if (path.startsWith('/monteur')) {
+    if (!auth?.ok) return NextResponse.redirect(new URL('/beheer/login', request.url))
+    return NextResponse.next()
   }
 
   return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/beheer/:path*', '/api/login'],
+  matcher: ['/beheer/:path*', '/monteur/:path*', '/api/login'],
 }

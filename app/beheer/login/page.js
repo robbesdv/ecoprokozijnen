@@ -22,7 +22,8 @@ export default function LoginPage() {
     })
 
     if (res.ok) {
-      router.push('/beheer')
+      const data = await res.json()
+      router.push(data.redirect || '/beheer')
       router.refresh()
     } else {
       const data = await res.json()

@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+const MONTEURS = ['rudy', 'vida', 'matthew', 'kay']
+const MONTEUR_NAMEN = { rudy: 'Rudy en team', vida: 'Vida Kozijnen', matthew: 'Matthew', kay: 'Kay' }
 import { supabase } from '@/lib/supabase'
 import { PHASES, getPhase, formatEuro, formatDate, formatDateShort, calcDeposit } from '@/lib/phases'
 
@@ -285,6 +287,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
   const [uploadingFile,    setUploadingFile]    = useState(false)
   const [confirmDelete,    setConfirmDelete]    = useState(false)
   const [deleting,         setDeleting]         = useState(false)
+  const [monteur,          setMonteur]          = useState(order.assigned_monteur || '')
 
   const baseUrl    = typeof window !== 'undefined' ? window.location.origin : ''
   const portalUrl  = `${process.env.NEXT_PUBLIC_BASE_URL || baseUrl}/portaal/${order.portal_token}`
@@ -302,7 +305,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
 
   async function save() {
     setSaving(true)
-    const updates = { phase, payment_split: paymentSplit, montage_notes: notes, deposit_confirmed: depositConf, main_payment_confirmed: mainConf, final_payment_confirmed: finalConf }
+    const updates = { phase, payment_split: paymentSplit, montage_notes: notes, assigned_monteur: monteur || null, deposit_confirmed: depositConf, main_payment_confirmed: mainConf, final_payment_confirmed: finalConf }
     if (installDate)      updates.installation_date = installDate
     if (deliveryExpected) updates.factory_delivery_expected = deliveryExpected
     if (phase >= 3 && !order.factory_ordered_at) updates.factory_ordered_at = new Date().toISOString()
@@ -419,6 +422,13 @@ function DetailPanel({ order, onClose, onUpdate, showToast }) {
                 {PHASES.map(p => <option key={p.id} value={p.id}>{p.id}. {p.adminLabel}</option>)}
               </select>
               <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>De klant ziet de update direct in het portaal én ontvangt een e-mail.</p>
+            </Section>
+            <Section title="Monteur toewijzen">
+              <select value={monteur} onChange={e => setMonteur(e.target.value)}>
+                <option value="">— Nog niet toegewezen —</option>
+                {MONTEURS.map(m => <option key={m} value={m}>{MONTEUR_NAMEN[m]}</option>)}
+              </select>
+              {monteur && <p style={{ fontSize: 11, color: 'var(--success)', marginTop: 6 }}>✓ Zichtbaar in monteur dashboard van {MONTEUR_NAMEN[monteur]}</p>}
             </Section>
             <Section title="Verwachte levering fabriek">
               <input type="date" value={deliveryExpected} onChange={e => setDeliveryExpected(e.target.value)} />
