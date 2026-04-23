@@ -25,6 +25,10 @@ const COMPANY = {
   address: 'Plataanstraat 20H, Enschede',
   fullAddress: 'Plataanstraat 20H, 7545MX Enschede',
   kvk: '91269458',
+  termsUrl: 'https://ecoprokozijnen.nl/algemene-voorwaarden',
+  privacyUrl: 'https://ecoprokozijnen.nl/privacy-policy-2',
+  contactName: 'Matthew van Delden',
+  contactRole: 'Account Manager',
 }
 
 export default function PortaalPage({ params: paramsPromise }) {
@@ -150,7 +154,7 @@ export default function PortaalPage({ params: paramsPromise }) {
   const currentStep = getCustomerStep(order.phase)
 
   return (
-    <Shell customerName={order.customer_name} phase={order.phase}>
+    <Shell customerName={order.customer_name}>
       <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 20px' }}>
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '16px 0' }}>
           <StepNav currentStep={currentStep} />
@@ -161,6 +165,7 @@ export default function PortaalPage({ params: paramsPromise }) {
         style={{ maxWidth: 560, margin: '0 auto', padding: '28px 20px 60px' }}
         className="animate-fade"
       >
+        <ProjectSummary order={order} />
         <PhaseContent order={order} onRefresh={refresh} showToast={showToast} />
       </div>
 
@@ -335,6 +340,58 @@ function Shell({ children, customerName }) {
           </a>
         </div>
 
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 10,
+            marginBottom: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <a
+            href={COMPANY.termsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: 8,
+              padding: '8px 14px',
+              color: '#334155',
+              textDecoration: 'none',
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            📄 Algemene voorwaarden
+          </a>
+
+          <a
+            href={COMPANY.privacyUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
+              borderRadius: 8,
+              padding: '8px 14px',
+              color: '#334155',
+              textDecoration: 'none',
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            🔒 Privacybeleid
+          </a>
+        </div>
+
         <p style={{ fontSize: 11, color: 'var(--text-light)', margin: 0, textAlign: 'center' }}>
           EcoPro Kozijnen · {COMPANY.address}
         </p>
@@ -414,6 +471,146 @@ function StepNav({ currentStep }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function ProjectSummary({ order }) {
+  const reference = order.id?.slice(0, 8).toUpperCase()
+  const totalItems = (order.order_items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)
+
+  return (
+    <div className="card-elevated" style={{ overflow: 'hidden', marginBottom: 20 }}>
+      <div
+        style={{
+          background: 'linear-gradient(135deg, var(--brand), #234B36)',
+          padding: '18px 20px',
+          color: 'white',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: 'rgba(255,255,255,0.65)',
+            marginBottom: 6,
+          }}
+        >
+          Projectoverzicht
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
+          {order.customer_name}
+        </div>
+        {order.customer_address && (
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 4 }}>
+            {order.customer_address}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          padding: '14px 16px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: 12,
+          background: 'white',
+        }}
+      >
+        <SummaryStat label="Orderreferentie" value={reference || '-'} />
+        <SummaryStat label="Totaalbedrag" value={formatEuro(order.total_amount || 0)} />
+        <SummaryStat label="Aantal onderdelen" value={String(totalItems)} />
+        <SummaryStat label="Status" value={phaseLabel(order.phase)} />
+      </div>
+    </div>
+  )
+}
+
+function SummaryStat({ label, value }) {
+  return (
+    <div
+      style={{
+        padding: '12px 14px',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        background: '#FCFCFB',
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          color: 'var(--text-light)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginBottom: 5,
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
+    </div>
+  )
+}
+
+function ContactCard() {
+  return (
+    <div className="card" style={{ padding: '16px 18px' }}>
+      <div style={S.sectionTitle}>Uw contactpersoon</div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          style={{
+            width: 46,
+            height: 46,
+            borderRadius: '50%',
+            background: 'var(--brand-muted)',
+            color: 'var(--brand)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 700,
+            fontSize: 16,
+            flexShrink: 0,
+          }}
+        >
+          {COMPANY.contactName
+            .split(' ')
+            .map((p) => p[0])
+            .slice(0, 2)
+            .join('')}
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{COMPANY.contactName}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+            {COMPANY.contactRole}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+        <a href={`tel:${COMPANY.phoneHref}`} className="btn btn-ghost" style={{ flex: 1, minWidth: 120 }}>
+          📞 Bellen
+        </a>
+        <a
+          href={COMPANY.whatsappHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-ghost"
+          style={{ flex: 1, minWidth: 120 }}
+        >
+          💬 WhatsApp
+        </a>
+        <a
+          href={`mailto:${COMPANY.email}`}
+          className="btn btn-ghost"
+          style={{ flex: 1, minWidth: 120 }}
+        >
+          ✉ E-mail
+        </a>
+      </div>
     </div>
   )
 }
@@ -514,11 +711,7 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(180, 210, 185)
-    doc.text(
-      `${COMPANY.fullAddress}  ·  ${COMPANY.phone}  ·  ${COMPANY.email}`,
-      M,
-      26
-    )
+    doc.text(`${COMPANY.fullAddress}  ·  ${COMPANY.phone}  ·  ${COMPANY.email}`, M, 26)
 
     doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
@@ -713,12 +906,12 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.text(COMPANY.name, M, y)
     y += 5
     doc.setFont('helvetica', 'bold')
-    doc.text('Matthew van Delden', M, y)
+    doc.text(COMPANY.contactName, M, y)
     y += 4
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(...gray)
     doc.setFontSize(8)
-    doc.text('Account Manager', M, y)
+    doc.text(COMPANY.contactRole, M, y)
     doc.text(`${COMPANY.phone}  ·  ${COMPANY.email}`, M, y + 4)
 
     doc.setFillColor(...brand)
@@ -920,6 +1113,8 @@ function Phase0({ order, onRefresh, showToast }) {
         </div>
       </div>
 
+      <ContactCard />
+
       {!expired && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button
@@ -1053,6 +1248,7 @@ function Phase1({ order, onRefresh, showToast }) {
           kozijnen worden nu besteld bij de fabriek.
         </div>
         <StatusTimeline phase={1} order={order} />
+        <ContactCard />
       </div>
     )
   }
@@ -1068,41 +1264,12 @@ function Phase1({ order, onRefresh, showToast }) {
         Om de productie te starten, ontvangen wij graag uw aanbetaling van 20%.
       </div>
 
-      <div className="card-elevated" style={{ overflow: 'hidden' }}>
-        <div
-          style={{
-            background: 'var(--brand-muted)',
-            padding: '20px 22px',
-            textAlign: 'center',
-            borderBottom: '1px solid var(--brand-border)',
-          }}
-        >
-          <div style={{ fontSize: 13, color: 'var(--brand)', fontWeight: 500 }}>Aanbetaling (20%)</div>
-          <div
-            style={{
-              fontSize: 38,
-              fontWeight: 700,
-              color: 'var(--brand)',
-              marginTop: 4,
-              letterSpacing: '-0.02em',
-            }}
-          >
-            {formatEuro(deposit)}
-          </div>
-        </div>
-
-        <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <BankRow label="Op naam van" value={COMPANY.name} />
-          <BankRow label="Bank" value={COMPANY.bankName} />
-          <BankRow label="IBAN" value={COMPANY.iban} copyable compactCopy />
-          <BankRow label="BIC" value={COMPANY.bic} copyable compactCopy />
-          <BankRow
-            label="Omschrijving"
-            value={`Aanbetaling ${order.id.slice(0, 8).toUpperCase()}`}
-            copyable
-          />
-        </div>
-      </div>
+      <PaymentCard
+        title="Aanbetaling (20%)"
+        amount={formatEuro(deposit)}
+        description="Na ontvangst starten wij uw order definitief op."
+        reference={`Aanbetaling ${order.id.slice(0, 8).toUpperCase()}`}
+      />
 
       {!order.deposit_notified ? (
         <button className="btn btn-secondary btn-full" onClick={notifyPayment} disabled={notifying}>
@@ -1120,6 +1287,7 @@ function Phase1({ order, onRefresh, showToast }) {
         </div>
       )}
 
+      <ContactCard />
       <OrderFiles order={order} />
     </div>
   )
@@ -1136,6 +1304,7 @@ function Phase2({ order }) {
         ontvangen. Wij bestellen uw kozijnen bij de fabriek.
       </div>
       <StatusTimeline phase={2} order={order} />
+      <ContactCard />
       <OrderFiles order={order} />
     </div>
   )
@@ -1167,6 +1336,7 @@ function Phase3({ order }) {
       )}
 
       <StatusTimeline phase={3} order={order} />
+      <ContactCard />
       <OrderFiles order={order} />
 
       <div className="notice notice-info">
@@ -1188,6 +1358,7 @@ function Phase4({ order }) {
         de montagedatum.
       </div>
       <StatusTimeline phase={4} order={order} />
+      <ContactCard />
       <OrderFiles order={order} />
     </div>
   )
@@ -1245,6 +1416,7 @@ function Phase5({ order }) {
       )}
 
       <StatusTimeline phase={5} order={order} />
+      <ContactCard />
       <OrderFiles order={order} />
     </div>
   )
@@ -1349,65 +1521,38 @@ function Phase6({ order, onRefresh, showToast }) {
       )}
 
       {order.payment_split !== 'pending' && !order.main_payment_confirmed && (
-        <div className="card-elevated" style={{ overflow: 'hidden' }}>
-          <div style={{ background: 'var(--brand)', padding: '18px 22px', textAlign: 'center' }}>
-            <div
-              style={{
-                color: 'rgba(255,255,255,0.65)',
-                fontSize: 12,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                marginBottom: 4,
-              }}
-            >
-              {order.payment_split === 'split_70_10' ? 'Te betalen (70%)' : 'Te betalen (80%)'}
-            </div>
-            <div
-              style={{
-                color: 'white',
-                fontWeight: 700,
-                fontSize: 34,
-                letterSpacing: '-0.02em',
-              }}
-            >
-              {formatEuro(calcMain(order.total_amount, order.payment_split))}
-            </div>
-          </div>
+        <>
+          <PaymentCard
+            title={order.payment_split === 'split_70_10' ? 'Te betalen (70%)' : 'Te betalen (80%)'}
+            amount={formatEuro(calcMain(order.total_amount, order.payment_split))}
+            description={
+              order.payment_split === 'split_70_10'
+                ? 'U kiest voor betaling in 2 delen.'
+                : 'Met deze betaling rondt u het volledige restbedrag af.'
+            }
+            reference={`Restbetaling ${order.id.slice(0, 8).toUpperCase()}`}
+          />
 
-          <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <BankRow label="Op naam van" value={COMPANY.name} />
-            <BankRow label="Bank" value={COMPANY.bankName} />
-            <BankRow label="IBAN" value={COMPANY.iban} copyable compactCopy />
-            <BankRow label="BIC" value={COMPANY.bic} copyable compactCopy />
-            <BankRow
-              label="Omschrijving"
-              value={`Restbetaling ${order.id.slice(0, 8).toUpperCase()}`}
-              copyable
-            />
-          </div>
-
-          <div style={{ padding: '0 22px 18px' }}>
-            {!order.main_payment_notified ? (
-              <button
-                className="btn btn-secondary btn-full"
-                onClick={notifyMainPayment}
-                disabled={notifyingMain}
-              >
-                {notifyingMain ? (
-                  <>
-                    <Spinner /> Even geduld…
-                  </>
-                ) : (
-                  'Ik heb de betaling overgemaakt'
-                )}
-              </button>
-            ) : (
-              <div className="notice notice-success">
-                ✓ &nbsp;Uw betaling is gemeld. Wij bevestigen zo spoedig mogelijk.
-              </div>
-            )}
-          </div>
-        </div>
+          {!order.main_payment_notified ? (
+            <button
+              className="btn btn-secondary btn-full"
+              onClick={notifyMainPayment}
+              disabled={notifyingMain}
+            >
+              {notifyingMain ? (
+                <>
+                  <Spinner /> Even geduld…
+                </>
+              ) : (
+                'Ik heb de betaling overgemaakt'
+              )}
+            </button>
+          ) : (
+            <div className="notice notice-success">
+              ✓ &nbsp;Uw betaling is gemeld. Wij bevestigen zo spoedig mogelijk.
+            </div>
+          )}
+        </>
       )}
 
       {order.payment_split !== 'pending' && order.main_payment_confirmed && (
@@ -1447,17 +1592,12 @@ function Phase6({ order, onRefresh, showToast }) {
               <div className="notice notice-success">✓ &nbsp;Slotbetaling ontvangen. Alles is afgerond!</div>
             ) : (
               <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                  <BankRow label="Op naam van" value={COMPANY.name} />
-                  <BankRow label="Bank" value={COMPANY.bankName} />
-                  <BankRow label="IBAN" value={COMPANY.iban} copyable compactCopy />
-                  <BankRow label="BIC" value={COMPANY.bic} copyable compactCopy />
-                  <BankRow
-                    label="Omschrijving"
-                    value={`Slotbetaling ${order.id.slice(0, 8).toUpperCase()}`}
-                    copyable
-                  />
-                </div>
+                <PaymentCard
+                  title="Slotbetaling (10%)"
+                  amount={formatEuro(calcFinal(order.total_amount))}
+                  description="Deze betaling wordt vrijgegeven zodra alle open punten zijn opgelost."
+                  reference={`Slotbetaling ${order.id.slice(0, 8).toUpperCase()}`}
+                />
 
                 {!order.final_payment_notified ? (
                   <button
@@ -1582,6 +1722,9 @@ function Phase6({ order, onRefresh, showToast }) {
           </button>
         </div>
       </div>
+
+      <ContactCard />
+      <OrderFiles order={order} />
     </div>
   )
 }
@@ -1818,7 +1961,65 @@ function Phase7({ order, showToast }) {
         )}
       </div>
 
+      <ContactCard />
       <OrderFiles order={order} />
+    </div>
+  )
+}
+
+function PaymentCard({ title, amount, description, reference }) {
+  return (
+    <div className="card-elevated" style={{ overflow: 'hidden' }}>
+      <div
+        style={{
+          background: 'linear-gradient(135deg, var(--brand), #234B36)',
+          padding: '20px 22px',
+          color: 'white',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 12,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: 'rgba(255,255,255,0.7)',
+            marginBottom: 6,
+          }}
+        >
+          {title}
+        </div>
+
+        <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em' }}>{amount}</div>
+
+        {description && (
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 6 }}>
+            {description}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '16px 22px 10px', background: 'white' }}>
+        <div
+          style={{
+            marginBottom: 14,
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: '#FFFBEB',
+            border: '1px solid #FDE68A',
+            color: '#92400E',
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          Controleer altijd goed de tenaamstelling en gebruik exact deze omschrijving bij uw betaling.
+        </div>
+
+        <BankRow label="Tenaamstelling" value={COMPANY.name} strong />
+        <BankRow label="Bank" value={COMPANY.bankName} />
+        <BankRow label="IBAN" value={COMPANY.iban} copyable compactCopy strong />
+        <BankRow label="BIC" value={COMPANY.bic} copyable compactCopy />
+        <BankRow label="Omschrijving" value={reference} copyable />
+      </div>
     </div>
   )
 }
@@ -1837,14 +2038,14 @@ function OrderFiles({ order }) {
           alignItems: 'center',
         }}
       >
-        <div style={{ fontWeight: 600, fontSize: 15 }}>Documenten & foto's</div>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>Documenten & foto&apos;s</div>
         {files.length > 0 && <span className="badge badge-productie">{files.length}</span>}
       </div>
 
       {files.length === 0 ? (
         <div
           style={{
-            padding: '16px 20px',
+            padding: '18px 20px',
             fontSize: 13,
             color: 'var(--text-light)',
             fontStyle: 'italic',
@@ -1853,9 +2054,9 @@ function OrderFiles({ order }) {
           Nog geen documenten toegevoegd door EcoPro Kozijnen.
         </div>
       ) : (
-        <div style={{ padding: '4px 0' }}>
-          {files.map((f, idx) => {
-            const isImage = f.file_type?.startsWith('image/')
+        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {files.map((f) => {
+            const meta = getFileMeta(f)
 
             return (
               <a
@@ -1867,24 +2068,68 @@ function OrderFiles({ order }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
-                  padding: '10px 20px',
+                  padding: '12px 14px',
                   textDecoration: 'none',
-                  borderBottom: idx < files.length - 1 ? '1px solid var(--border)' : 'none',
-                  background: idx % 2 === 0 ? 'white' : '#FAFAF9',
+                  border: '1px solid var(--border)',
+                  borderRadius: 14,
+                  background: 'white',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
                 }}
               >
-                <span style={{ fontSize: 22, flexShrink: 0 }}>{isImage ? '🖼' : '📄'}</span>
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 20,
+                    background: meta.tint,
+                    border: `1px solid ${meta.border}`,
+                    flexShrink: 0,
+                  }}
+                >
+                  {meta.icon}
+                </div>
 
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--brand)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'var(--text)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {f.filename}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 2 }}>
-                    Openen / downloaden
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '4px 8px',
+                        borderRadius: 999,
+                        background: meta.tint,
+                        border: `1px solid ${meta.border}`,
+                        color: meta.color,
+                      }}
+                    >
+                      {meta.label}
+                    </span>
+
+                    <span style={{ fontSize: 11, color: 'var(--text-light)' }}>
+                      Openen / downloaden
+                    </span>
                   </div>
                 </div>
 
-                <span style={{ fontSize: 18, color: 'var(--text-light)' }}>›</span>
+                <div style={{ fontSize: 18, color: 'var(--text-light)', flexShrink: 0 }}>›</div>
               </a>
             )
           })}
@@ -2029,12 +2274,12 @@ function SplitOption({ title, sub, amount, amountSub, accent, disabled, onClick 
   )
 }
 
-function BankRow({ label, value, copyable, compactCopy }) {
+function BankRow({ label, value, copyable, compactCopy, strong }) {
   const [copied, setCopied] = useState(false)
 
-  function copy() {
+  async function copy() {
     const text = compactCopy ? value.replace(/\s/g, '') : value
-    navigator.clipboard.writeText(text)
+    await navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -2042,43 +2287,44 @@ function BankRow({ label, value, copyable, compactCopy }) {
   return (
     <div
       style={{
-        display: 'flex',
-        justifyContent: 'space-between',
+        display: 'grid',
+        gridTemplateColumns: '110px 1fr auto',
+        gap: 10,
         alignItems: 'center',
         fontSize: 13,
-        padding: '4px 0',
-        gap: 12,
+        padding: '8px 0',
+        borderBottom: '1px solid #F1F5F9',
       }}
     >
-      <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>{label}</span>
+      <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{label}</span>
 
-      <div
+      <span
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
+          fontWeight: strong ? 700 : 500,
+          color: 'var(--text)',
+          wordBreak: 'break-word',
           textAlign: 'right',
-          justifyContent: 'flex-end',
-          flexWrap: 'wrap',
         }}
       >
-        <span style={{ fontWeight: 500, wordBreak: 'break-word' }}>{value}</span>
-        {copyable && (
-          <button
-            onClick={copy}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 11,
-              color: copied ? 'var(--success)' : 'var(--text-light)',
-              padding: '2px 4px',
-            }}
-          >
-            {copied ? '✓' : 'Kopieer'}
-          </button>
-        )}
-      </div>
+        {value}
+      </span>
+
+      {copyable ? (
+        <button
+          onClick={copy}
+          className="btn btn-ghost"
+          style={{
+            minWidth: 78,
+            padding: '6px 10px',
+            fontSize: 12,
+            height: 'auto',
+          }}
+        >
+          {copied ? '✓ Gekopieerd' : 'Kopieer'}
+        </button>
+      ) : (
+        <span />
+      )}
     </div>
   )
 }
@@ -2151,6 +2397,119 @@ function safeParseArray(value) {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
+  }
+}
+
+function getFileMeta(file) {
+  const name = (file.filename || '').toLowerCase()
+  const type = (file.file_type || '').toLowerCase()
+
+  const isImage = type.startsWith('image/')
+  const isPdf = type.includes('pdf') || name.endsWith('.pdf')
+
+  if (name.includes('offerte')) {
+    return {
+      icon: '📄',
+      label: 'Offerte',
+      tint: '#EFF6FF',
+      border: '#BFDBFE',
+      color: '#1D4ED8',
+      isImage,
+      isPdf,
+    }
+  }
+
+  if (name.includes('factuur')) {
+    return {
+      icon: '🧾',
+      label: 'Factuur',
+      tint: '#FFF7ED',
+      border: '#FED7AA',
+      color: '#C2410C',
+      isImage,
+      isPdf,
+    }
+  }
+
+  if (name.includes('oplever')) {
+    return {
+      icon: '✅',
+      label: 'Opleverbon',
+      tint: '#ECFDF5',
+      border: '#BBF7D0',
+      color: '#15803D',
+      isImage,
+      isPdf,
+    }
+  }
+
+  if (name.includes('tekening') || name.includes('werkbon')) {
+    return {
+      icon: '📐',
+      label: 'Technisch document',
+      tint: '#F5F3FF',
+      border: '#DDD6FE',
+      color: '#6D28D9',
+      isImage,
+      isPdf,
+    }
+  }
+
+  if (isImage) {
+    return {
+      icon: '🖼',
+      label: 'Foto',
+      tint: '#FDF2F8',
+      border: '#FBCFE8',
+      color: '#BE185D',
+      isImage,
+      isPdf,
+    }
+  }
+
+  if (isPdf) {
+    return {
+      icon: '📄',
+      label: 'PDF',
+      tint: '#F8FAFC',
+      border: '#CBD5E1',
+      color: '#334155',
+      isImage,
+      isPdf,
+    }
+  }
+
+  return {
+    icon: '📎',
+    label: 'Document',
+    tint: '#F8FAFC',
+    border: '#E2E8F0',
+    color: '#475569',
+    isImage,
+    isPdf,
+  }
+}
+
+function phaseLabel(phase) {
+  switch (phase) {
+    case 0:
+      return 'Offerte'
+    case 1:
+      return 'Wacht op aanbetaling'
+    case 2:
+      return 'Besteld'
+    case 3:
+      return 'In productie'
+    case 4:
+      return 'Geleverd'
+    case 5:
+      return 'Montage ingepland'
+    case 6:
+      return 'Montage afgerond'
+    case 7:
+      return 'Compleet'
+    default:
+      return 'Onbekend'
   }
 }
 
