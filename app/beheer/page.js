@@ -127,8 +127,8 @@ export default function BeheerPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
-      <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
+      <header style={{ background: 'linear-gradient(135deg, var(--brand) 0%, #1a4d31 100%)', color: 'white', flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 58 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
             <div>
@@ -159,28 +159,66 @@ export default function BeheerPage() {
         </div>
       </header>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        {[
-          { label: 'Actieve orders',    value: stats.actief,            icon: '📋', onClick: () => { setFilterPhase(null); setFilterUrgent(false) }, color: 'var(--brand)' },
-          { label: 'Actie vereist',     value: stats.urgent,            icon: '⚠', warn: stats.urgent > 0,    onClick: () => setFilterUrgent(u => !u) },
-          { label: 'Montage inplannen', value: stats.inplannen,         icon: '🔧', warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
-          { label: 'Openstaande omzet', value: formatEuro(stats.omzet), icon: '💶', isText: true, color: 'var(--brand)' },
-        ].map(s => (
-          <div key={s.label} onClick={s.onClick}
-            style={{ padding: '16px 22px', borderRight: '1px solid var(--border)', cursor: s.onClick ? 'pointer' : 'default', transition: 'background 0.12s', display: 'flex', flexDirection: 'column', gap: 4 }}
-            onMouseEnter={e => s.onClick && (e.currentTarget.style.background = 'var(--bg)')}
-            onMouseLeave={e => s.onClick && (e.currentTarget.style.background = 'white')}
-          >
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span>{s.icon}</span> {s.label}
+      {/* ── KPI + Pipeline ────────────────────────────────────────────── */}
+      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '20px 24px 16px', flexShrink: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          {[
+            { label: 'Actieve orders',    value: stats.actief,            icon: '📋', sub: 'Lopende trajecten',  accent: 'var(--brand)',  onClick: () => { setFilterPhase(null); setFilterUrgent(false) } },
+            { label: 'Actie vereist',     value: stats.urgent,            icon: '⚠',  sub: 'Wacht op aandacht', accent: stats.urgent > 0 ? '#f59e0b' : '#cbd5e1', warn: stats.urgent > 0, onClick: () => setFilterUrgent(u => !u) },
+            { label: 'Montage plannen',   value: stats.inplannen,         icon: '🔧', sub: 'Datum instellen',    accent: stats.inplannen > 0 ? '#3b82f6' : '#cbd5e1', warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
+            { label: 'Openstaande omzet', value: formatEuro(stats.omzet), icon: '💶', sub: 'Incl. BTW',          accent: 'var(--brand)',  isText: true },
+          ].map(s => (
+            <div key={s.label} onClick={s.onClick}
+              style={{ position: 'relative', background: '#FAFAFA', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px 14px', cursor: s.onClick ? 'pointer' : 'default', overflow: 'hidden', transition: 'box-shadow 0.15s', borderLeft: `4px solid ${s.accent}` }}
+              onMouseEnter={e => s.onClick && (e.currentTarget.style.boxShadow = '0 4px 18px rgba(0,0,0,0.07)')}
+              onMouseLeave={e => s.onClick && (e.currentTarget.style.boxShadow = 'none')}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>{s.label}</div>
+                <span style={{ fontSize: 17, opacity: 0.55 }}>{s.icon}</span>
+              </div>
+              <div style={{ fontSize: s.isText ? 21 : 34, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, color: s.warn ? s.accent : 'var(--text)' }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 6 }}>{s.sub}</div>
+              {s.onClick && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: s.accent, marginTop: 5, opacity: 0.8 }}>Filteren →</div>}
             </div>
-            <div style={{ fontSize: s.isText ? 20 : 28, fontWeight: 700, color: s.warn ? 'var(--warn)' : s.color || 'var(--text)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>{s.value}</div>
-            {s.onClick && <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 1 }}>Klik om te filteren →</div>}
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Pipeline bar */}
+        {(() => {
+          const phColors = ['#94a3b8','#818cf8','#3b82f6','#22c55e','#f59e0b','#10b981','#14b8a6','#8b5cf6']
+          const counts = [0,1,2,3,4,5,6,7].map(ph => ({ ph, count: orders.filter(o => o.phase === ph).length }))
+          const total = orders.length || 1
+          const filled = counts.filter(c => c.count > 0)
+          if (!filled.length) return null
+          return (
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 7 }}>Pipeline overzicht</div>
+              <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', height: 7, gap: 2 }}>
+                {counts.map(({ ph, count }, i) => count > 0 && (
+                  <div key={ph} title={`${getPhase(ph).adminLabel}: ${count}`}
+                    onClick={() => { setFilterPhase(ph); setFilterUrgent(false) }}
+                    style={{ flex: count / total, background: phColors[i], cursor: 'pointer', transition: 'opacity 0.1s', borderRadius: 3 }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = '0.7'}
+                    onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                  />
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 14, marginTop: 7, flexWrap: 'wrap' }}>
+                {counts.filter(c => c.count > 0).map(({ ph, count }, i) => (
+                  <div key={ph} style={{ display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }} onClick={() => { setFilterPhase(ph); setFilterUrgent(false) }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: phColors[i], flexShrink: 0 }} />
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{getPhase(ph).adminLabel}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
-      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 14 }}>🔍</span>
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek op naam of adres…" style={{ width: 160, paddingLeft: 32, fontSize: 13, flexShrink: 0 }} />
@@ -205,14 +243,15 @@ export default function BeheerPage() {
 
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <div style={{ height: '100%', overflowY: 'auto', background: 'white' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '7px 16px', background: 'var(--bg)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '44px 2fr 1.3fr 1fr 36px', padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
+            <div />
             {[
               { label: 'Klant', key: 'customer_name' },
               { label: 'Fase', key: 'phase' },
               { label: 'Bedrag', key: 'total_amount' },
             ].map(col => (
               <div key={col.label} onClick={col.key ? () => toggleSort(col.key) : undefined}
-                style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', cursor: col.key ? 'pointer' : 'default', userSelect: 'none', display: 'flex', alignItems: 'center' }}>
+                style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700, cursor: col.key ? 'pointer' : 'default', userSelect: 'none', display: 'flex', alignItems: 'center' }}>
                 {col.label}{col.key && <SortIcon col={col.key} />}
               </div>
             ))}
@@ -239,24 +278,32 @@ export default function BeheerPage() {
             return (
               <React.Fragment key={order.id}>
                 <div onClick={() => setSelected(isSelected ? null : order)}
-                  style={{ display: 'grid', gridTemplateColumns: '2fr 1.3fr 0.9fr 36px', padding: '12px 16px', borderBottom: isSelected ? 'none' : '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid var(--warn)' : '3px solid transparent' }}
-                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F9FAFB' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'var(--brand-muted)' : hasAction ? '#FFFCF5' : 'white' }}
+                  style={{ display: 'grid', gridTemplateColumns: '44px 2fr 1.3fr 1fr 36px', padding: '11px 20px', borderBottom: isSelected ? 'none' : '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? '#EEF6F0' : hasAction ? '#FFFCF5' : 'white', borderLeft: isSelected ? '3px solid var(--brand)' : hasAction ? '3px solid #f59e0b' : '3px solid transparent' }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F8FAFC' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = isSelected ? '#EEF6F0' : hasAction ? '#FFFCF5' : 'white' }}
                 >
+                  {/* Avatar */}
+                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: `hsl(${((order.customer_name?.charCodeAt(0) || 65) * 97 + 120) % 360},40%,38%)`, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                    {(order.customer_name || '?')[0].toUpperCase()}
+                  </div>
+                  {/* Klant */}
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
                       {order.customer_name}
-                      {!!getPhase(order.phase).actionNeeded(order) && <span style={{ fontSize: 10, background: 'var(--warn-bg)', color: 'var(--warn)', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>Actie</span>}
+                      {hasAction && <span style={{ fontSize: 9, background: '#FEF3C7', color: '#92400E', padding: '2px 7px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Actie</span>}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>📍 {order.customer_address}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{order.customer_address}</div>
                     {order.installation_date && (
-                      <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2, fontWeight: 500 }}>
+                      <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 2, fontWeight: 600 }}>
                         📅 {new Date(order.installation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </div>
                     )}
                   </div>
+                  {/* Fase */}
                   <div><PhaseBadge phase={order.phase} /></div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{formatEuro(order.total_amount)}</div>
+                  {/* Bedrag */}
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{formatEuro(order.total_amount)}</div>
+                  {/* Expand */}
                   <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center', transition: 'transform 0.2s', transform: isSelected ? 'rotate(90deg)' : 'rotate(0)' }}>›</div>
                 </div>
                 {isSelected && (
