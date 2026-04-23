@@ -15,11 +15,12 @@ export function middleware(request) {
   // /beheer alleen voor admin
   if (path.startsWith('/beheer')) {
     if (!auth?.ok) return NextResponse.redirect(new URL('/beheer/login', request.url))
-    if (auth.role !== 'admin') return NextResponse.redirect(new URL('/monteur', request.url))
+    // Expliciet checken op admin - alles wat niet monteur is mag door
+    if (auth.role === 'monteur') return NextResponse.redirect(new URL('/monteur', request.url))
     return NextResponse.next()
   }
 
-  // /monteur alleen voor monteurs (en admins mogen ook meekijken)
+  // /monteur alleen voor ingelogden
   if (path.startsWith('/monteur')) {
     if (!auth?.ok) return NextResponse.redirect(new URL('/beheer/login', request.url))
     return NextResponse.next()

@@ -12,6 +12,7 @@ import {
   formatEuro,
   formatDate,
 } from '@/lib/phases'
+import { KozijnSVG, kozijnSVGString, svgToPngDataUrl, ralName, PANE_NAMES } from '@/lib/KozijnSVG'
 
 const COMPANY = {
   name: 'EcoPro Kozijnen B.V.',
@@ -925,6 +926,89 @@ function Phase0({ order, onRefresh, showToast }) {
     const footerText = `${COMPANY.name}  ·  ${COMPANY.fullAddress}  ·  ${COMPANY.email}  ·  ${COMPANY.phone}  ·  KVK: ${COMPANY.kvk}`
     doc.text(footerText, W / 2 - doc.getTextWidth(footerText) / 2, 291)
 
+    // ── Tekeningen per element (eigen pagina per kozijn) ────────────────────
+    const elemItems = items.filter(i => i.element_config)
+    for (const item of elemItems) {
+      const el = item.element_config
+      doc.addPage()
+
+      // Pagina-header
+      doc.setFillColor(...brand)
+      doc.rect(0, 0, W, 22, 'F')
+      doc.setFillColor(...gold)
+      doc.rect(0, 20, W, 1.5, 'F')
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255)
+      doc.text('EcoPro Kozijnen  ·  Technische tekening', M, 14)
+      doc.setFont('helvetica', 'normal')
+      const refStr = `Offerte ${offerteNr}  ·  ${order.customer_name}`
+      doc.text(refStr, W - M - doc.getTextWidth(refStr), 14)
+
+      let py = 30
+
+      // Element naam + afmetingen
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...dark)
+      doc.text(el.name, M, py)
+      py += 7
+
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...gray)
+      doc.text(`${el.widthMM} × ${el.heightMM} mm  ·  ${item.quantity}×  ·  Kleur: ${el.colorOutside} ${ralName(el.colorOutside)}`, M, py)
+      py += 10
+
+      // SVG tekening → PNG → jsPDF
+      const svgStr = kozijnSVGString(el, 480, 300)
+      try {
+        const pngUrl = await svgToPngDataUrl(svgStr, 480, 300)
+        if (pngUrl) {
+          const drawW = W - 2 * M
+          const drawH = drawW * (300 / 480)
+          doc.addImage(pngUrl, 'PNG', M, py, drawW, drawH)
+          py += drawH + 8
+        }
+      } catch (e) {}
+
+      // Specs tabel
+      const cols = el.columns || []
+      const specsBody = [
+        ['Type', el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—'],
+        ['Breedte × Hoogte', `${el.widthMM} × ${el.heightMM} mm`],
+        ['Kleur buiten', `${el.colorOutside} — ${ralName(el.colorOutside)}`],
+        ['Kleur binnen', el.colorInside === 'same' ? `Zelfde als buiten` : `${el.colorInside} — ${ralName(el.colorInside)}`],
+        ['Afwerking', `Buiten: ${el.finishOutside === 'woodgrain' ? 'Houtnerf' : 'Glad'}  /  Binnen: ${el.finishInside === 'woodgrain' ? 'Houtnerf' : 'Glad'}`],
+        ['Aantal kolommen', String(cols.length)],
+        ...cols.map((col, ci) => {
+          const vakken = col.rows.map((r, ri) => `V${ri + 1}: ${PANE_NAMES[r.paneType] || r.paneType}${['draai','draaikiep','deur'].includes(r.paneType) ? ` (${r.hinge === 'left' ? 'L' : 'R'})` : ''}`).join('  ·  ')
+          return [`Kolom ${ci + 1} (${Math.round(el.widthMM * col.widthPct / 100)} mm)`, vakken]
+        }),
+      ]
+
+      doc.autoTable({
+        startY: py,
+        head: [['Specificatie', 'Waarde']],
+        body: specsBody,
+        headStyles: { fillColor: brand, textColor: [255,255,255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
+        bodyStyles: { fontSize: 8.5, cellPadding: 3 },
+        alternateRowStyles: { fillColor: [247, 250, 248] },
+        columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' }, 1: { cellWidth: W - 2 * M - 55 } },
+        margin: { left: M, right: M },
+      })
+
+      // Pagina-footer
+      doc.setFillColor(...brand)
+      doc.rect(0, 282, W, 15, 'F')
+      doc.setFillColor(...gold)
+      doc.rect(0, 282, W, 1.5, 'F')
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(200, 220, 205)
+      doc.text(footerText, W / 2 - doc.getTextWidth(footerText) / 2, 291)
+    }
+
     doc.save(`Offerte EcoPro Kozijnen - ${order.customer_name} ${offerteNr}.pdf`)
   }
 
@@ -1221,6 +1305,79 @@ function Phase0({ order, onRefresh, showToast }) {
       )}
 
       <OrderFiles order={order} />
+
+      <KozijnElementenSection items={items} />
+    </div>
+  )
+}
+
+function KozijnElementenSection({ items }) {
+  const elemItems = (items || []).filter(i => i.element_config)
+  if (elemItems.length === 0) return null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)', marginBottom: 4 }}>
+          Configuratie per element
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+          Hieronder vindt u de technische tekening van elk kozijn in uw offerte.
+        </div>
+      </div>
+
+      {elemItems.map((item, idx) => {
+        const el = item.element_config
+        const cols = el.columns || []
+        const panesSummary = cols.map((col, ci) =>
+          col.rows.map((r, ri) => `K${ci + 1}-V${ri + 1}: ${PANE_NAMES[r.paneType] || r.paneType}`).join(', ')
+        ).join(' · ')
+        const colorInside = el.colorInside === 'same' ? el.colorOutside : el.colorInside
+
+        return (
+          <div key={item.id || idx} className="card-elevated" style={{ overflow: 'hidden', pageBreakInside: 'avoid' }}>
+            <div style={{ background: 'linear-gradient(135deg, var(--brand), #234B36)', padding: '14px 20px', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>Element {idx + 1}</div>
+                <div style={{ fontWeight: 700, fontSize: 17 }}>{el.name}</div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
+                  {el.widthMM} × {el.heightMM} mm · {item.quantity}×
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>Prijs</div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>{formatEuro(item.unit_price * item.quantity)}</div>
+              </div>
+            </div>
+
+            <div style={{ padding: '16px 20px', background: '#FAFAF9', borderBottom: '1px solid var(--border)' }}>
+              <KozijnSVG element={el} width={480} height={300} showDims />
+            </div>
+
+            <div style={{ padding: '14px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
+              {[
+                { label: 'Type', value: el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—' },
+                { label: 'Breedte × Hoogte', value: `${el.widthMM} × ${el.heightMM} mm` },
+                { label: 'Kleur buiten', value: `${el.colorOutside} ${ralName(el.colorOutside)}` },
+                { label: 'Kleur binnen', value: el.colorInside === 'same' ? `Zelfde (${ralName(el.colorOutside)})` : `${colorInside} ${ralName(colorInside)}` },
+                { label: 'Kolommen', value: String(cols.length) },
+                { label: 'Vakken', value: panesSummary || '—' },
+              ].map(row => (
+                <div key={row.label} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', background: '#F8FAFC', borderRadius: 8 }}>
+                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', fontWeight: 600 }}>{row.label}</div>
+                  <div style={{ fontWeight: 500, color: 'var(--text)' }}>{row.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {el.notes && (
+              <div style={{ padding: '0 20px 14px', fontSize: 13, color: 'var(--text-muted)' }}>
+                <span style={{ fontWeight: 600 }}>Notities: </span>{el.notes}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

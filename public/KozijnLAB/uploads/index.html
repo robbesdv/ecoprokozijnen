@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>KozynLAB — Configurator</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="./styles.css">
+
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>KozynLAB — Configurator</h1>
+        <p id="appVersionLabel">Clean build</p>
+        <div class="topMetaRow">
+          <span class="statusDot" id="statusDot" aria-hidden="true"></span>
+          <span id="saveStateLabel">Gereed</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="topCenter">
+      <div class="modeToggle" aria-label="Modus">
+        <span class="modeLabel">Modus:</span>
+        <span class="modeSide" id="lblModeSales">Verkoop</span>
+        <label class="switch">
+          <input type="checkbox" id="chkModeFactory" />
+          <span class="knob"></span>
+        </label>
+        <span class="modeSide" id="lblModeFactory">Fabriek</span>
+      </div>
+    </div>
+
+    <div class="topRight">
+      <button class="btn btnGhost" id="btnResetAll" type="button">Reset</button>
+    </div>
+  </div>
+
+  <div class="app">
+
+    <div class="leftStack">
+<section class="panel" aria-label="Klant">
+      <div class="panelHeader">
+        <h2>Klant <span class="badge">Offerte <span class="mono" id="projectCode">—</span></span></h2>
+        <div class="row">
+          <button class="btn btnGhost" id="btnNewOfferNumber" type="button">Nieuw nummer</button>
+        </div>
+      </div>
+      <div class="panelBody">
+        <div class="grid">
+              <div class="field">
+            <div class="label">Naam</div>
+            <input class="input" id="inpCustomerName" placeholder="Naam klant" />
+          </div>
+          <div class="field">
+            <div class="label">Projectnaam</div>
+            <input class="input" id="inpProjectName" placeholder="Project / adresnaam" />
+          </div>
+
+          <div class="field">
+            <div class="label">Adres</div>
+            <input class="input" id="inpCustomerAddress" placeholder="Straat + huisnummer" />
+          </div>
+          <div class="field">
+            <div class="label">Postcode</div>
+            <input class="input" id="inpCustomerPostcode" placeholder="1234 AB" />
+          </div>
+
+          <div class="field">
+            <div class="label">Plaats</div>
+            <input class="input" id="inpCustomerCity" placeholder="Plaats" />
+          </div>
+          <div class="field">
+            <div class="label">Tel. nr.</div>
+            <input class="input" id="inpCustomerPhone" placeholder="+31 ..." />
+          </div>
+
+          <div class="field">
+            <div class="label">Email</div>
+            <input class="input" id="inpCustomerEmail" type="email" placeholder="naam@email.nl" />
+          </div>
+          <div class="field">
+            <div class="label">Datum</div>
+            <input class="input" id="inpProjectDate" type="date" />
+          </div>
+
+          <div class="field">
+            <div class="label">Leverdatum indicatie</div>
+            <input class="input" id="inpDeliveryDate" type="date" />
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+      </div>
+    </section>
+<section class="panel" aria-label="Instellingen">
+      <div class="panelHeader">
+        <h2>Instellingen <span class="badge">Element instellingen</span></h2>
+        <button class="btn btnGhost" id="btnReset" type="button">Reset</button>
+      </div>
+      <div class="panelBody">
+        <div class="grid">
+          <div class="field">
+            <div class="label">Type (hele element)</div>
+            <select id="selElementType">
+              <option value="kozijn">Kozijn</option>
+              <option value="deur">Deur</option>
+              <option value="schuifpui">Schuifpui</option>
+              <option value="dakraam">Dakraam</option>
+            </select>
+          </div>
+
+          
+
+          <div class="field" id="fieldSlideSystem" style="display:none;">
+            <div class="label">Schuifsysteem</div>
+            <select id="selSlideSystem">
+              <option value="hst">HST (hef-schuif)</option>
+              <option value="psk">PSK (kiepschuif)</option>
+            </select>
+          </div>
+
+<input type="hidden" id="selRenderMode" value="sales">
+<div class="field">
+            <div class="label">Breedte (mm)</div>
+            <input class="input mono" id="inpWidth" type="number" min="400" step="10" />
+          </div>
+          <div class="field">
+            <div class="label">Hoogte (mm)</div>
+            <input class="input mono" id="inpHeight" type="number" min="400" step="10" />
+          </div>
+
+          <div class="field">
+            <div class="label">Kolommen</div>
+            <input class="input mono" id="inpCols" type="number" min="1" max="6" step="1" />
+          </div>
+
+        </div>
+
+        <div class="panel" style="margin-top:10px;border-radius:14px;border-color:var(--line2);box-shadow:none;">
+          <div class="panelHeader" style="border-bottom:1px solid var(--line2); border-radius:14px 14px 0 0;">
+            <h2>Profielmaten <span class="badge">Preset + handmatig</span></h2>
+          </div>
+          <div class="panelBody">
+            <div class="grid">
+              <div class="field">
+                <div class="label">Profiel template</div>
+                <select class="select" id="selProfilePreset">
+                  <option value="standard70">Standaard 70mm (indicatie)</option>
+                  <option value="slim60">Slank 60mm (indicatie)</option>
+                  <option value="heavy90">Zwaar 90mm (indicatie)</option>
+                  <option value="custom">Handmatig</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="label">Profiel systeem</div>
+                <select class="select" id="selProfileSystem">
+                  <option value="living_variant">Living Variant</option>
+                  <option value="blokkader">Blokkader</option>
+                  <option value="standard">Standaard profiel</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="label">Profiel vorm</div>
+                <select class="select" id="selProfileShape">
+                  <option value="15deg">15 graden profiel</option>
+                  <option value="straight">Recht profiel</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="label">Hang- en sluitwerk</div>
+                <select class="select" id="selHardwareType">
+                  <option value="type1_hidden">Type 1: verdekt liggend</option>
+                  <option value="type2_siegenia">Type 2: standaard (Siegenia)</option>
+                </select>
+              </div>
+
+            </div>
+              <div class="field" id="fieldSchuifpuiOptions" style="display:none;">
+                <div class="label">Schuifpui opties</div>
+                <div class="row" style="gap:10px; flex-wrap:wrap;">
+                  <div style="flex:1; min-width:150px;">
+                    <div class="hint" style="margin-bottom:6px;">Schuifdeur zijde</div>
+                    <select class="select" id="selSpActiveSide">
+                      <option value="left">Links (schuifdeur links)</option>
+                      <option value="right">Rechts (schuifdeur rechts)</option>
+                    </select>
+                  </div>
+                  <div style="flex:1; min-width:150px;">
+                    <div class="hint" style="margin-bottom:6px;">Aantal vakken</div>
+                    <select class="select" id="selSpBayCount">
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5">5</option>
+                      <option value="6">6</option>
+                    </select>
+                  </div>
+                </div>
+                <div id="spBayRoles" style="margin-top:10px;"></div>
+
+              </div>
+
+            <div class="divider"></div>
+
+            <div id="profileGenericWrap">
+  <div class="grid">
+    <div class="field">
+      <div class="label">Kader (mm)</div>
+      <input class="input mono" id="inpFrameMM" type="number" min="30" max="160" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Vleugel (mm)</div>
+      <input class="input mono" id="inpSashMM" type="number" min="30" max="160" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Middenstijl (mm)</div>
+      <input class="input mono" id="inpMullionMM" type="number" min="20" max="140" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Tussenregel (mm)</div>
+      <input class="input mono" id="inpTransomMM" type="number" min="20" max="140" step="1" />
+    </div>
+  </div>
+</div>
+
+<div id="profileSchuifpuiWrap" style="display:none;">
+  <div class="grid">
+    <div class="field">
+      <div class="label">Buitenframe 3-zijdig (mm)</div>
+      <input class="input mono" id="inpSpOuterFrameMM" type="number" min="30" max="180" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Binnenframe 3-zijdig (mm)</div>
+      <input class="input mono" id="inpSpInnerFrameMM" type="number" min="20" max="160" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Dorpel hoogte (mm)</div>
+      <input class="input mono" id="inpSpSillMM" type="number" min="20" max="220" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Vleugel profiel (mm)</div>
+      <input class="input mono" id="inpSpSashMM" type="number" min="30" max="180" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Glas-inzet (mm)</div>
+      <input class="input mono" id="inpSpGlassInsetMM" type="number" min="6" max="40" step="1" />
+    </div>
+    <div class="field">
+      <div class="label">Meeting-gap (mm)</div>
+      <input class="input mono" id="inpSpMeetingGapMM" type="number" min="0" max="40" step="1" />
+    </div>
+  </div>
+  <div class="divider"></div>
+  <div class="pill" style="width:100%;justify-content:space-between;">
+    <span>Schuifpui-profielen zijn los van kozijn/deur profielen.</span>
+    <span class="mono" style="opacity:.8;">(kader ≠ dorpel)</span>
+  </div>
+</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="panel" style="border-radius:14px;border-color:var(--line2);box-shadow:none;">
+          <div class="panelHeader" style="border-bottom:1px solid var(--line2); border-radius:14px 14px 0 0;">
+            <h2>Kolom instellingen <span class="badge" id="activeColBadge">K1</span></h2>
+          </div>
+          <div class="panelBody">
+            <div class="grid">
+              <div class="field">
+                <div class="label">Actieve kolom</div>
+                <select id="selActiveCol"></select>
+              </div>
+
+              <div class="field" id="spSideField" style="display:none;">
+                <div class="label">Schuifdeur zijde</div>
+                <select id="selSpSideInVakken">
+                  <option value="left">Links</option>
+                  <option value="right">Rechts</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="label">Vakken</div>
+                <input class="input mono" id="inpRows" type="number" min="1" max="6" step="1" />
+              </div>
+              <div class="field" style="grid-column: span 2;">
+                <div id="rowTypeList" class="rowTypeList"></div>
+              </div>
+</div>
+        </div>
+
+                <div class="panel" style="border-radius:14px;border-color:var(--line2);box-shadow:none;">
+          <div class="panelHeader" style="border-bottom:1px solid var(--line2); border-radius:14px 14px 0 0;">
+            <h2>Kleuren</h2>
+          </div>
+          <div class="panelBody">
+            <div class="grid optionsGrid">
+              <div class="field">
+                <div class="label">Kleur buiten</div>
+                <select id="selColorOutside">
+                  <option value="RAL9016">RAL9016 Verkeerswit</option>
+                  <option value="RAL9001">RAL9001 Crème</option>
+                  <option value="RAL7016" selected>RAL7016 Antraciet</option>
+                  <option value="RAL9005">RAL9005 Zwart</option>
+                  <option value="RAL7039">RAL7039 Quartzgrijs</option>
+                  <option value="RAL7012">RAL7012 Basaltgrijs</option>
+                  <option value="RAL7038">RAL7038 Agate grijs</option>
+                  <option value="custom">Overig / custom</option>
+                </select>
+              </div>
+              <div class="field" id="fieldColorCodeOutside" style="display:none;">
+                <div class="label">Kleurcode buiten</div>
+                <input class="input" id="inpColorCodeOutside" type="text" placeholder="Bijv. RAL 7021 of DB 703" />
+              </div>
+              <div class="field">
+                <div class="label">Kleur binnen</div>
+                <select id="selColorInside">
+                  <option value="same">Gelijk aan buitenzijde</option>
+                  <option value="RAL9016">RAL9016 Verkeerswit</option>
+                  <option value="RAL9001">RAL9001 Crème</option>
+                  <option value="RAL7016">RAL7016 Antraciet</option>
+                  <option value="RAL9005">RAL9005 Zwart</option>
+                  <option value="RAL7039">RAL7039 Quartzgrijs</option>
+                  <option value="RAL7012">RAL7012 Basaltgrijs</option>
+                  <option value="RAL7038">RAL7038 Agate grijs</option>
+                  <option value="custom">Overig / custom</option>
+                </select>
+              </div>
+              <div class="field" id="fieldColorCodeInside" style="display:none;">
+                <div class="label">Kleurcode binnen</div>
+                <input class="input" id="inpColorCodeInside" type="text" placeholder="Bijv. RAL 9010 of structuurwit" />
+              </div>
+              <div class="field">
+                <div class="label">Afwerking buiten</div>
+                <select id="selFinishOutside">
+                  <option value="smooth">Glad</option>
+                  <option value="woodgrain">Houtnerf</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="label">Afwerking binnen</div>
+                <select id="selFinishInside">
+                  <option value="smooth">Glad</option>
+                  <option value="woodgrain">Houtnerf</option>
+                </select>
+              </div>
+              <div class="field">
+                <div class="label">Premium kleur</div>
+                <select id="selPremiumColor">
+                  <option value="no">Nee</option>
+                  <option value="yes">Ja</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="grid">
+          <div class="field">
+            <div class="label">Montage (€)</div>
+            <input class="input mono" id="inpMontage" type="number" min="0" step="1" />
+          </div>
+          <div class="field">
+            <div class="label">Korting (%)</div>
+            <input class="input mono" id="inpDiscount" type="number" min="0" max="50" step="0.5" />
+          </div>
+        </div>
+
+      </div>
+    </section>
+    </div>
+
+    <div class="rightStack">
+<section class="panel" aria-label="Preview">
+      <div class="panelHeader">
+        <h2>Preview <span class="badge">Live</span></h2>
+        
+      </div>
+
+      <div class="previewWrap">
+        
+        <div class="card">
+          <div class="cardHeader">
+              <h3>2D tekening</h3>
+              <div class="toolbar">
+                <span class="pill" id="pillDims">—</span>
+                <button class="btn btnGhost" id="btnZoomOut" type="button" title="Zoom uit">−</button>
+                <span class="pill" id="pillZoom">100%</span>
+                <button class="btn btnGhost" id="btnZoomIn" type="button" title="Zoom in">+</button>
+                <button class="btn btnGhost" id="btnZoomReset" type="button">100%</button>
+              </div>
+            </div>
+          <div class="svgBox">
+
+          <div class="drawOverlay">
+            <button class="drawToggle" id="btnToggleDims" type="button" title="Maatvoering aan/uit">Maat</button>
+            <button class="drawToggle" id="btnToggleFieldDims" type="button" title="Veldmaten aan/uit">Veld</button>
+
+            
+            <input type="checkbox" id="chkShowDims" class="visuallyHidden" />
+                      </div>
+
+            <svg id="svgPreview" viewBox="0 0 1100 520" role="img" aria-label="Kozijn tekening"></svg>
+          </div>
+        </div>
+
+        
+        <div class="card">
+          <div class="cardHeader"><h3>Overzicht</h3></div>
+          <div class="cardBody">
+            <div class="kv" id="overviewKv"></div>
+          </div>
+        </div>
+
+        <div class="card" id="cardProjectExtras">
+          <div class="cardHeader">
+            <h3>Project extra opties</h3>
+            <div class="toolbar">
+              <button class="btn btnGhost" id="btnAddExtra" type="button">+ Regel</button>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div id="extrasList" class="extrasList"></div>
+          </div>
+        </div>
+
+        
+        <div class="card" id="cardProject">
+          <div class="cardHeader">
+            <h3>Project</h3>
+            <div class="toolbar">
+              <span class="pill" id="pillProjectCount">0 items</span>
+            </div>
+          </div>
+          <div class="cardBody">
+            <div class="row">
+              <div class="field grow">
+                <div class="label">Naam kozijn</div>
+                <input id="inpProjectItemName" type="text" placeholder="Bijv. Kozijn voor" />
+              </div>
+              <div class="field" style="display:flex;align-items:flex-end;gap:10px;">
+                <button class="btn btnPrimary" id="btnAddProjectItem" type="button">+ Regel toevoegen</button>
+              </div>
+            </div>
+
+            
+            <div id="projectList" class="projectList" style="margin-top:14px;"></div>
+          </div>
+        </div>
+
+        
+        <div class="card">
+          <div class="cardHeader"><h3>Totaal offerte</h3></div>
+          <div class="cardBody">
+            <table class="table">
+              <tbody id="totalsBody"></tbody>
+            </table>
+
+          </div>
+        </div>
+
+      </div>
+    </section>
+    </div>
+
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="./core.js"></script>
+  <script src="./ui.js"></script>
+</body>
+</html>

@@ -139,6 +139,9 @@ export default function BeheerPage() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Link href="/beheer/verkoop" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)', padding: '7px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 500 }}>
+              💼 Verkoop
+            </Link>
             <Link href="/beheer/montage" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)', padding: '7px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 500 }}>
               🔧 Montage
             </Link>
@@ -257,7 +260,7 @@ export default function BeheerPage() {
                   <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center', transition: 'transform 0.2s', transform: isSelected ? 'rotate(90deg)' : 'rotate(0)' }}>›</div>
                 </div>
                 {isSelected && (
-                  <div className="animate-fade" style={{ borderBottom: '1px solid var(--border)', background: '#FAFBFA' }}>
+                  <div className="animate-fade" style={{ borderBottom: '2px solid var(--brand)', background: 'var(--brand-muted)', borderLeft: '3px solid var(--brand)' }}>
                     <DetailPanel order={order} onClose={() => setSelected(null)} onUpdate={loadOrders} showToast={showToast} inline />
                   </div>
                 )}
@@ -410,26 +413,38 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
 
   return (
     <>
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15 }}>{order.customer_name}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{order.customer_address}</div>
-          <div style={{ marginTop: 6 }}><PhaseBadge phase={order.phase} /></div>
+      {!inline && (
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{order.customer_name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{order.customer_address}</div>
+            <div style={{ marginTop: 6 }}><PhaseBadge phase={order.phase} /></div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: '0 2px', lineHeight: 1 }}>✕</button>
         </div>
-        {!inline && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: '0 2px', lineHeight: 1 }}>✕</button>}
-        {inline && <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-light)', padding: '4px 8px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>Sluiten ↑</button>}
-      </div>
+      )}
+      {inline && (
+        <div style={{ padding: '8px 18px', borderBottom: '1px solid var(--brand-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <PhaseBadge phase={order.phase} />
+            {order.customer_phone && <a href={`tel:${order.customer_phone}`} style={{ fontSize: 12, color: 'var(--brand)', textDecoration: 'none', fontWeight: 500 }}>📞 {order.customer_phone}</a>}
+          </div>
+          <button onClick={onClose} style={{ background: 'var(--brand)', color: 'white', border: 'none', cursor: 'pointer', fontSize: 12, padding: '5px 12px', borderRadius: 6, fontFamily: 'inherit', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            ↑ Sluiten
+          </button>
+        </div>
+      )}
 
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto', background: 'white' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            style={{ flex: '0 0 auto', padding: '9px 10px', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: tab === t.key ? 700 : 400, background: 'none', color: tab === t.key ? 'var(--brand)' : 'var(--text-muted)', borderBottom: tab === t.key ? '2px solid var(--brand)' : '2px solid transparent', transition: 'all 0.1s', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+            style={{ flex: '0 0 auto', padding: inline ? '7px 14px' : '9px 10px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: tab === t.key ? 700 : 400, background: 'none', color: tab === t.key ? 'var(--brand)' : 'var(--text-muted)', borderBottom: tab === t.key ? '2px solid var(--brand)' : '2px solid transparent', transition: 'all 0.1s', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
             {t.label}
           </button>
         ))}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 18 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 18, maxHeight: inline ? '420px' : undefined, background: 'white' }}>
 
         {tab === 'order' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>

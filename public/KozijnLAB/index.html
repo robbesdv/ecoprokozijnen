@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="nl" data-theme="light" data-accent="sky" data-density="comfortable">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>KozijnLAB — Configurator</title>
+<link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="1"/>
+          <line x1="12" y1="3" x2="12" y2="21"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">KozijnLAB</div>
+        <div class="brand-sub">Configurator v2</div>
+      </div>
+    </div>
+    <div class="offer-chip">
+      <span class="offer-lbl">Offerte</span>
+      <span class="offer-val mono" id="offer-code">—</span>
+    </div>
+  </div>
+  <div class="topbar-center">
+    <div class="save-state">
+      <span class="save-dot" id="save-dot"></span>
+      <span id="save-label">Opgeslagen</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-ghost" id="btn-toggle-config" aria-label="Config">☰</button>
+    <button class="btn btn-icon" id="btn-theme-toggle" title="Thema"></button>
+    <button class="btn btn-ghost" id="btn-print" title="Print / PDF">🖨</button>
+    <button class="btn btn-ghost" id="btn-new-offer">Nieuwe offerte</button>
+    <button class="btn btn-primary" id="btn-export">Exporteer JSON</button>
+    <button class="btn btn-success" id="btn-to-ecopro">→ EcoPro</button>
+    <button class="btn btn-ghost" id="btn-toggle-meta" aria-label="Overzicht">▤</button>
+  </div>
+</header>
+
+<main class="app">
+  <!-- LEFT: config -->
+  <aside class="col-config">
+    <div class="col-head">
+      <h2 class="col-title">Configuratie</h2>
+      <div class="col-sub">Stel je element samen, stap voor stap.</div>
+    </div>
+    <div class="col-scroll">
+      <div id="config-root"></div>
+    </div>
+  </aside>
+
+  <!-- CENTER: preview -->
+  <section class="col-preview">
+    <div class="preview-toolbar">
+      <div class="tool-group">
+        <button class="tool-btn" data-mode-opt="sales">Verkoop</button>
+        <button class="tool-btn" data-mode-opt="factory">Fabriek</button>
+      </div>
+      <div class="tool-group">
+        <button class="tool-btn" id="toggle-dims" title="Maatvoering">📏 Maat</button>
+        <button class="tool-btn" id="toggle-fielddims" title="Veldmaten">⊞ Veldmaten</button>
+        <button class="tool-btn" id="toggle-labels" title="Labels">🏷 Labels</button>
+      </div>
+    </div>
+
+    <div class="preview-stage">
+      <svg id="preview-svg" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+
+    <div class="preview-footer">
+      <div class="stat">
+        <span class="stat-label">Afmeting</span>
+        <span class="stat-value mono" id="stat-dims">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Oppervlakte</span>
+        <span class="stat-value mono" id="stat-area">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Vakken</span>
+        <span class="stat-value mono" id="stat-vakken">—</span>
+      </div>
+      <div class="stat stat-price">
+        <span class="stat-label">Stukprijs (×aantal)</span>
+        <span class="stat-value mono" id="stat-price">—</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: project list + totals -->
+  <aside class="col-meta">
+    <div class="col-head">
+      <h2 class="col-title">Project</h2>
+      <div class="col-sub" id="elem-count">—</div>
+    </div>
+    <div class="col-scroll">
+      <div class="panel">
+        <div class="panel-head">
+          <span>Elementen</span>
+          <button class="btn btn-sm btn-primary" id="btn-add-element">＋ Toevoegen</button>
+        </div>
+        <div class="element-list" id="element-list"></div>
+      </div>
+
+      <div class="panel panel-totals">
+        <div class="panel-head"><span>Totalen</span></div>
+        <div class="totals" id="totals-table"></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- Drawer: JSON export -->
+<div class="drawer-overlay" id="drawer-overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <h3 class="drawer-title">Offerte export</h3>
+      <div class="drawer-sub mono" id="drawer-offer">Gestructureerde JSON klaar voor koppeling</div>
+    </div>
+    <button class="btn btn-ghost" id="drawer-close">✕</button>
+  </div>
+  <div class="drawer-actions">
+    <button class="btn btn-primary" id="btn-download-json">⬇ Download .json</button>
+    <button class="btn btn-ghost" id="btn-copy-json">⧉ Kopieer</button>
+  </div>
+  <pre class="drawer-body"><code id="json-output"></code></pre>
+</div>
+
+<!-- Tweaks panel -->
+<div class="tweaks-panel" id="tweaks-panel">
+  <div class="tweaks-head">
+    <div class="tweaks-title">Tweaks</div>
+    <button class="btn btn-ghost btn-sm" id="tw-close">✕</button>
+  </div>
+  <div class="tweaks-body">
+    <div class="tw-group">
+      <div class="tw-label">Thema</div>
+      <div class="tw-opts">
+        <button data-theme-opt="light">☀ Licht</button>
+        <button data-theme-opt="dark">☾ Donker</button>
+      </div>
+    </div>
+    <div class="tw-group">
+      <div class="tw-label">Accent</div>
+      <div class="tw-opts tw-colors">
+        <button data-accent-opt="sky" style="--acc:#0284c7"></button>
+        <button data-accent-opt="emerald" style="--acc:#059669"></button>
+        <button data-accent-opt="amber" style="--acc:#d97706"></button>
+        <button data-accent-opt="rose" style="--acc:#e11d48"></button>
+        <button data-accent-opt="violet" style="--acc:#7c3aed"></button>
+        <button data-accent-opt="slate" style="--acc:#475569"></button>
+      </div>
+    </div>
+    <div class="tw-group">
+      <div class="tw-label">Dichtheid</div>
+      <div class="tw-opts">
+        <button data-density-opt="compact">Compact</button>
+        <button data-density-opt="comfortable">Comfortabel</button>
+        <button data-density-opt="spacious">Ruim</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
