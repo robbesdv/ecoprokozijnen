@@ -324,7 +324,7 @@ export default function BeheerPage() {
         </div>
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>{/* /outer flex-row */}
+    </div>
   )
 }
 
