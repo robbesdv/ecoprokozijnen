@@ -12,7 +12,7 @@ import {
   formatEuro,
   formatDate,
 } from '@/lib/phases'
-import { KozijnSVG, kozijnSVGString, svgToPngDataUrl, ralName, PANE_NAMES } from '@/lib/KozijnSVG'
+import { KozijnSVG, kozijnSVGString, svgToPngDataUrl, ralName, PANE_NAMES, normalizeEl } from '@/lib/KozijnSVG'
 
 const COMPANY = {
   name: 'EcoPro Kozijnen B.V.',
@@ -701,18 +701,18 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.rect(0, 40, W, 2, 'F')
 
     try {
-      doc.addImage(LOGO_BASE64, 'PNG', W - M - 28, 7, 22, 22)
+      doc.addImage(LOGO_BASE64, 'PNG', M, 8, 22, 22)
     } catch (e) {}
 
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(20)
     doc.setFont('helvetica', 'bold')
-    doc.text('EcoPro Kozijnen', M, 18)
+    doc.text('EcoPro Kozijnen', M + 26, 18)
 
     doc.setFontSize(8)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(180, 210, 185)
-    doc.text(`${COMPANY.fullAddress}  ·  ${COMPANY.phone}  ·  ${COMPANY.email}`, M, 26)
+    doc.text(`${COMPANY.fullAddress}  ·  ${COMPANY.phone}  ·  ${COMPANY.email}`, M + 26, 26)
 
     doc.setFontSize(22)
     doc.setFont('helvetica', 'bold')
@@ -875,13 +875,7 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.setTextColor(60, 60, 60)
     doc.setFontSize(8.5)
     doc.text('20% aanbetaling bij akkoord: ' + eur(inclBTW * 0.2), M + 3, y + 11)
-    doc.text(
-      '80% restbetaling na succesvolle montage: ' +
-        eur(inclBTW * 0.8) +
-        '  (optioneel: 70% na montage + 10% na oplevering)',
-      M + 3,
-      y + 17
-    )
+    doc.text('80% restbetaling na succesvolle montage: ' + eur(inclBTW * 0.8), M + 3, y + 17)
 
     y += 26
 
@@ -929,7 +923,7 @@ function Phase0({ order, onRefresh, showToast }) {
     // ── Tekeningen per element (eigen pagina per kozijn) ────────────────────
     const elemItems = items.filter(i => i.element_config)
     for (const item of elemItems) {
-      const el = item.element_config
+      const el = normalizeEl(item.element_config)
       doc.addPage()
 
       // Pagina-header
@@ -957,7 +951,7 @@ function Phase0({ order, onRefresh, showToast }) {
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(...gray)
-      doc.text(`${el.widthMM} × ${el.heightMM} mm  ·  ${item.quantity}×  ·  Kleur: ${el.colorOutside} ${ralName(el.colorOutside)}`, M, py)
+      doc.text(`${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm  ·  ${item.quantity}×  ·  Kleur: ${el.colorOutside} ${ralName(el.colorOutside)}`, M, py)
       py += 10
 
       // SVG tekening → PNG → jsPDF
@@ -976,14 +970,15 @@ function Phase0({ order, onRefresh, showToast }) {
       const cols = el.columns || []
       const specsBody = [
         ['Type', el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—'],
-        ['Breedte × Hoogte', `${el.widthMM} × ${el.heightMM} mm`],
+        ['Breedte × Hoogte', `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm`],
         ['Kleur buiten', `${el.colorOutside} — ${ralName(el.colorOutside)}`],
         ['Kleur binnen', el.colorInside === 'same' ? `Zelfde als buiten` : `${el.colorInside} — ${ralName(el.colorInside)}`],
         ['Afwerking', `Buiten: ${el.finishOutside === 'woodgrain' ? 'Houtnerf' : 'Glad'}  /  Binnen: ${el.finishInside === 'woodgrain' ? 'Houtnerf' : 'Glad'}`],
         ['Aantal kolommen', String(cols.length)],
         ...cols.map((col, ci) => {
           const vakken = col.rows.map((r, ri) => `V${ri + 1}: ${PANE_NAMES[r.paneType] || r.paneType}${['draai','draaikiep','deur'].includes(r.paneType) ? ` (${r.hinge === 'left' ? 'L' : 'R'})` : ''}`).join('  ·  ')
-          return [`Kolom ${ci + 1} (${Math.round(el.widthMM * col.widthPct / 100)} mm)`, vakken]
+          const colW = col.widthMM ?? (el.widthMM && col.widthPct ? Math.round(el.widthMM * col.widthPct / 100) : '—')
+          return [`Kolom ${ci + 1} (${colW} mm)`, vakken]
         }),
       ]
 
@@ -1327,7 +1322,7 @@ function KozijnElementenSection({ items }) {
       </div>
 
       {elemItems.map((item, idx) => {
-        const el = item.element_config
+        const el = normalizeEl(item.element_config)
         const cols = el.columns || []
         const panesSummary = cols.map((col, ci) =>
           col.rows.map((r, ri) => `K${ci + 1}-V${ri + 1}: ${PANE_NAMES[r.paneType] || r.paneType}`).join(', ')
@@ -1341,7 +1336,7 @@ function KozijnElementenSection({ items }) {
                 <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.6)', marginBottom: 3 }}>Element {idx + 1}</div>
                 <div style={{ fontWeight: 700, fontSize: 17 }}>{el.name}</div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
-                  {el.widthMM} × {el.heightMM} mm · {item.quantity}×
+                  {el.widthMM ?? '—'} × {el.heightMM ?? '—'} mm · {item.quantity}×
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
@@ -1357,7 +1352,7 @@ function KozijnElementenSection({ items }) {
             <div style={{ padding: '14px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
               {[
                 { label: 'Type', value: el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—' },
-                { label: 'Breedte × Hoogte', value: `${el.widthMM} × ${el.heightMM} mm` },
+                { label: 'Breedte × Hoogte', value: `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm` },
                 { label: 'Kleur buiten', value: `${el.colorOutside} ${ralName(el.colorOutside)}` },
                 { label: 'Kleur binnen', value: el.colorInside === 'same' ? `Zelfde (${ralName(el.colorOutside)})` : `${colorInside} ${ralName(colorInside)}` },
                 { label: 'Kolommen', value: String(cols.length) },
