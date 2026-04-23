@@ -4,6 +4,31 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { getPhase, formatEuro, formatDate } from '@/lib/phases'
+import { ralName } from '@/lib/KozijnSVG'
+
+const PANE_LABEL = {
+  vast: 'vast glas', draai: 'draai', kiep: 'kiep',
+  draaikiep: 'draai-kiep', vent: 'ventilatie', deur: 'deur', schuif: 'schuif',
+}
+
+function buildItemDescription(el) {
+  const cols = el.columns || []
+  const allRows = cols.flatMap(c => c.rows || [])
+  const nVaks = allRows.length
+  const seenTypes = []
+  allRows.forEach(r => {
+    const label = PANE_LABEL[r.paneType] || r.paneType
+    if (!seenTypes.includes(label)) seenTypes.push(label)
+  })
+  const w = el.dimensions?.widthMM
+  const h = el.dimensions?.heightMM
+  const colorCode = el.finish?.colorOutside || ''
+  const colorName = ralName(colorCode)
+  const vaksStr = `${nVaks || 1}-vaks`
+  const typesStr = seenTypes.join(' / ') || 'vast glas'
+  const kleurStr = colorCode + (colorName && colorName !== colorCode ? ` — ${colorName}` : '')
+  return `Premium Schüco Living Variant ${vaksStr}, ${typesStr}, ${w} × ${h}mm bxh, Kleur: ${kleurStr}, HR++`
+}
 
 const NAV = [
   { key: 'dashboard',  label: 'Dashboard',    icon: '▣' },
@@ -73,7 +98,7 @@ export default function VerkoopPage() {
 
     const items = (kl.elements || []).map((el, idx) => ({
       order_id:      order.id,
-      description:   `${el.name} — ${el.dimensions?.widthMM}×${el.dimensions?.heightMM}mm, kleur ${el.finish?.colorOutside || ''}`,
+      description:   buildItemDescription(el),
       quantity:      el.qty || 1,
       unit_price:    el.pricePerUnit || 0,
       sort_order:    idx,
