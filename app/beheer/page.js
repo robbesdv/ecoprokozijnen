@@ -53,6 +53,7 @@ export default function BeheerPage() {
   const [showNewModal, setShowNewModal] = useState(false)
   const [loading, setLoading]           = useState(true)
   const [toast, setToast]               = useState(null)
+  const [activeView, setActiveView]     = useState('orders')
 
   const loadOrders = useCallback(async () => {
     const { data } = await supabase
@@ -126,38 +127,24 @@ export default function BeheerPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
-      <header style={{ background: 'linear-gradient(135deg, var(--brand) 0%, #1a4d31 100%)', color: 'white', flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 58 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
-              <div style={{ fontSize: 11, opacity: 0.5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </div>
-            </div>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <BeheerSidebar activeView={activeView} setActiveView={setActiveView} onLogout={logout} onNewOrder={() => setShowNewModal(true)} />
+
+      {/* ── Main column ─────────────────────────────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
+
+      {/* Topbar */}
+      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 28px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>
+            {activeView === 'orders' ? 'Dashboard' : activeView === 'klanten' ? 'Klanten' : ''}
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Link href="/beheer/verkoop" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)', padding: '7px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 500 }}>
-              💼 Verkoop
-            </Link>
-            <Link href="/beheer/montage" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)', padding: '7px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 500 }}>
-              🔧 Montage
-            </Link>
-            <Link href="/beheer/rapportage" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)', padding: '7px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 500 }}>
-              📊 Rapport
-            </Link>
-            <button className="btn btn-accent btn-sm" onClick={() => setShowNewModal(true)} style={{ whiteSpace: 'nowrap', padding: '7px 16px', fontWeight: 600 }}>+ Nieuwe order</button>
-            <button
-              onClick={logout}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)', padding: '7px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-            >
-              ↩ Uitloggen
-            </button>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+            {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </div>
         </div>
-      </header>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowNewModal(true)} style={{ fontWeight: 600 }}>+ Nieuwe order</button>
+      </div>
 
       {/* ── KPI + Pipeline ────────────────────────────────────────────── */}
       <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '20px 24px 16px', flexShrink: 0 }}>
@@ -218,7 +205,7 @@ export default function BeheerPage() {
         })()}
       </div>
 
-      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      {activeView === 'orders' && <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, overflowX: 'auto', scrollbarWidth: 'none' }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 14 }}>🔍</span>
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek op naam of adres…" style={{ width: 160, paddingLeft: 32, fontSize: 13, flexShrink: 0 }} />
@@ -239,9 +226,12 @@ export default function BeheerPage() {
           </button>
         </div>
         <span style={{ fontSize: 12, color: 'var(--text-light)', flexShrink: 0, whiteSpace: 'nowrap' }}>{visible.length} orders</span>
-      </div>
+      </div>}
 
       <div style={{ flex: 1, overflow: 'hidden' }}>
+        {activeView === 'klanten' ? (
+          <KlantenView orders={orders} />
+        ) : (
         <div style={{ height: '100%', overflowY: 'auto', background: 'white' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '44px 2fr 1.3fr 1fr 36px', padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
             <div />
@@ -315,9 +305,10 @@ export default function BeheerPage() {
             )
           })}
         </div>
-
-
+        )}
       </div>
+
+      </div>{/* /main column */}
 
       {showNewModal && (
         <NewOrderModal
@@ -333,6 +324,142 @@ export default function BeheerPage() {
         </div>
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>{/* /outer flex-row */}
+  )
+}
+
+function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
+  const NAV_TOP = [
+    { key: 'orders',   icon: '▣', label: 'Dashboard',  inPage: true },
+    { key: 'klanten',  icon: '👥', label: 'Klanten',    inPage: true },
+  ]
+  const NAV_LINKS = [
+    { href: '/beheer/verkoop',    icon: '💼', label: 'Verkoop' },
+    { href: '/beheer/montage',    icon: '🔧', label: 'Montage' },
+    { href: '/beheer/rapportage', icon: '📊', label: 'Rapportage' },
+  ]
+  const navItem = (active, onClick, icon, label) => (
+    <div key={label} onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 14px', borderRadius: 9, marginBottom: 2, cursor: 'pointer', fontSize: 13, fontWeight: active ? 600 : 400, color: active ? 'white' : 'rgba(255,255,255,0.52)', background: active ? 'rgba(255,255,255,0.13)' : 'transparent', transition: 'all 0.13s', userSelect: 'none', textDecoration: 'none' }}
+      onMouseEnter={e => !active && (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
+      onMouseLeave={e => !active && (e.currentTarget.style.background = 'transparent')}
+    >
+      <span style={{ fontSize: 15, width: 18, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+      {label}
+      {active && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#4ade80' }} />}
+    </div>
+  )
+  return (
+    <div style={{ width: 220, background: '#152318', color: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0, height: '100vh', borderRight: '1px solid rgba(0,0,0,0.2)' }}>
+      {/* Logo */}
+      <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <img src="/logo.png" alt="EcoPro" style={{ width: 34, height: 34, objectFit: 'contain', background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 4 }} />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>EcoPro Kozijnen</div>
+            <div style={{ fontSize: 10, opacity: 0.38, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Beheerpaneel</div>
+          </div>
+        </div>
+        <button onClick={onNewOrder} style={{ width: '100%', background: 'var(--brand)', border: 'none', color: 'white', padding: '9px 14px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          + Nieuwe order
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '14px 10px 8px', overflowY: 'auto' }}>
+        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', padding: '0 14px 8px' }}>Overzicht</div>
+        {NAV_TOP.map(item => navItem(activeView === item.key, () => setActiveView(item.key), item.icon, item.label))}
+
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 4px' }} />
+        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', padding: '0 14px 8px' }}>Werkplekken</div>
+        {NAV_LINKS.map(item => (
+          <Link key={item.href} href={item.href} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 14px', borderRadius: 9, marginBottom: 2, fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.52)', textDecoration: 'none', transition: 'all 0.13s' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)', e.currentTarget.style.color = 'white')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'rgba(255,255,255,0.52)')}
+          >
+            <span style={{ fontSize: 15, width: 18, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+
+      {/* Bottom */}
+      <div style={{ padding: '12px 10px 16px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', textAlign: 'center', marginBottom: 8 }}>
+          {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </div>
+        <div onClick={onLogout}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 9, cursor: 'pointer', fontSize: 12, color: 'rgba(255,255,255,0.38)', transition: 'all 0.13s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)', e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'rgba(255,255,255,0.38)')}
+        >
+          <span>↩</span> Uitloggen
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function KlantenView({ orders }) {
+  const klanten = Object.values(
+    (orders || []).reduce((acc, o) => {
+      const key = o.customer_email || o.customer_name
+      if (!acc[key]) acc[key] = { name: o.customer_name, email: o.customer_email, phone: o.customer_phone, address: o.customer_address, orders: [], totalValue: 0 }
+      acc[key].orders.push(o)
+      acc[key].totalValue += o.total_amount || 0
+      return acc
+    }, {})
+  ).sort((a, b) => b.totalValue - a.totalValue)
+
+  if (!klanten.length) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', fontSize: 14 }}>
+      Nog geen klanten.
+    </div>
+  )
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '24px 28px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
+        {klanten.map((k, i) => {
+          const lastOrder = k.orders[0]
+          const activeOrders = k.orders.filter(o => o.phase < 7).length
+          const initColor = `hsl(${((k.name?.charCodeAt(0) || 65) * 97 + 120) % 360},40%,38%)`
+          return (
+            <div key={i} style={{ background: 'white', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden', transition: 'box-shadow 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+            >
+              <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)' }}>
+                <div style={{ width: 42, height: 42, borderRadius: '50%', background: initColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, flexShrink: 0 }}>
+                  {(k.name || '?')[0].toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.address || k.email || '—'}</div>
+                </div>
+              </div>
+              <div style={{ padding: '12px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {[
+                  { label: 'Orders', value: k.orders.length },
+                  { label: 'Actief', value: activeOrders, warn: activeOrders > 0 },
+                  { label: 'Totaal', value: `€ ${Math.round(k.totalValue).toLocaleString('nl-NL')}` },
+                ].map(s => (
+                  <div key={s.label} style={{ background: 'var(--bg)', borderRadius: 8, padding: '8px 10px' }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 3 }}>{s.label}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: s.warn ? 'var(--brand)' : 'var(--text)' }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+              {(k.email || k.phone) && (
+                <div style={{ padding: '0 18px 14px', display: 'flex', gap: 10 }}>
+                  {k.email && <a href={`mailto:${k.email}`} style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>✉ {k.email}</a>}
+                  {k.phone && <a href={`tel:${k.phone}`} style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>📞 {k.phone}</a>}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
