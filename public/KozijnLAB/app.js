@@ -160,23 +160,23 @@ function priceElement(el) {
 
   if (el.type === 'kozijn') {
     const vakken = countVakken(el);
-    const startTable = { 1: 1128, 2: 1258, 3: 1388, 4: 1518, 5: 1649 };
-    let s = startTable[Math.min(5, vakken)] || 1128;
+    const startTable = { 1: 1406, 2: 1568, 3: 1730, 4: 1893, 5: 2055 };
+    let s = startTable[Math.min(5, vakken)] || 1406;
     const wCm = Math.ceil(el.widthMM / 10);
     const hCm = Math.ceil(el.heightMM / 10);
     const wSteps = Math.max(0, Math.ceil((wCm - 70) / 10));
     const hSteps = Math.max(0, Math.ceil((hCm - 70) / 10));
     base = s + (wSteps + hSteps) * 26;
-  } else if (el.type === 'deur') base = 1450 + m2 * 280;
-  else if (el.type === 'schuifpui') base = 2200 + m2 * 850;
-  else if (el.type === 'hefschuif') base = 3400 + m2 * 1100;
-  else if (el.type === 'dakraam') base = 580 + m2 * 220;
+  } else if (el.type === 'deur') base = 1494 + m2 * 288;
+  else if (el.type === 'schuifpui') base = 2266 + m2 * 876;
+  else if (el.type === 'hefschuif') base = 3502 + m2 * 1133;
+  else if (el.type === 'dakraam') base = 597 + m2 * 227;
 
   let openCount = 0;
   el.columns.forEach(col => col.rows.forEach(r => {
     if (['draai', 'kiep', 'draaikiep', 'deur'].includes(r.paneType)) openCount++;
   }));
-  base += openCount * 140;
+  base += openCount * 144;
 
   let glassUpgrade = 0;
   el.columns.forEach(col => col.rows.forEach(r => {
@@ -185,15 +185,15 @@ function priceElement(el) {
     const rowH = el.heightMM * (r.heightPct / 100);
     const am2 = (colW * rowH) / 1e6;
     const pack = r.glassPack || el.glassPack || 'HR++';
-    if (pack === 'HR+++') glassUpgrade += am2 * 87;
-    if (pack === 'Triple') glassUpgrade += am2 * 87;
-    if (r.glassFinish === 'satinato') glassUpgrade += am2 * 18;
-    if (r.glassFinish === 'solar') glassUpgrade += am2 * 58;
+    if (pack === 'HR+++') glassUpgrade += am2 * 90;
+    if (pack === 'Triple') glassUpgrade += am2 * 90;
+    if (r.glassFinish === 'satinato') glassUpgrade += am2 * 19;
+    if (r.glassFinish === 'solar') glassUpgrade += am2 * 60;
   }));
   base += glassUpgrade;
 
-  if (el.colorInside !== 'same' && el.colorInside !== el.colorOutside) base += 180;
-  if (el.finishOutside === 'woodgrain' || el.finishInside === 'woodgrain') base += 95;
+  if (el.colorInside !== 'same' && el.colorInside !== el.colorOutside) base += 185;
+  if (el.finishOutside === 'woodgrain' || el.finishInside === 'woodgrain') base += 98;
 
   return Math.round(base * el.qty);
 }
