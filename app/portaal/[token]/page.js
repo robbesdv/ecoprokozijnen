@@ -15,9 +15,9 @@ import {
 
 const COMPANY = {
   name: 'EcoPro Kozijnen B.V.',
-  iban: 'HIER_JE_ECHTE_IBAN',
-  bic: 'HIER_JE_ECHTE_BIC',
-  bankName: 'HIER_JE_BANKNAAM',
+  iban: 'NL37ABNA0126549974',
+  bic: 'ABNANL2A',
+  bankName: 'ABN-AMBRO',
   phone: '085 049 24 56',
   phoneHref: '+31850492456',
   whatsappHref: 'https://wa.me/31850492456',
