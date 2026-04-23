@@ -176,7 +176,7 @@ function priceElement(el) {
   el.columns.forEach(col => col.rows.forEach(r => {
     if (['draai', 'kiep', 'draaikiep', 'deur'].includes(r.paneType)) openCount++;
   }));
-  base += openCount * 144;
+  base += openCount * 148;
 
   let glassUpgrade = 0;
   el.columns.forEach(col => col.rows.forEach(r => {
@@ -185,15 +185,15 @@ function priceElement(el) {
     const rowH = el.heightMM * (r.heightPct / 100);
     const am2 = (colW * rowH) / 1e6;
     const pack = r.glassPack || el.glassPack || 'HR++';
-    if (pack === 'HR+++') glassUpgrade += am2 * 90;
-    if (pack === 'Triple') glassUpgrade += am2 * 90;
-    if (r.glassFinish === 'satinato') glassUpgrade += am2 * 19;
-    if (r.glassFinish === 'solar') glassUpgrade += am2 * 60;
+    if (pack === 'HR+++') glassUpgrade += am2 * 93;
+    if (pack === 'Triple') glassUpgrade += am2 * 93;
+    if (r.glassFinish === 'satinato') glassUpgrade += am2 * 20;
+    if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
   }));
   base += glassUpgrade;
 
-  if (el.colorInside !== 'same' && el.colorInside !== el.colorOutside) base += 185;
-  if (el.finishOutside === 'woodgrain' || el.finishInside === 'woodgrain') base += 98;
+  if (el.colorInside !== 'same' && el.colorInside !== el.colorOutside) base += 191;
+  if (el.finishOutside === 'woodgrain' || el.finishInside === 'woodgrain') base += 101;
 
   return Math.round(base * el.qty);
 }
