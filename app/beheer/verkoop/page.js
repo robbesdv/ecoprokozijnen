@@ -380,7 +380,6 @@ export default function VerkoopPage() {
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
       )}
-      </div>
     </div>
   )
 }
