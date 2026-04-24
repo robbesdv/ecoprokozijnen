@@ -30,11 +30,13 @@ const PANE_TYPES = {
     { id: 'draai', label: 'Draai' },
     { id: 'kiep', label: 'Kiep' },
     { id: 'draaikiep', label: 'Draai-kiep' },
+    { id: 'deur', label: 'Openslaand (deur)' },
+    { id: 'deur2', label: 'Dubbele deur' },
     { id: 'vent', label: 'Ventilatie' },
   ],
   deur: [
-    { id: 'deur', label: 'Deur' },
-    { id: 'vast', label: 'Bovenlicht' },
+    { id: 'deur', label: 'Openslaand' },
+    { id: 'vast', label: 'Vast / bovenlicht' },
   ],
   schuifpui: [
     { id: 'schuif', label: 'Schuifdeel' },
@@ -89,6 +91,8 @@ function newElement(type = 'kozijn', name = '') {
   };
   if (type === 'deur') {
     base.widthMM = 1000; base.heightMM = 2300;
+    base.doorSubtype = 'voordeur';
+    base.doorOptions = {};
     base.columns = [{ widthPct: 100, rows: [{ paneType: 'deur', hinge: 'left', fill: 'panel', heightPct: 100 }] }];
   }
   if (type === 'schuifpui' || type === 'hefschuif') {
@@ -121,6 +125,7 @@ function newProject() {
     discountPct: 0,
     vatRate: 0.21,
     notes: '',
+    extras: [],
   };
 }
 
@@ -158,8 +163,7 @@ function priceElement(el) {
   const wM = el.widthMM / 1000, hM = el.heightMM / 1000;
   const m2 = wM * hM;
 
-  // Alle prijzen hieronder zijn INCL. BTW (rechtstreeks uit de Excel prijstabel)
-  // Aan het einde wordt gedeeld door 1.21 zodat projectTotals BTW correct één keer toevoegt
+  // Alle prijzen zijn INCL. BTW (uit Excel). Aan het einde ÷1.21 → projectTotals voegt BTW toe.
   if (el.type === 'kozijn') {
     const vakken = countVakken(el);
     const startTable = { 1: 1406, 2: 1568, 3: 1730, 4: 1893, 5: 2055 };
@@ -169,33 +173,57 @@ function priceElement(el) {
     const wSteps = Math.max(0, Math.ceil((wCm - 70) / 10));
     const hSteps = Math.max(0, Math.ceil((hCm - 70) / 10));
     base = s + (wSteps + hSteps) * 31;
-  } else if (el.type === 'deur') base = 1494 + m2 * 288;
-  else if (el.type === 'schuifpui') base = 2266 + m2 * 876;
+
+    let openCount = 0;
+    el.columns.forEach(col => col.rows.forEach(r => {
+      if (['draai', 'kiep', 'draaikiep'].includes(r.paneType)) openCount++;
+    }));
+    base += openCount * 315;
+
+    let glassUpgrade = 0;
+    el.columns.forEach(col => col.rows.forEach(r => {
+      if (r.fill !== 'glass') return;
+      const colW = el.widthMM * (col.widthPct / 100);
+      const rowH = el.heightMM * (r.heightPct / 100);
+      const am2 = (colW * rowH) / 1e6;
+      const pack = r.glassPack || el.glassPack || 'HR++';
+      if (pack === 'HR+++') glassUpgrade += am2 * 105;
+      if (pack === 'Triple') glassUpgrade += am2 * 105;
+      if (r.glassFinish === 'satinato') glassUpgrade += am2 * 20;
+      if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
+    }));
+    base += glassUpgrade;
+
+    if (el.colorInside !== 'same' && el.colorInside !== el.colorOutside) base += 191;
+    if (el.finishOutside === 'woodgrain' || el.finishInside === 'woodgrain') base += 101;
+
+  } else if (el.type === 'deur') {
+    const sub = el.doorSubtype || 'voordeur';
+    const opts = el.doorOptions || {};
+    if (sub === 'voordeur') {
+      base = opts.epkSchuin ? 4892.5 : 4738;
+      if (opts.briefklep)        base += 257.5;
+      if (opts.briefbak)         base += 154.5;
+      if (opts.draadlozeBel)     base += 103;
+      if (opts.zijlicht)         base += 257.5;
+      if (opts.bovenlicht)       base += 257.5;
+      if (opts.dddPaneel)        base += 1545;
+      if (opts.paneelSierrooster) base += 2575;
+    } else if (sub === 'achterdeur') {
+      base = 3811;
+      if (opts.zijlicht)   base += 257.5;
+      if (opts.bovenlicht) base += 257.5;
+      if (opts.dddPaneel)  base += 1545;
+    } else if (sub === 'tuindeur') {
+      base = 7210;
+      if (opts.zijlichtKlein) base += 515;
+      if (opts.zijlichtGroot) base += 1030;
+      if (opts.bovenlicht)    base += 515;
+    }
+
+  } else if (el.type === 'schuifpui') base = 2266 + m2 * 876;
   else if (el.type === 'hefschuif') base = 3502 + m2 * 1133;
   else if (el.type === 'dakraam') base = 597 + m2 * 227;
-
-  let openCount = 0;
-  el.columns.forEach(col => col.rows.forEach(r => {
-    if (['draai', 'kiep', 'draaikiep', 'deur'].includes(r.paneType)) openCount++;
-  }));
-  base += openCount * 315;
-
-  let glassUpgrade = 0;
-  el.columns.forEach(col => col.rows.forEach(r => {
-    if (r.fill !== 'glass') return;
-    const colW = el.widthMM * (col.widthPct / 100);
-    const rowH = el.heightMM * (r.heightPct / 100);
-    const am2 = (colW * rowH) / 1e6;
-    const pack = r.glassPack || el.glassPack || 'HR++';
-    if (pack === 'HR+++') glassUpgrade += am2 * 105;
-    if (pack === 'Triple') glassUpgrade += am2 * 105;
-    if (r.glassFinish === 'satinato') glassUpgrade += am2 * 20;
-    if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
-  }));
-  base += glassUpgrade;
-
-  if (el.colorInside !== 'same' && el.colorInside !== el.colorOutside) base += 191;
-  if (el.finishOutside === 'woodgrain' || el.finishInside === 'woodgrain') base += 101;
 
   return (base / 1.21) * el.qty;
 }
@@ -209,13 +237,15 @@ function countVakken(el) {
 function projectTotals() {
   let material = 0;
   state.elements.forEach(el => material += priceElement(el));
+  let extrasTotal = 0;
+  (state.extras || []).forEach(ex => extrasTotal += (ex.qty || 1) * (ex.unitPrice || 0));
   const montage = Number(state.montageEuro) || 0;
-  const sub = material + montage;
+  const sub = material + extrasTotal + montage;
   const discount = sub * ((Number(state.discountPct) || 0) / 100);
   const net = Math.max(0, sub - discount);
   const vat = net * (Number(state.vatRate) || 0);
   const gross = net + vat;
-  return { material, montage, sub, discount, net, vat, gross };
+  return { material, extrasTotal, montage, sub, discount, net, vat, gross };
 }
 
 const fmtEuro = n => '€ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
@@ -484,6 +514,18 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, isFactory) {
       svg.appendChild(svgEl('line', { x1: x + 10, y1: ly, x2: x + w - 10, y2: ly, stroke: 'var(--draw-arrow)', 'stroke-width': 1 }));
     }
   }
+  if (pType === 'deur2') {
+    const gap = Math.max(2, inset / 2);
+    const lw = sw / 2 - gap / 2;
+    const rox = sx + sw / 2 + gap / 2;
+    const rw = sw - lw - gap;
+    svg.appendChild(svgEl('rect', { x: sx,  y: sy, width: lw, height: sh, class: 'svg-sash', rx: 1 }));
+    svg.appendChild(svgEl('rect', { x: rox, y: sy, width: rw, height: sh, class: 'svg-sash', rx: 1 }));
+    svg.appendChild(svgEl('path', { d: `M ${sx} ${sy} L ${sx + lw} ${sy + sh / 2} L ${sx} ${sy + sh}`, class: 'svg-op' }));
+    svg.appendChild(svgEl('rect', { x: sx + lw - 8, y: sy + sh * 0.5 - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
+    svg.appendChild(svgEl('path', { d: `M ${rox + rw} ${sy} L ${rox} ${sy + sh / 2} L ${rox + rw} ${sy + sh}`, class: 'svg-op' }));
+    svg.appendChild(svgEl('rect', { x: rox + 4, y: sy + sh * 0.5 - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
+  }
   if (pType === 'vast' && (isFactory || row.fill === 'glass')) {
     const cxm = x + w / 2, cym = y + h / 2;
     const sz = Math.min(w, h) * 0.05;
@@ -706,6 +748,7 @@ function render() {
 function _render() {
   renderConfig();
   renderProject();
+  renderExtras();
   renderTotals();
   renderPreview();
   document.getElementById('offer-code').textContent = state.offerCode;
@@ -752,6 +795,54 @@ function renderConfig() {
     b.classList.toggle('is-active', b.dataset.v === (el.slideSystem || 'hst'));
   });
 
+  const doorTypeField = root.querySelector('#door-type-field');
+  const doorOptsField = root.querySelector('#door-options-field');
+  doorTypeField.style.display = el.type === 'deur' ? '' : 'none';
+  doorOptsField.style.display = el.type === 'deur' ? '' : 'none';
+  if (el.type === 'deur') {
+    const sub = el.doorSubtype || 'voordeur';
+    doorTypeField.querySelectorAll('#door-seg button').forEach(b => {
+      b.classList.toggle('is-active', b.dataset.v === sub);
+    });
+    const DOOR_OPTS = {
+      voordeur: [
+        { key: 'epkSchuin',        label: 'EPK-1 + 16 deur (schuin)', price: 154.5 },
+        { key: 'briefklep',        label: 'Briefklep',                 price: 257.5 },
+        { key: 'briefbak',         label: 'Briefbak',                  price: 154.5 },
+        { key: 'draadlozeBel',     label: 'Draadloze bel',             price: 103   },
+        { key: 'zijlicht',         label: 'Zijlicht',                  price: 257.5 },
+        { key: 'bovenlicht',       label: 'Bovenlicht',                price: 257.5 },
+        { key: 'dddPaneel',        label: 'DDD Paneel',                price: 1545  },
+        { key: 'paneelSierrooster',label: 'Paneel + sierrooster',      price: 2575  },
+      ],
+      achterdeur: [
+        { key: 'zijlicht',   label: 'Zijlicht',   price: 257.5 },
+        { key: 'bovenlicht', label: 'Bovenlicht',  price: 257.5 },
+        { key: 'dddPaneel',  label: 'DDD Paneel',  price: 1545  },
+      ],
+      tuindeur: [
+        { key: 'zijlichtKlein', label: 'Zijlicht tot 0,5M',    price: 515  },
+        { key: 'zijlichtGroot', label: 'Zijlicht groter 0,5M', price: 1030 },
+        { key: 'bovenlicht',    label: 'Bovenlicht',            price: 515  },
+      ],
+    };
+    const opts = el.doorOptions || {};
+    const optsList = root.querySelector('#door-opts-list');
+    optsList.innerHTML = (DOOR_OPTS[sub] || []).map(o => `
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;">
+        <input type="checkbox" data-door-opt="${o.key}" ${opts[o.key] ? 'checked' : ''}/>
+        <span style="flex:1">${o.label}</span>
+        <span style="color:var(--text-muted);font-size:12px;">+${fmtEuro(o.price)}</span>
+      </label>`).join('');
+    optsList.querySelectorAll('[data-door-opt]').forEach(cb => {
+      cb.onchange = () => {
+        if (!el.doorOptions) el.doorOptions = {};
+        el.doorOptions[cb.dataset.doorOpt] = cb.checked;
+        render();
+      };
+    });
+  }
+
   if (document.activeElement?.id !== 'elem-name') root.querySelector('#elem-name').value = el.name;
   if (document.activeElement?.id !== 'elem-qty') root.querySelector('#elem-qty').value = el.qty;
   if (document.activeElement?.id !== 'width-mm') root.querySelector('#width-mm').value = el.widthMM;
@@ -764,7 +855,7 @@ function renderConfig() {
     <div class="dim-row">
       <span class="dim-tag">K${i + 1}</span>
       <div class="input-wrap">
-        <input class="input mono col-w" data-i="${i}" type="number" value="${Math.round(el.widthMM * c.widthPct / 100)}" step="10"/>
+        <input class="input mono col-w" data-i="${i}" type="number" value="${Math.round(el.widthMM * c.widthPct / 100)}" step="1"/>
         <span class="input-suffix">mm</span>
       </div>
       <button class="btn btn-sm btn-ghost" data-eq="${i}" title="Verdeel gelijk">⇋</button>
@@ -800,7 +891,7 @@ function renderConfig() {
     <div class="dim-row">
       <span class="dim-tag">V${i + 1}</span>
       <div class="input-wrap">
-        <input class="input mono row-h" data-i="${i}" type="number" value="${Math.round(el.heightMM * r.heightPct / 100)}" step="10"/>
+        <input class="input mono row-h" data-i="${i}" type="number" value="${Math.round(el.heightMM * r.heightPct / 100)}" step="1"/>
         <span class="input-suffix">mm</span>
       </div>
       <button class="btn btn-sm btn-ghost" data-eq="${i}">⇋</button>
@@ -841,7 +932,7 @@ function renderConfig() {
   if (showHinge) hingeField.querySelector('select').value = activeRow.hinge || 'left';
 
   const fillField = root.querySelector('#fill-field');
-  const showFill = ['vast', 'draai', 'draaikiep', 'kiep', 'deur'].includes(activeRow.paneType);
+  const showFill = ['vast', 'draai', 'draaikiep', 'kiep', 'deur', 'deur2'].includes(activeRow.paneType);
   fillField.style.display = showFill ? '' : 'none';
   if (showFill) fillField.querySelector('select').value = activeRow.fill || 'glass';
 
@@ -913,6 +1004,17 @@ function buildConfigShell() {
             <button data-v="psk">PSK (kiepschuif)</button>
           </div>
         </div>
+        <div class="field" id="door-type-field" style="display:none">
+          <label class="label">Deurtype</label>
+          <div class="segmented full" id="door-seg">
+            <button data-v="voordeur">Voordeur</button>
+            <button data-v="achterdeur">Achterdeur</button>
+            <button data-v="tuindeur">Tuindeur</button>
+          </div>
+        </div>
+        <div id="door-options-field" style="display:none">
+          <div class="field"><label class="label">Opties</label><div id="door-opts-list"></div></div>
+        </div>
       </div>
     </div>
 
@@ -920,8 +1022,8 @@ function buildConfigShell() {
       <div class="section-head"><span class="section-title"><span class="step-num">3</span>Maatvoering</span><span class="section-chev">▾</span></div>
       <div class="section-body">
         <div class="field-row">
-          <div class="field"><label class="label">Breedte</label><div class="input-wrap"><input class="input mono with-suffix" id="width-mm" type="number" step="10"/><span class="input-suffix">mm</span></div></div>
-          <div class="field"><label class="label">Hoogte</label><div class="input-wrap"><input class="input mono with-suffix" id="height-mm" type="number" step="10"/><span class="input-suffix">mm</span></div></div>
+          <div class="field"><label class="label">Breedte</label><div class="input-wrap"><input class="input mono with-suffix" id="width-mm" type="number" step="1"/><span class="input-suffix">mm</span></div></div>
+          <div class="field"><label class="label">Hoogte</label><div class="input-wrap"><input class="input mono with-suffix" id="height-mm" type="number" step="1"/><span class="input-suffix">mm</span></div></div>
         </div>
         <div class="field"><label class="label">Aantal kolommen <span class="label-hint">(K1, K2, ...)</span></label><input class="input mono" id="cols-count" type="number" min="1" max="6" step="1"/></div>
         <div class="field"><label class="label">Kolombreedtes <span class="label-hint">· sleep ook de grepen in de tekening</span></label><div class="dim-list" id="col-dims"></div></div>
@@ -1034,6 +1136,21 @@ function bindConfigShell() {
   root.addEventListener('click', e => {
     const seg = e.target.closest('#slide-seg button');
     if (seg) { activeElement().slideSystem = seg.dataset.v; render(); }
+    const doorSeg = e.target.closest('#door-seg button');
+    if (doorSeg) {
+      const el = activeElement();
+      el.doorSubtype = doorSeg.dataset.v;
+      el.doorOptions = {};
+      if (doorSeg.dataset.v === 'tuindeur') {
+        el.columns = [
+          { widthPct: 50, rows: [{ paneType: 'deur', hinge: 'right', fill: 'glass', heightPct: 100 }] },
+          { widthPct: 50, rows: [{ paneType: 'deur', hinge: 'left',  fill: 'glass', heightPct: 100 }] },
+        ];
+      } else {
+        el.columns = [{ widthPct: 100, rows: [{ paneType: 'deur', hinge: 'left', fill: 'panel', heightPct: 100 }] }];
+      }
+      render();
+    }
   });
 }
 
@@ -1126,10 +1243,58 @@ function deleteElement(id) {
 
 function typeLabel(t) { return ELEMENT_TYPES.find(e => e.id === t)?.label || t; }
 
+function renderExtras() {
+  const list = document.getElementById('extras-list');
+  if (!list) return;
+  if (!state.extras) state.extras = [];
+  if (document.activeElement?.closest?.('#extras-list')) return;
+
+  if (state.extras.length === 0) {
+    list.innerHTML = '<div style="padding:6px 0 2px;color:var(--text-muted);font-size:12px;">Geen extra\'s toegevoegd.</div>';
+    return;
+  }
+
+  list.innerHTML = state.extras.map((ex, i) => `
+    <div class="extra-row" style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);">
+      <input class="input extra-name" data-i="${i}" placeholder="Omschrijving" value="${escapeHtml(ex.name)}" style="flex:1;min-width:0;font-size:12px;padding:4px 6px;"/>
+      <input class="input mono extra-qty" data-i="${i}" type="number" min="1" step="1" value="${ex.qty}" style="width:46px;font-size:12px;padding:4px 6px;" title="Aantal"/>
+      <input class="input mono extra-price" data-i="${i}" type="number" min="0" step="1" value="${ex.unitPrice}" style="width:70px;font-size:12px;padding:4px 6px;" title="Stukprijs €"/>
+      <span class="extra-total mono" style="font-size:11px;color:var(--text-muted);min-width:60px;text-align:right;">${fmtEuro(ex.qty * ex.unitPrice)}</span>
+      <button class="btn btn-sm btn-danger extra-del" data-i="${i}" style="padding:2px 6px;">✕</button>
+    </div>`).join('');
+
+  list.querySelectorAll('.extra-name').forEach(inp => {
+    inp.oninput = () => { state.extras[+inp.dataset.i].name = inp.value; saveState(); };
+  });
+  list.querySelectorAll('.extra-qty').forEach(inp => {
+    inp.oninput = () => {
+      const i = +inp.dataset.i;
+      state.extras[i].qty = Math.max(1, +inp.value || 1);
+      inp.closest('.extra-row').querySelector('.extra-total').textContent = fmtEuro(state.extras[i].qty * state.extras[i].unitPrice);
+      renderTotals(); saveState();
+    };
+  });
+  list.querySelectorAll('.extra-price').forEach(inp => {
+    inp.oninput = () => {
+      const i = +inp.dataset.i;
+      state.extras[i].unitPrice = Math.max(0, +inp.value || 0);
+      inp.closest('.extra-row').querySelector('.extra-total').textContent = fmtEuro(state.extras[i].qty * state.extras[i].unitPrice);
+      renderTotals(); saveState();
+    };
+  });
+  list.querySelectorAll('.extra-del').forEach(btn => {
+    btn.onclick = () => { state.extras.splice(+btn.dataset.i, 1); render(); };
+  });
+}
+
 function renderTotals() {
   const t = projectTotals();
+  const extraRows = (state.extras || []).map(ex =>
+    `<div class="row muted"><span>${escapeHtml(ex.name || 'Extra')} (${ex.qty}×)</span><span class="v">${fmtEuro(ex.qty * ex.unitPrice)}</span></div>`
+  ).join('');
   document.getElementById('totals-table').innerHTML = `
     <div class="row muted"><span>Materiaal (${state.elements.length} el.)</span><span class="v">${fmtEuro(t.material)}</span></div>
+    ${extraRows}
     <div class="row muted"><span>Montage</span><span class="v">${fmtEuro(t.montage)}</span></div>
     <div class="row divider"><span>Subtotaal</span><span class="v">${fmtEuro(t.sub)}</span></div>
     ${t.discount > 0 ? `<div class="row muted"><span>Korting (${state.discountPct}%)</span><span class="v">−${fmtEuro(t.discount)}</span></div>` : ''}
@@ -1182,6 +1347,7 @@ function buildExportPayload() {
     version: 'kozijnlab.v2', offerCode: state.offerCode, createdAt: new Date().toISOString(),
     customer: state.customer,
     project: { notes: state.notes, montageEuro: state.montageEuro, discountPct: state.discountPct, vatRate: state.vatRate },
+    extras: (state.extras || []).map(ex => ({ id: ex.id, name: ex.name, qty: ex.qty, unitPrice: ex.unitPrice })),
     elements: state.elements.map(el => ({
       id: el.id, name: el.name, type: el.type, qty: el.qty,
       dimensions: { widthMM: el.widthMM, heightMM: el.heightMM, areaM2: +(el.widthMM * el.heightMM / 1e6).toFixed(3) },
@@ -1214,6 +1380,64 @@ function openExport() {
 function closeExport() {
   document.getElementById('drawer').classList.remove('is-open');
   document.getElementById('drawer-overlay').classList.remove('is-open');
+}
+
+function importFromJSON(data) {
+  if (!data || data.version !== 'kozijnlab.v2') { toast('Ongeldig bestand — versie niet herkend'); return; }
+
+  const proj = data.project || {};
+  const elements = (data.elements || []).map(e => {
+    const dims = e.dimensions || {};
+    const finish = e.finish || {};
+    return {
+      id: e.id || uid(),
+      name: e.name || '',
+      type: e.type || 'kozijn',
+      qty: e.qty || 1,
+      widthMM: dims.widthMM || e.widthMM || 1200,
+      heightMM: dims.heightMM || e.heightMM || 1400,
+      profile: e.profile || defaultProfile(),
+      colorOutside: finish.colorOutside || e.colorOutside || 'RAL7016',
+      colorInside: finish.colorInside || e.colorInside || 'same',
+      finishOutside: finish.finishOutside || e.finishOutside || 'smooth',
+      finishInside: finish.finishInside || e.finishInside || 'smooth',
+      hardware: e.hardware || 'siegenia',
+      slideSystem: e.slideSystem || 'hst',
+      doorSubtype: e.doorSubtype || 'voordeur',
+      doorOptions: e.doorOptions || {},
+      columns: (e.columns || []).map(col => ({
+        widthPct: col.widthPct || 50,
+        rows: (col.rows || []).map(r => ({
+          paneType: r.paneType || 'vast',
+          heightPct: r.heightPct || 100,
+          fill: r.fill || 'glass',
+          hinge: r.hinge || 'left',
+          glassPack: r.glassPack || 'HR++',
+          glassFinish: r.glassFinish || 'clear',
+        })),
+      })),
+      notes: e.notes || '',
+    };
+  });
+
+  if (elements.length === 0) { toast('Geen elementen gevonden in bestand'); return; }
+
+  state = {
+    offerCode: data.offerCode || newOfferCode(),
+    customer: data.customer || {},
+    elements,
+    activeElementId: elements[0].id,
+    montageEuro: proj.montageEuro || 0,
+    discountPct: proj.discountPct || 0,
+    vatRate: proj.vatRate || 0.21,
+    notes: proj.notes || '',
+    extras: (data.extras || []).map(ex => ({ id: ex.id || uid(), name: ex.name || '', qty: ex.qty || 1, unitPrice: ex.unitPrice || 0 })),
+  };
+
+  const root = document.getElementById('config-root');
+  delete root.dataset.built;
+  render();
+  toast('Project geladen ✓');
 }
 
 // ============================================================
@@ -1292,6 +1516,23 @@ function init() {
     toast('Nieuw element toegevoegd');
   };
   document.getElementById('btn-export').onclick = openExport;
+  document.getElementById('btn-import').onclick = () => document.getElementById('file-import').click();
+  document.getElementById('file-import').onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try { importFromJSON(JSON.parse(ev.target.result)); }
+      catch (_) { toast('Kon bestand niet lezen'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+  document.getElementById('btn-add-extra').onclick = () => {
+    if (!state.extras) state.extras = [];
+    state.extras.push({ id: uid(), name: '', qty: 1, unitPrice: 0 });
+    render();
+  };
   document.getElementById('btn-print').onclick = () => window.print();
   document.getElementById('btn-new-offer').onclick = () => {
     if (!confirm('Nieuwe offerte starten? Huidige wordt opgeslagen in lokale opslag.')) return;
