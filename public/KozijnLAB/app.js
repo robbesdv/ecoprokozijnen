@@ -167,12 +167,21 @@ function activeElement() {
 
 function drawingProfile(el) {
   const p = el.profile || defaultProfile();
-  if (el?.type !== 'deur') return p;
+  const keepOriginal = el?.type === 'schuifpui' || el?.type === 'hefschuif';
+  const scale = keepOriginal ? 1 : 0.82;
+  if (el?.type !== 'deur') {
+    return {
+      frameMM: (p.frameMM || 70) * scale,
+      sashMM: (p.sashMM || 60) * scale,
+      mullionMM: (p.mullionMM || 60) * scale,
+      transomMM: (p.transomMM || p.mullionMM || 60) * scale,
+    };
+  }
   return {
-    frameMM: (p.frameMM || 70) * 2,
-    sashMM: (p.sashMM || 60) * 2,
-    mullionMM: (p.mullionMM || 60) * 2,
-    transomMM: (p.transomMM || p.mullionMM || 60) * 2,
+    frameMM: (p.frameMM || 70) * scale * 2,
+    sashMM: (p.sashMM || 60) * scale * 2,
+    mullionMM: (p.mullionMM || 60) * scale * 2,
+    transomMM: (p.transomMM || p.mullionMM || 60) * scale * 2,
   };
 }
 
@@ -246,6 +255,16 @@ function applyDoorSubtypeLayout(el) {
 // ============================================================
 // PRICING
 // ============================================================
+function kozijnMatrixBaseIncl(vakken, widthMM, heightMM) {
+  const startTable = { 1: 1406, 2: 1568, 3: 1730, 4: 1893, 5: 2055 };
+  const s = startTable[Math.min(5, Math.max(1, vakken))] || 1406;
+  const wCm = Math.ceil(widthMM / 10);
+  const hCm = Math.ceil(heightMM / 10);
+  const wSteps = Math.max(0, Math.ceil((wCm - 70) / 10));
+  const hSteps = Math.max(0, Math.ceil((hCm - 70) / 10));
+  return s + (wSteps + hSteps) * 31;
+}
+
 function priceElement(el) {
   if (!el) return 0;
   let base = 0;
@@ -255,19 +274,24 @@ function priceElement(el) {
   // Alle prijzen zijn INCL. BTW (uit Excel). Aan het einde ÷1.21 → projectTotals voegt BTW toe.
   if (el.type === 'kozijn') {
     const vakken = countVakken(el);
-    const startTable = { 1: 1406, 2: 1568, 3: 1730, 4: 1893, 5: 2055 };
-    let s = startTable[Math.min(5, vakken)] || 1406;
-    const wCm = Math.ceil(el.widthMM / 10);
-    const hCm = Math.ceil(el.heightMM / 10);
-    const wSteps = Math.max(0, Math.ceil((wCm - 70) / 10));
-    const hSteps = Math.max(0, Math.ceil((hCm - 70) / 10));
-    base = s + (wSteps + hSteps) * 31;
+    base = kozijnMatrixBaseIncl(vakken, el.widthMM, el.heightMM);
 
     let openCount = 0;
+    let tuindeurCorrection = 0;
+    const colPctSum = el.columns.reduce((sum, col) => sum + (Number(col.widthPct) || 0), 0) || 100;
     el.columns.forEach(col => col.rows.forEach(r => {
-      if (['draai', 'kiep', 'draaikiep'].includes(r.paneType)) openCount++;
+      if (['draai', 'kiep', 'draaikiep', 'deur'].includes(r.paneType)) openCount++;
+      if (r.paneType === 'deur2') {
+        openCount += 2;
+        const rowPctSum = col.rows.reduce((sum, row) => sum + (Number(row.heightPct) || 0), 0) || 100;
+        const colW = el.widthMM * ((Number(col.widthPct) || 0) / colPctSum);
+        const rowH = el.heightMM * ((Number(r.heightPct) || 0) / rowPctSum);
+        const normalDoubleDoorIncl = kozijnMatrixBaseIncl(2, colW || el.widthMM, rowH || el.heightMM) + 2 * 315;
+        tuindeurCorrection += 7210 - normalDoubleDoorIncl;
+      }
     }));
     base += openCount * 315;
+    base += tuindeurCorrection;
 
     let glassUpgrade = 0;
     el.columns.forEach(col => col.rows.forEach(r => {
@@ -319,7 +343,9 @@ function priceElement(el) {
 
 function countVakken(el) {
   let n = 0;
-  el.columns.forEach(c => n += c.rows.length);
+  el.columns.forEach(c => c.rows.forEach(r => {
+    n += r.paneType === 'deur2' ? 2 : 1;
+  }));
   return Math.max(1, n);
 }
 
@@ -588,7 +614,9 @@ function drawElement(svg, el, opts = {}) {
 }
 
 function doorPanelsFor(el, row) {
-  const panels = (Array.isArray(el.doorPanels) && el.doorPanels.length)
+  const panels = (Array.isArray(row?.doorPanels) && row.doorPanels.length)
+    ? row.doorPanels
+    : (Array.isArray(el.doorPanels) && el.doorPanels.length)
     ? el.doorPanels
     : [defaultDoorPanel(row.fill === 'glass' ? 'glass' : 'panel')];
   const sum = panels.reduce((a, p) => a + (Number(p.heightPct) || 0), 0) || 100;
@@ -602,7 +630,7 @@ function doorPanelsFor(el, row) {
 
 function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx) {
   const rail = Math.max(4, Math.min(18, profilePx * 0.34, Math.min(w, h) * 0.16));
-  const gap = panels.length > 1 ? Math.max(3, Math.min(12, profilePx * 0.24)) : 0;
+  const gap = 0;
   const innerX = x + rail;
   const innerY = y + rail;
   const innerW = Math.max(1, w - 2 * rail);
@@ -622,26 +650,26 @@ function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx) {
       svg.appendChild(svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-door-panel', rx: 1 }));
       svg.appendChild(svgEl('rect', { x: innerX + 4, y: cy + 4, width: Math.max(1, innerW - 8), height: Math.max(1, ph - 8), class: 'svg-door-panel-inner', rx: 1 }));
     }
-    if (i < panels.length - 1) {
-      svg.appendChild(svgEl('rect', { x: x + rail * 0.45, y: cy + ph, width: w - rail * 0.9, height: gap, class: 'svg-door-profile', rx: 1 }));
-    }
     cy += ph + gap;
   });
 }
 
-function drawFlagHinges(svg, side, sashEdgeX, y, h, profilePx) {
-  const halfW = Math.max(4, Math.min(12, profilePx * 0.22));
-  const hingeH = Math.max(13, Math.min(34, h * 0.075));
+function drawFlagHinges(svg, side, edgeX, y, h, profilePx) {
+  const frameW = Math.max(3.5, Math.min(7, profilePx * 0.14));
+  const leafW = Math.max(7, Math.min(14, profilePx * 0.34));
+  const hingeH = Math.max(12, Math.min(28, h * 0.06));
+  const leafH = Math.max(7, Math.min(14, hingeH * 0.58));
+  const leafY = hy => hy + Math.max(1, hingeH * 0.14);
   const positions = [0.18, 0.5, 0.82];
 
   positions.forEach(pos => {
     const hy = y + h * pos - hingeH / 2;
     if (side === 'left') {
-      svg.appendChild(svgEl('rect', { x: sashEdgeX - halfW - 1, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-frame', rx: 1 }));
-      svg.appendChild(svgEl('rect', { x: sashEdgeX, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-leaf', rx: 1 }));
+      svg.appendChild(svgEl('rect', { x: edgeX - frameW, y: hy, width: frameW, height: hingeH, class: 'svg-hinge-frame', rx: Math.min(3, frameW / 2) }));
+      svg.appendChild(svgEl('rect', { x: edgeX, y: leafY(hy), width: leafW, height: leafH, class: 'svg-hinge-leaf', rx: 1 }));
     } else {
-      svg.appendChild(svgEl('rect', { x: sashEdgeX - halfW, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-leaf', rx: 1 }));
-      svg.appendChild(svgEl('rect', { x: sashEdgeX + 1, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-frame', rx: 1 }));
+      svg.appendChild(svgEl('rect', { x: edgeX, y: hy, width: frameW, height: hingeH, class: 'svg-hinge-frame', rx: Math.min(3, frameW / 2) }));
+      svg.appendChild(svgEl('rect', { x: edgeX - leafW, y: leafY(hy), width: leafW, height: leafH, class: 'svg-hinge-leaf', rx: 1 }));
     }
   });
 }
@@ -672,7 +700,8 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     }
   }
 
-  const inset = Math.max(4, Math.min(sashPx, Math.min(w, h) * (isDoorPane ? 0.16 : 0.12)));
+  const doorPaneProfilePx = isDoorPane && el.type !== 'deur' ? sashPx * 2 : sashPx;
+  const inset = Math.max(4, Math.min(isDoorPane ? doorPaneProfilePx : sashPx, Math.min(w, h) * (isDoorPane ? 0.16 : 0.12)));
   const isOpenable = ['draai', 'kiep', 'draaikiep', 'deur', 'schuif'].includes(pType);
   if (isOpenable) {
     svg.appendChild(svgEl('rect', {
@@ -684,19 +713,20 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   const sx = x + inset, sy = y + inset, sw = w - 2 * inset, sh = h - 2 * inset;
   const hinge = row.hinge || 'left';
 
-  if (pType === 'draai' || pType === 'draaikiep' || pType === 'deur') {
+  if (pType === 'draai' || pType === 'draaikiep') {
     const hx = hinge === 'left' ? sx : sx + sw;
     const handleX = hinge === 'left' ? sx + sw : sx;
-    if (pType === 'deur') {
-      drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), sashPx);
-    }
     svg.appendChild(svgEl('path', { d: `M ${hx} ${sy} L ${handleX} ${sy + sh / 2} L ${hx} ${sy + sh}`, class: 'svg-op' }));
-    if (pType === 'deur') {
-      const hdy = sy + sh * 0.5;
-      const hdx = hinge === 'left' ? sx + sw - 8 : sx + 8;
-      svg.appendChild(svgEl('rect', { x: hdx - 2, y: hdy - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
-      drawFlagHinges(svg, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? sx : sx + sw, sy, sh, sashPx);
-    }
+  }
+  if (pType === 'deur') {
+    const hx = hinge === 'left' ? x : x + w;
+    const handleX = hinge === 'left' ? x + w : x;
+    drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx);
+    svg.appendChild(svgEl('path', { d: `M ${hx} ${y} L ${handleX} ${y + h / 2} L ${hx} ${y + h}`, class: 'svg-op' }));
+    const hdy = sy + sh * 0.5;
+    const hdx = hinge === 'left' ? sx + sw - 8 : sx + 8;
+    svg.appendChild(svgEl('rect', { x: hdx - 2, y: hdy - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
+    drawFlagHinges(svg, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? x : x + w, y, h, doorPaneProfilePx);
   }
   if (pType === 'kiep' || pType === 'draaikiep') {
     svg.appendChild(svgEl('path', { d: `M ${sx} ${sy + sh} L ${sx + sw / 2} ${sy} L ${sx + sw} ${sy + sh}`, class: 'svg-op' }));
@@ -719,22 +749,22 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     const lw = sw / 2 - gap / 2;
     const rox = sx + sw / 2 + gap / 2;
     const rw = sw - lw - gap;
-    const seamX = sx + sw / 2;
+    const seamX = x + w / 2;
     svg.appendChild(svgEl('rect', { x: sx,  y: sy, width: lw, height: sh, class: 'svg-sash', rx: 1 }));
     svg.appendChild(svgEl('rect', { x: rox, y: sy, width: rw, height: sh, class: 'svg-sash', rx: 1 }));
-    svg.appendChild(svgEl('line', { x1: seamX, y1: sy, x2: seamX, y2: sy + sh, class: 'svg-sash' }));
+    svg.appendChild(svgEl('line', { x1: seamX, y1: y, x2: seamX, y2: y + h, class: 'svg-sash' }));
     const panels = doorPanelsFor(el, row);
-    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, sashPx);
-    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, sashPx);
-    svg.appendChild(svgEl('path', { d: `M ${sx} ${sy} L ${sx + lw} ${sy + sh / 2} L ${sx} ${sy + sh}`, class: 'svg-op' }));
-    svg.appendChild(svgEl('path', { d: `M ${rox + rw} ${sy} L ${rox} ${sy + sh / 2} L ${rox + rw} ${sy + sh}`, class: 'svg-op' }));
+    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, doorPaneProfilePx);
+    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx);
+    svg.appendChild(svgEl('path', { d: `M ${x} ${y} L ${seamX} ${y + h / 2} L ${x} ${y + h}`, class: 'svg-op' }));
+    svg.appendChild(svgEl('path', { d: `M ${x + w} ${y} L ${seamX} ${y + h / 2} L ${x + w} ${y + h}`, class: 'svg-op' }));
     const handleH = Math.max(12, sh * 0.045);
     const handleW = Math.max(3, inset * 0.22);
     const handleY = sy + sh * 0.5 - handleH / 2;
     svg.appendChild(svgEl('rect', { x: seamX - gap - handleW, y: handleY, width: handleW, height: handleH, class: 'svg-door-handle', rx: 1 }));
     svg.appendChild(svgEl('rect', { x: seamX + gap, y: handleY, width: handleW, height: handleH, class: 'svg-door-handle', rx: 1 }));
-    drawFlagHinges(svg, 'left', sx, sy, sh, sashPx);
-    drawFlagHinges(svg, 'right', sx + sw, sy, sh, sashPx);
+    drawFlagHinges(svg, 'left', x, y, h, doorPaneProfilePx);
+    drawFlagHinges(svg, 'right', x + w, y, h, doorPaneProfilePx);
   }
   if (pType === 'vast' && (isFactory || row.fill === 'glass')) {
     const cxm = x + w / 2, cym = y + h / 2;
@@ -963,6 +993,14 @@ function _render() {
   renderTotals();
   renderPreview();
   document.getElementById('offer-code').textContent = state.offerCode;
+}
+
+function renderDrawingOnly() {
+  state.elements.forEach(applyDoorSubtypeLayout);
+  renderProject();
+  renderTotals();
+  renderPreview();
+  saveState();
 }
 
 function typeIconSvg(type) {
@@ -1214,7 +1252,7 @@ function renderDoorPanelControls(root, el) {
         <input class="input mono door-panel-h" data-i="${i}" type="number" value="${Math.round(el.heightMM * p.heightPct / 100)}" step="1"/>
         <span class="input-suffix">mm</span>
       </div>
-      <button class="btn btn-sm btn-ghost" data-door-eq="${i}">â‡‹</button>
+      <button class="btn btn-sm btn-ghost" data-door-eq="${i}" type="button">=</button>
     </div>`).join('');
   dims.querySelectorAll('.door-panel-h').forEach(inp => {
     inp.oninput = () => {
@@ -1225,22 +1263,14 @@ function renderDoorPanelControls(root, el) {
       const otherSum = others.reduce((a, p) => a + p.heightPct, 0);
       panels[i].heightPct = Math.min(100, (v / el.heightMM) * 100);
       others.forEach(p => { p.heightPct = otherSum > 0 ? (p.heightPct / otherSum) * remPct : remPct / Math.max(1, others.length); });
-      render();
+      renderDrawingOnly();
     };
   });
-  dims.querySelectorAll('[data-door-eq]').forEach(b => {
-    b.onclick = () => { panels.forEach(p => { p.heightPct = 100 / panels.length; }); render(); };
-  });
-
   const tabs = root.querySelector('#door-panel-tabs');
   tabs.innerHTML = panels.map((p, i) => {
     const lbl = p.fill === 'glass' ? 'Glas' : 'Paneel';
     return `<button class="vak-tab ${i === activeIdx ? 'is-active' : ''}" data-door-panel="${i}">D${i + 1}<span class="vak-tag">${lbl}</span></button>`;
   }).join('');
-  tabs.querySelectorAll('[data-door-panel]').forEach(b => {
-    b.onclick = () => { el._activeDoorPanelIdx = +b.dataset.doorPanel; render(); };
-  });
-
   root.querySelector('#door-panel-fill').value = activePanel.fill || 'panel';
   const glassFields = root.querySelector('#door-glass-fields');
   glassFields.style.display = activePanel.fill === 'glass' ? '' : 'none';
@@ -1454,13 +1484,44 @@ function bindConfigShell() {
     if (t.closest('#fill-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].fill = t.value; render(); return; }
   });
   root.addEventListener('change', e => {
-    if (['door-hinge', 'door-panel-fill', 'door-panel-glass-pack', 'door-panel-glass-finish'].includes(e.target.id)) {
-      e.target.dispatchEvent(new Event('input', { bubbles: true }));
-      return;
+    const el = activeElement();
+    if (e.target.id === 'door-hinge') {
+      const row = el.columns?.[0]?.rows?.[0];
+      if (row) row.hinge = e.target.value;
+      render(); return;
+    }
+    if (e.target.id === 'door-panel-fill') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].fill = e.target.value;
+      render(); return;
+    }
+    if (e.target.id === 'door-panel-glass-pack') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].glassPack = e.target.value;
+      render(); return;
+    }
+    if (e.target.id === 'door-panel-glass-finish') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].glassFinish = e.target.value;
+      render(); return;
     }
     if (['pane-type', 'color-outside', 'color-inside'].includes(e.target.id)) render();
   });
   root.addEventListener('click', e => {
+    const doorPanelTab = e.target.closest('[data-door-panel]');
+    if (doorPanelTab) {
+      const el = activeElement();
+      normalizeDoorPanels(el);
+      el._activeDoorPanelIdx = Math.max(0, Math.min(el.doorPanels.length - 1, +doorPanelTab.dataset.doorPanel || 0));
+      render(); return;
+    }
+    const doorEqual = e.target.closest('[data-door-eq]');
+    if (doorEqual) {
+      const el = activeElement();
+      normalizeDoorPanels(el);
+      el.doorPanels.forEach(p => { p.heightPct = 100 / el.doorPanels.length; });
+      render(); return;
+    }
     const seg = e.target.closest('#slide-seg button');
     if (seg) { activeElement().slideSystem = seg.dataset.v; render(); }
     const doorSeg = e.target.closest('#door-seg button');
@@ -1667,6 +1728,25 @@ function toast(msg) {
 // ============================================================
 // EXPORT JSON
 // ============================================================
+function exportDoorPanels(panels, fallbackFill = 'panel') {
+  const src = (Array.isArray(panels) && panels.length) ? panels : [defaultDoorPanel(fallbackFill)];
+  const sum = src.reduce((a, p) => a + (Number(p.heightPct) || 0), 0) || 100;
+  return src.map(p => ({
+    heightPct: +(((Number(p.heightPct) || 0) / sum) * 100).toFixed(2),
+    fill: p.fill === 'glass' ? 'glass' : 'panel',
+    glassPack: p.glassPack || 'HR++',
+    glassFinish: p.glassFinish || 'clear',
+  }));
+}
+
+function exportDoorPanelsForRow(el, row) {
+  if (!isDoorPaneType(row?.paneType)) return undefined;
+  const source = (Array.isArray(row.doorPanels) && row.doorPanels.length)
+    ? row.doorPanels
+    : (Array.isArray(el.doorPanels) && el.doorPanels.length ? el.doorPanels : null);
+  return exportDoorPanels(source, row.fill === 'glass' ? 'glass' : 'panel');
+}
+
 function buildExportPayload() {
   state.elements.forEach(applyDoorSubtypeLayout);
   const t = projectTotals();
@@ -1679,30 +1759,28 @@ function buildExportPayload() {
       id: el.id, name: el.name, type: el.type, qty: el.qty,
       doorSubtype: el.type === 'deur' ? (el.doorSubtype || 'voordeur') : undefined,
       doorOptions: el.type === 'deur' ? (el.doorOptions || {}) : undefined,
-      doorPanels: el.type === 'deur' ? (el.doorPanels || []).map(p => ({
-        heightPct: p.heightPct,
-        fill: p.fill,
-        glassPack: p.glassPack,
-        glassFinish: p.glassFinish,
-      })) : undefined,
+      doorPanels: el.type === 'deur' ? exportDoorPanels(el.doorPanels, 'panel') : undefined,
       dimensions: { widthMM: el.widthMM, heightMM: el.heightMM, areaM2: +(el.widthMM * el.heightMM / 1e6).toFixed(3) },
       profile: el.profile,
       finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, finishOutside: el.finishOutside, finishInside: el.finishInside },
       hardware: el.hardware,
       slideSystem: (el.type === 'schuifpui' || el.type === 'hefschuif') ? el.slideSystem : undefined,
-      doorSubtype: el.type === 'deur' ? (el.doorSubtype || 'voordeur') : undefined,
-      doorPanels: el.type === 'deur' ? (el.doorPanels || []) : undefined,
       columns: el.columns.map((col, ci) => ({
         index: ci + 1,
         widthMM: Math.round(el.widthMM * col.widthPct / 100),
         widthPct: +col.widthPct.toFixed(2),
-        rows: col.rows.map((r, ri) => ({
-          index: ri + 1,
-          heightMM: Math.round(el.heightMM * r.heightPct / 100),
-          heightPct: +r.heightPct.toFixed(2),
-          paneType: r.paneType, fill: r.fill, hinge: r.hinge,
-          glassPack: r.glassPack, glassFinish: r.glassFinish,
-        })),
+        rows: col.rows.map((r, ri) => {
+          const row = {
+            index: ri + 1,
+            heightMM: Math.round(el.heightMM * r.heightPct / 100),
+            heightPct: +r.heightPct.toFixed(2),
+            paneType: r.paneType, fill: r.fill, hinge: r.hinge,
+            glassPack: r.glassPack, glassFinish: r.glassFinish,
+          };
+          const doorPanels = exportDoorPanelsForRow(el, r);
+          if (doorPanels) row.doorPanels = doorPanels;
+          return row;
+        }),
       })),
       pricePerUnit: priceElement(el) / el.qty, priceTotal: priceElement(el),
     })),
@@ -1757,6 +1835,12 @@ function importFromJSON(data) {
           hinge: r.hinge || 'left',
           glassPack: r.glassPack || 'HR++',
           glassFinish: r.glassFinish || 'clear',
+          doorPanels: Array.isArray(r.doorPanels) ? r.doorPanels.map(p => ({
+            heightPct: p.heightPct || 100,
+            fill: p.fill === 'glass' ? 'glass' : 'panel',
+            glassPack: p.glassPack || 'HR++',
+            glassFinish: p.glassFinish || 'clear',
+          })) : undefined,
         })),
       })),
       notes: e.notes || '',

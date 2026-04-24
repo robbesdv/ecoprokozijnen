@@ -976,7 +976,7 @@ function Phase0({ order, onRefresh, showToast }) {
         ['Afwerking', `Buiten: ${el.finishOutside === 'woodgrain' ? 'Houtnerf' : 'Glad'}  /  Binnen: ${el.finishInside === 'woodgrain' ? 'Houtnerf' : 'Glad'}`],
         ['Aantal kolommen', String(cols.length)],
         ...cols.map((col, ci) => {
-          const vakken = col.rows.map((r, ri) => `V${ri + 1}: ${PANE_NAMES[r.paneType] || r.paneType}${['draai','draaikiep','deur'].includes(r.paneType) ? ` (${r.hinge === 'left' ? 'L' : 'R'})` : ''}`).join('  ·  ')
+          const vakken = col.rows.map((r, ri) => `V${ri + 1}: ${PANE_NAMES[r.paneType] || r.paneType}${['draai','draaikiep','deur','deur2'].includes(r.paneType) ? ` (${r.hinge === 'left' ? 'L' : 'R'})` : ''}`).join('  ·  ')
           const colW = col.widthMM ?? (el.widthMM && col.widthPct ? Math.round(el.widthMM * col.widthPct / 100) : '—')
           return [`Kolom ${ci + 1} (${colW} mm)`, vakken]
         }),

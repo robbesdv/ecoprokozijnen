@@ -378,7 +378,6 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
 .svg-hinge-frame { opacity: .85; }
 .svg-hinge-leaf { opacity: 1; }
 .svg-door-handle { fill: var(--draw-sash); stroke: var(--draw-sash); stroke-width: .8; }
-.svg-door-profile { fill: var(--draw-sash); opacity: .9; }
 .svg-door-panel { fill: var(--surface-3); stroke: var(--draw-mull); stroke-width: 1; }
 .svg-door-panel-inner { fill: none; stroke: var(--draw-mull); stroke-width: .8; opacity: .75; }
 .svg-door-panel-fill { opacity: .82; }
@@ -401,7 +400,6 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
 #preview-svg[data-mode="factory"] .svg-hinge-frame,
 #preview-svg[data-mode="factory"] .svg-hinge-leaf,
 #preview-svg[data-mode="factory"] .svg-door-handle { fill: #0f172a; stroke: #0f172a; }
-#preview-svg[data-mode="factory"] .svg-door-profile { fill: #0f172a; opacity: 1; }
 #preview-svg[data-mode="factory"] .svg-door-panel { fill: #e2e8f0; stroke: #475569; }
 #preview-svg[data-mode="factory"] .svg-door-panel-inner { stroke: #475569; }
 #preview-svg[data-mode="factory"] .svg-glass { fill: #f1f5f9; stroke: #94a3b8; opacity: .6; }

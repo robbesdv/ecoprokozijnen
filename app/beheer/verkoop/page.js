@@ -9,7 +9,7 @@ import BeheerNav from '@/lib/BeheerNav'
 
 const PANE_LABEL = {
   vast: 'vast glas', draai: 'draai', kiep: 'kiep',
-  draaikiep: 'draai-kiep', vent: 'ventilatie', deur: 'deur', schuif: 'schuif',
+  draaikiep: 'draai-kiep', vent: 'ventilatie', deur: 'deur', deur2: 'dubbele deur', schuif: 'schuif',
   glas: 'glas', paneel: 'paneel',
 }
 
