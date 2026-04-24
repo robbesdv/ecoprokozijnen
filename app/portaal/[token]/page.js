@@ -774,13 +774,14 @@ function Phase0({ order, onRefresh, showToast }) {
       startY: y,
       head: [['Hoeveelheid', 'Omschrijving', 'Prijs excl. btw', 'Btw', 'Totaal incl. btw']],
       body: items.map((i) => {
-        const excl = (i.unit_price * i.quantity) / 1.21
+        const excl = i.unit_price * i.quantity
+        const incl = excl * 1.21
         return [
           String(i.quantity),
           i.description,
           eur(excl),
           '21%',
-          eur(i.unit_price * i.quantity),
+          eur(incl),
         ]
       }),
       headStyles: {
