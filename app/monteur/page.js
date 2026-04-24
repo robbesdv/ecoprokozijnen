@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getPhase } from '@/lib/phases'
 
 export default function MonteurPage() {
   const [orders, setOrders]       = useState([])
@@ -36,7 +35,7 @@ export default function MonteurPage() {
 
   useEffect(() => {
     if (!user) return
-    const ch = supabase.channel('monteur-realtime')
+    const ch = supabase.channel('monteur-rt')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, loadOrders)
       .subscribe()
     return () => supabase.removeChannel(ch)
@@ -60,14 +59,14 @@ export default function MonteurPage() {
   }
 
   async function updatePhase(orderId, newPhase) {
-    const prevPhase = orders.find(o => o.id === orderId)?.phase
+    const prev = orders.find(o => o.id === orderId)?.phase
     await supabase.from('orders').update({
       phase: newPhase,
       ...(newPhase === 6 ? { installation_done_at: new Date().toISOString() } : {}),
       ...(newPhase === 7 ? { completed_at: new Date().toISOString() } : {}),
     }).eq('id', orderId)
-    if (prevPhase !== undefined) {
-      await supabase.from('status_history').insert({ order_id: orderId, from_phase: prevPhase, to_phase: newPhase, changed_by: user?.name || 'monteur' })
+    if (prev !== undefined) {
+      await supabase.from('status_history').insert({ order_id: orderId, from_phase: prev, to_phase: newPhase, changed_by: user?.name || 'monteur' })
     }
     showToast('Status bijgewerkt')
     loadOrders()
@@ -81,13 +80,10 @@ export default function MonteurPage() {
     for (const file of files) {
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const path = `montage/${orderId}/${Date.now()}-${safe}`
-      const { error: upErr } = await supabase.storage.from('order-files').upload(path, file)
-      if (upErr) { showToast('Upload mislukt: ' + upErr.message, 'error'); continue }
+      const { error } = await supabase.storage.from('order-files').upload(path, file)
+      if (error) { showToast('Upload mislukt', 'error'); continue }
       const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-      await supabase.from('montage_files').insert({
-        order_id: orderId, filename: file.name, storage_path: path,
-        file_url: publicUrl, file_type: file.type, uploaded_by: user?.username || 'monteur',
-      })
+      await supabase.from('montage_files').insert({ order_id: orderId, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type, uploaded_by: user?.username || 'monteur' })
       ok++
     }
     setUploading(false)
@@ -96,139 +92,231 @@ export default function MonteurPage() {
     e.target.value = ''
   }
 
-  const todayStr  = new Date().toISOString().slice(0, 10)
-  const actief    = orders.filter(o => o.phase < 7)
-  const compleet  = orders.filter(o => o.phase >= 7)
-  const vandaag   = orders.filter(o => o.installation_date?.startsWith(todayStr))
+  const todayStr   = new Date().toISOString().slice(0, 10)
+  const actief     = orders.filter(o => o.phase < 7)
+  const compleet   = orders.filter(o => o.phase >= 7)
+  const vandaag    = orders.filter(o => o.installation_date?.startsWith(todayStr))
   const openPunten = orders.reduce((s, o) => s + (o.defects || []).filter(d => d.status === 'open').length, 0)
 
-  let visible = (filter === 'compleet' ? compleet : filter === 'vandaag' ? vandaag : actief)
+  let visible = filter === 'compleet' ? compleet : filter === 'vandaag' ? vandaag : actief
   if (search) {
     const q = search.toLowerCase()
     visible = visible.filter(o => o.customer_name?.toLowerCase().includes(q) || o.customer_address?.toLowerCase().includes(q))
   }
 
   if (!user) return (
-    <div style={{ minHeight: '100vh', background: '#0F2318', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Spinner color="rgba(255,255,255,0.4)" />
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 28, height: 28, border: '2px solid var(--brand-muted)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0F2318', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",sans-serif', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
 
-      {/* Header */}
-      <header style={{ background: '#152318', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 58 }}>
+      {/* Sidebar */}
+      <div style={{ width: 220, background: '#152318', color: 'white', display: 'flex', flexDirection: 'column', flexShrink: 0, height: '100vh', borderRight: '1px solid rgba(0,0,0,0.2)' }}>
+        <div style={{ padding: '18px 18px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img src="/logo.png" alt="EcoPro" style={{ width: 34, height: 34, objectFit: 'contain', background: 'rgba(255,255,255,0.1)', borderRadius: 8, padding: 4 }} />
             <div>
-              <div style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>EcoPro Kozijnen</div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Montage Dashboard</div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>EcoPro Kozijnen</div>
+              <div style={{ fontSize: 10, opacity: 0.38, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Monteur</div>
             </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.3)', borderRadius: 20, padding: '5px 14px', color: '#C8A96E', fontSize: 13, fontWeight: 700, letterSpacing: '-0.01em' }}>
-              {user.name}
-            </div>
-            <button onClick={logout}
-              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.55)', padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.1s' }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = 'white' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = 'rgba(255,255,255,0.55)' }}>
-              ↩ Uitloggen
-            </button>
           </div>
         </div>
-      </header>
 
-      {/* KPI cards */}
-      <div style={{ background: '#152318', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '14px 20px', flexShrink: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+        <div style={{ padding: '20px 14px' }}>
+          <div style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.25)', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Ingelogd als</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#C8A96E' }}>{user.name}</div>
+          </div>
+        </div>
+
+        <div style={{ padding: '0 14px' }}>
           {[
-            { label: 'Vandaag',       value: vandaag.length,  accent: vandaag.length > 0 ? '#C8A96E' : 'rgba(255,255,255,0.15)',  sub: 'Op locatie',          onClick: () => setFilter('vandaag') },
-            { label: 'Actieve orders',value: actief.length,   accent: '#3B82F6',                                                   sub: 'Lopende opdrachten',  onClick: () => setFilter('actief') },
-            { label: 'Afgerond',      value: compleet.length, accent: '#10B981',                                                   sub: 'Voltooide montages',  onClick: () => setFilter('compleet') },
-            { label: 'Open punten',   value: openPunten,      accent: openPunten > 0 ? '#ef4444' : 'rgba(255,255,255,0.15)',       sub: 'Bevindingen klant',   warn: openPunten > 0 },
-          ].map(s => (
-            <div key={s.label} onClick={s.onClick}
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${s.accent}`, borderRadius: 12, padding: '12px 14px', cursor: s.onClick ? 'pointer' : 'default', transition: 'background 0.1s' }}
-              onMouseEnter={e => s.onClick && (e.currentTarget.style.background = 'rgba(255,255,255,0.09)')}
-              onMouseLeave={e => s.onClick && (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}>
-              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>{s.label}</div>
-              <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, color: s.warn ? s.accent : 'white' }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>{s.sub}</div>
+            { key: 'vandaag',  label: `Vandaag${vandaag.length > 0 ? ` (${vandaag.length})` : ''}`, icon: '📅' },
+            { key: 'actief',   label: `Actief (${actief.length})`,   icon: '🔧' },
+            { key: 'compleet', label: `Afgerond (${compleet.length})`, icon: '✓' },
+          ].map(item => (
+            <div key={item.key} onClick={() => setFilter(item.key)}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 9, marginBottom: 2, cursor: 'pointer', fontSize: 13, fontWeight: filter === item.key ? 600 : 400, color: filter === item.key ? 'white' : 'rgba(255,255,255,0.5)', background: filter === item.key ? 'rgba(255,255,255,0.13)' : 'transparent', transition: 'all 0.12s' }}
+              onMouseEnter={e => { if (filter !== item.key) e.currentTarget.style.background = 'rgba(255,255,255,0.07)' }}
+              onMouseLeave={e => { if (filter !== item.key) e.currentTarget.style.background = 'transparent' }}>
+              <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{item.icon}</span>
+              {item.label}
+              {filter === item.key && <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: '#4ade80' }} />}
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Filter + search */}
-      <div style={{ background: '#152318', borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
-        <div style={{ display: 'flex' }}>
-          {[
-            { key: 'vandaag',  label: `Vandaag${vandaag.length > 0 ? ` (${vandaag.length})` : ''}` },
-            { key: 'actief',   label: `Actief (${actief.length})` },
-            { key: 'compleet', label: `Afgerond (${compleet.length})` },
-          ].map(t => (
-            <button key={t.key} onClick={() => setFilter(t.key)}
-              style={{ padding: '11px 16px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: filter === t.key ? 700 : 400, background: 'none', color: filter === t.key ? '#C8A96E' : 'rgba(255,255,255,0.4)', borderBottom: filter === t.key ? '2px solid #C8A96E' : '2px solid transparent', fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap' }}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div style={{ position: 'relative', flex: 1, maxWidth: 240 }}>
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>🔍</span>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoeken…"
-            style={{ width: '100%', paddingLeft: 32, fontSize: 13, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: 8, padding: '7px 12px 7px 32px', boxSizing: 'border-box' }} />
+        <div style={{ marginTop: 'auto', padding: '12px 14px 18px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', textAlign: 'center', marginBottom: 10 }}>
+            {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </div>
+          <div onClick={logout}
+            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 9, cursor: 'pointer', fontSize: 12, color: 'rgba(255,255,255,0.38)', transition: 'all 0.13s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.color = 'rgba(255,255,255,0.7)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.38)' }}>
+            <span>↩</span> Uitloggen
+          </div>
         </div>
       </div>
 
-      {/* Lijst + detail */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* Hoofdinhoud */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
 
-        {/* Orderlijst */}
-        <div style={{ width: selected ? 300 : '100%', maxWidth: selected ? 300 : undefined, flexShrink: 0, overflowY: 'auto', background: '#152318', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
-          {loading ? (
-            <div style={{ padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, color: 'rgba(255,255,255,0.35)' }}>
-              <Spinner />
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        {/* Topbar */}
+        <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 28px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>Mijn opdrachten</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+              {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
-          ) : visible.length === 0 ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 14 }}>
-              {filter === 'vandaag' ? '— Geen montages vandaag —' : filter === 'compleet' ? 'Nog geen afgeronde opdrachten.' : 'Geen actieve opdrachten.'}
+          </div>
+          {vandaag.length > 0 && (
+            <div style={{ background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 10, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>📅</span>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--accent-dark)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Vandaag</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                  {vandaag.map(o => o.customer_name).join(', ')}
+                </div>
+              </div>
             </div>
-          ) : (
-            visible.map(order => <OrderKaart key={order.id} order={order} isSelected={selected?.id === order.id} onClick={() => setSelected(s => s?.id === order.id ? null : order)} todayStr={todayStr} />)
           )}
         </div>
 
-        {/* Detail paneel */}
-        {selected && (
-          <div style={{ flex: 1, overflowY: 'auto', background: '#0F2318' }}>
-            <OrderDetail
-              order={selected}
-              onClose={() => setSelected(null)}
-              onUpdatePhase={updatePhase}
-              onUploadPhotos={uploadPhotos}
-              uploading={uploading}
-              showToast={showToast}
-              user={user}
-              onRefresh={loadOrders}
-            />
+        {/* KPI cards */}
+        <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '20px 24px', flexShrink: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+            {[
+              { label: 'Vandaag',        value: vandaag.length,   icon: '📅', sub: 'Op locatie vandaag',      accent: vandaag.length > 0 ? 'var(--accent)' : '#cbd5e1', warn: vandaag.length > 0,    filter: 'vandaag' },
+              { label: 'Actieve orders', value: actief.length,    icon: '🔧', sub: 'Lopende opdrachten',      accent: 'var(--brand)',                                                                filter: 'actief' },
+              { label: 'Afgerond',       value: compleet.length,  icon: '✅', sub: 'Voltooide montages',      accent: 'var(--success)',                                                              filter: 'compleet' },
+              { label: 'Open punten',    value: openPunten,       icon: '⚠', sub: 'Klantbevindingen',        accent: openPunten > 0 ? 'var(--danger)' : '#cbd5e1',     warn: openPunten > 0 },
+            ].map(s => (
+              <div key={s.label} onClick={() => s.filter && setFilter(s.filter)}
+                style={{ position: 'relative', background: '#FAFAFA', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px 14px', cursor: s.filter ? 'pointer' : 'default', overflow: 'hidden', transition: 'box-shadow 0.15s', borderLeft: `4px solid ${s.accent}` }}
+                onMouseEnter={e => s.filter && (e.currentTarget.style.boxShadow = '0 4px 18px rgba(0,0,0,0.07)')}
+                onMouseLeave={e => s.filter && (e.currentTarget.style.boxShadow = 'none')}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>{s.label}</div>
+                  <span style={{ fontSize: 17, opacity: 0.5 }}>{s.icon}</span>
+                </div>
+                <div style={{ fontSize: 34, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, color: s.warn ? s.accent : 'var(--text)' }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 6 }}>{s.sub}</div>
+                {s.filter && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: s.accent, marginTop: 5, opacity: 0.8 }}>FILTEREN →</div>}
+              </div>
+            ))}
           </div>
-        )}
+        </div>
 
-        {!selected && !loading && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.2)', fontSize: 14, flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 40, opacity: 0.3 }}>🔧</div>
-            Selecteer een opdracht
+        {/* Zoekbalk + filter chips */}
+        <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)', fontSize: 14 }}>🔍</span>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Zoek op naam of adres…" style={{ width: 200, paddingLeft: 32, fontSize: 13 }} />
           </div>
-        )}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[
+              { key: 'vandaag',  label: `Vandaag${vandaag.length > 0 ? ` (${vandaag.length})` : ''}` },
+              { key: 'actief',   label: `Actief (${actief.length})` },
+              { key: 'compleet', label: `Afgerond (${compleet.length})` },
+            ].map(t => (
+              <button key={t.key} onClick={() => setFilter(t.key)}
+                style={{ padding: '4px 14px', borderRadius: 20, fontSize: 12, cursor: 'pointer', border: `1px solid ${filter === t.key ? 'var(--brand)' : 'var(--border)'}`, background: filter === t.key ? 'var(--brand)' : 'white', color: filter === t.key ? 'white' : 'var(--text-muted)', fontWeight: filter === t.key ? 600 : 400, transition: 'all 0.1s', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontSize: 12, color: 'var(--text-light)', marginLeft: 'auto' }}>{visible.length} opdracht{visible.length !== 1 ? 'en' : ''}</span>
+        </div>
+
+        {/* Lijst + detail */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+
+          {/* Orderlijst */}
+          <div style={{ width: selected ? 360 : '100%', flexShrink: 0, overflowY: 'auto', background: 'white' }}>
+
+            {/* Tabel header */}
+            <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 100px' : '44px 2fr 1.2fr 120px 36px', padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
+              {!selected && <div />}
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>Klant</div>
+              {!selected && <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>Adres</div>}
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 700 }}>Datum</div>
+              {!selected && <div />}
+            </div>
+
+            {loading ? (
+              <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 28, height: 28, border: '2px solid var(--brand-muted)', borderTopColor: 'var(--brand)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                Laden…
+              </div>
+            ) : visible.length === 0 ? (
+              <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                {filter === 'vandaag' ? 'Geen montages vandaag.' : filter === 'compleet' ? 'Nog geen afgeronde opdrachten.' : 'Geen actieve opdrachten.'}
+              </div>
+            ) : visible.map(order => {
+              const isSelected = selected?.id === order.id
+              const isVandaag  = order.installation_date?.startsWith(todayStr)
+              const openDefs   = (order.defects || []).filter(d => d.status === 'open').length
+              const fase       = FASE[order.phase]
+              const initColor  = `hsl(${((order.customer_name?.charCodeAt(0) || 65) * 97 + 120) % 360},40%,38%)`
+              return (
+                <div key={order.id} onClick={() => setSelected(isSelected ? null : order)}
+                  style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 100px' : '44px 2fr 1.2fr 120px 36px', padding: '11px 20px', borderBottom: '1px solid var(--border)', cursor: 'pointer', alignItems: 'center', transition: 'background 0.1s', background: isSelected ? '#EEF6F0' : isVandaag ? '#FFFDF5' : 'white', borderLeft: `3px solid ${isSelected ? 'var(--brand)' : isVandaag ? 'var(--accent)' : 'transparent'}` }}
+                  onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F8FAFC' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = isSelected ? '#EEF6F0' : isVandaag ? '#FFFDF5' : 'white' }}>
+                  {!selected && (
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: initColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                      {(order.customer_name || '?')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {order.customer_name}
+                      {isVandaag && <span style={{ fontSize: 9, background: 'var(--accent-bg)', color: 'var(--accent-dark)', padding: '2px 7px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', border: '1px solid var(--accent-border)' }}>Vandaag</span>}
+                    </div>
+                    {selected && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{order.customer_address}</div>}
+                    {openDefs > 0 && <div style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 600, marginTop: 2 }}>⚠ {openDefs} punt{openDefs !== 1 ? 'en' : ''}</div>}
+                  </div>
+                  {!selected && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{order.customer_address}</div>}
+                  <div>
+                    {fase && <span className={`badge ${fase.cls}`}>{fase.label}</span>}
+                    {order.installation_date && (
+                      <div style={{ fontSize: 11, color: isVandaag ? 'var(--accent-dark)' : 'var(--brand)', marginTop: 4, fontWeight: isVandaag ? 700 : 500 }}>
+                        📅 {new Date(order.installation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+                      </div>
+                    )}
+                  </div>
+                  {!selected && <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'center', transition: 'transform 0.2s', transform: isSelected ? 'rotate(90deg)' : 'none' }}>›</div>}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Detail paneel */}
+          {selected && (
+            <div style={{ flex: 1, borderLeft: '1px solid var(--border)', background: 'var(--bg)', overflowY: 'auto' }}>
+              <OrderDetail
+                order={selected}
+                onClose={() => setSelected(null)}
+                onUpdatePhase={updatePhase}
+                onUploadPhotos={uploadPhotos}
+                uploading={uploading}
+                showToast={showToast}
+                onRefresh={loadOrders}
+                todayStr={todayStr}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {toast && (
-        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? '#DC2626' : '#1A1A1A', color: 'white', padding: '12px 22px', borderRadius: 10, fontSize: 14, fontWeight: 500, zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,0.5)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="animate-fade" style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? 'var(--danger)' : '#1A1A1A', color: 'white', padding: '11px 22px', borderRadius: 10, fontSize: 14, fontWeight: 500, zIndex: 9999, boxShadow: '0 8px 24px rgba(0,0,0,0.22)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 8 }}>
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
       )}
@@ -236,39 +324,9 @@ export default function MonteurPage() {
   )
 }
 
-// ─── Order kaart in lijst ─────────────────────────────────────────────────────
+// ─── Order detail paneel ──────────────────────────────────────────────────────
 
-function OrderKaart({ order, isSelected, onClick, todayStr }) {
-  const isVandaag = order.installation_date?.startsWith(todayStr)
-  const openDefs  = (order.defects || []).filter(d => d.status === 'open').length
-  const fase      = FASE_BADGE[order.phase]
-
-  return (
-    <div onClick={onClick}
-      style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', background: isSelected ? 'rgba(200,169,110,0.1)' : 'transparent', borderLeft: `3px solid ${isSelected ? '#C8A96E' : isVandaag ? 'rgba(200,169,110,0.4)' : 'transparent'}`, transition: 'all 0.1s' }}
-      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.04)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(200,169,110,0.1)' : 'transparent' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 5 }}>
-        <div style={{ color: 'white', fontWeight: 700, fontSize: 14, flex: 1 }}>{order.customer_name}</div>
-        {fase && <span style={{ background: fase.bg, color: fase.color, padding: '2px 9px', borderRadius: 20, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>{fase.label}</span>}
-      </div>
-      <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, marginBottom: 6 }}>📍 {order.customer_address}</div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        {order.installation_date && (
-          <span style={{ fontSize: 11, color: isVandaag ? '#C8A96E' : 'rgba(255,255,255,0.4)', fontWeight: isVandaag ? 700 : 400 }}>
-            {isVandaag ? '📅 Vandaag' : `📅 ${new Date(order.installation_date).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}`}
-          </span>
-        )}
-        {openDefs > 0 && <span style={{ fontSize: 11, color: '#FCA5A5', fontWeight: 600 }}>⚠ {openDefs}</span>}
-        {(order.montage_files || []).length > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>📷 {order.montage_files.length}</span>}
-      </div>
-    </div>
-  )
-}
-
-// ─── Order detail ─────────────────────────────────────────────────────────────
-
-function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhotos, uploading, showToast, user, onRefresh }) {
+function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhotos, uploading, showToast, onRefresh, todayStr }) {
   const [tab, setTab] = useState('info')
 
   const items        = (order.order_items || []).sort((a, b) => a.sort_order - b.sort_order)
@@ -276,7 +334,8 @@ function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhotos, uploading,
   const montageFiles = order.montage_files || []
   const defects      = order.defects || []
   const openDefs     = defects.filter(d => d.status === 'open')
-  const fase         = FASE_BADGE[order.phase]
+  const fase         = FASE[order.phase]
+  const isVandaag    = order.installation_date?.startsWith(todayStr)
 
   const TABS = [
     { key: 'info',       label: 'Opdracht' },
@@ -286,129 +345,113 @@ function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhotos, uploading,
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+    <>
       {/* Header */}
-      <div style={{ background: '#152318', padding: '18px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+      <div style={{ background: 'white', padding: '16px 20px 14px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
           <div>
-            <h2 style={{ color: 'white', fontSize: 20, fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.02em' }}>{order.customer_name}</h2>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>📍 {order.customer_address}</div>
+            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-0.02em', color: 'var(--text)' }}>{order.customer_name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 3 }}>📍 {order.customer_address}</div>
             {order.customer_phone && (
-              <a href={`tel:${order.customer_phone}`} style={{ color: '#C8A96E', fontSize: 13, textDecoration: 'none', marginTop: 4, display: 'inline-block', fontWeight: 600 }}>📞 {order.customer_phone}</a>
+              <a href={`tel:${order.customer_phone}`} style={{ fontSize: 13, color: 'var(--brand)', textDecoration: 'none', marginTop: 4, display: 'inline-block', fontWeight: 600 }}>📞 {order.customer_phone}</a>
             )}
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.35)', fontSize: 22, cursor: 'pointer', padding: '0 4px', lineHeight: 1, flexShrink: 0 }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-light)', padding: '0 2px', lineHeight: 1 }}>✕</button>
         </div>
 
-        {/* Datum + route + contact knoppen */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {/* Status + datum */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {fase && <span className={`badge ${fase.cls}`}>{fase.label}</span>}
           {order.installation_date && (
-            <div style={{ background: 'rgba(200,169,110,0.15)', border: '1px solid rgba(200,169,110,0.25)', borderRadius: 9, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-              <span style={{ fontSize: 18 }}>📅</span>
-              <div>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Montagedatum</div>
-                <div style={{ color: '#C8A96E', fontWeight: 700, fontSize: 14 }}>
-                  {new Date(order.installation_date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}
-                </div>
-              </div>
-            </div>
+            <span style={{ background: isVandaag ? 'var(--accent-bg)' : 'var(--brand-muted)', color: isVandaag ? 'var(--accent-dark)' : 'var(--brand)', border: `1px solid ${isVandaag ? 'var(--accent-border)' : 'var(--brand-border)'}`, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+              📅 {new Date(order.installation_date).toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long' })}{isVandaag ? ' — Vandaag' : ''}
+            </span>
           )}
-          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.customer_address || '')}`}
-            target="_blank" rel="noopener noreferrer"
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 9, padding: '8px 14px', textDecoration: 'none', minWidth: 70 }}>
-            <span style={{ fontSize: 20 }}>🗺</span>
-            <span style={{ color: '#93C5FD', fontSize: 11, fontWeight: 600 }}>Route</span>
-          </a>
-          <a href="https://wa.me/31850492456" target="_blank" rel="noopener noreferrer"
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 9, padding: '8px 14px', textDecoration: 'none', minWidth: 70 }}>
-            <span style={{ fontSize: 20 }}>💬</span>
-            <span style={{ color: '#6EE7B7', fontSize: 11, fontWeight: 600 }}>WhatsApp</span>
-          </a>
-        </div>
-
-        {/* Fase + actie knoppen */}
-        <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {fase && <span style={{ background: fase.bg, color: fase.color, padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>{fase.label}</span>}
           {order.phase === 5 && (
             <button onClick={() => { onUpdatePhase(order.id, 6); setTab('fotos') }}
-              style={{ background: '#C8A96E', color: '#1A3A2A', border: 'none', borderRadius: 20, padding: '4px 14px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              className="btn btn-sm btn-primary" style={{ padding: '3px 12px', fontSize: 11, borderRadius: 20 }}>
               ✓ Montage afgerond
             </button>
           )}
-          {order.phase === 6 && (
-            <button onClick={() => setTab('opleverbon')}
-              style={{ background: '#10B981', color: 'white', border: 'none', borderRadius: 20, padding: '4px 14px', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-              📋 Opleverbon invullen →
-            </button>
-          )}
         </div>
 
-        {/* Open bevindingen badge */}
+        {/* Snelle acties */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.customer_address || '')}`}
+            target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{ flex: 1, textDecoration: 'none', fontSize: 12, justifyContent: 'center' }}>
+            🗺 Route
+          </a>
+          <a href="tel:+31850492456" className="btn btn-secondary btn-sm" style={{ flex: 1, textDecoration: 'none', fontSize: 12, justifyContent: 'center' }}>
+            📞 EcoPro
+          </a>
+          <a href="https://wa.me/31850492456" target="_blank" rel="noopener noreferrer"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 'var(--radius-sm)', fontSize: 12, fontWeight: 500, color: 'var(--success)', textDecoration: 'none', boxShadow: 'var(--shadow-sm)' }}>
+            💬 WhatsApp
+          </a>
+        </div>
+
+        {/* Open bevindingen notice */}
         {openDefs.length > 0 && (
-          <div style={{ marginTop: 10, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#FCA5A5', fontWeight: 600 }}>
-            ⚠ {openDefs.length} open bevinding{openDefs.length !== 1 ? 'en' : ''} — zie klantportaal
+          <div className="notice notice-warning" style={{ marginTop: 10, fontSize: 12 }}>
+            ⚠ {openDefs.length} open bevinding{openDefs.length !== 1 ? 'en' : ''}
           </div>
         )}
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', background: '#152318', borderBottom: '1px solid rgba(255,255,255,0.07)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid var(--border)' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            style={{ flex: 1, padding: '11px 8px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: tab === t.key ? 700 : 400, background: 'none', color: tab === t.key ? '#C8A96E' : 'rgba(255,255,255,0.4)', borderBottom: tab === t.key ? '2px solid #C8A96E' : '2px solid transparent', fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap' }}>
+            style={{ flex: 1, padding: '10px 8px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: tab === t.key ? 700 : 400, background: 'none', color: tab === t.key ? 'var(--brand)' : 'var(--text-muted)', borderBottom: tab === t.key ? '2px solid var(--brand)' : '2px solid transparent', fontFamily: 'inherit', transition: 'all 0.1s', whiteSpace: 'nowrap' }}>
             {t.label}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+      <div style={{ padding: 18 }}>
 
         {tab === 'info' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-            {/* Notities EcoPro */}
             {order.montage_notes && (
-              <MCard title="Notities van EcoPro" icon="📝">
-                <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0 }}>{order.montage_notes}</p>
-              </MCard>
+              <DCard title="Notities van EcoPro" icon="📝">
+                <p style={{ fontSize: 13, lineHeight: 1.75, whiteSpace: 'pre-wrap', margin: 0, color: 'var(--text)' }}>{order.montage_notes}</p>
+              </DCard>
             )}
 
-            {/* Open bevindingen */}
             {openDefs.length > 0 && (
-              <MCard title={`Open bevindingen (${openDefs.length})`} icon="⚠" accent="rgba(239,68,68,0.15)" accentBorder="rgba(239,68,68,0.25)">
+              <DCard title={`Open bevindingen (${openDefs.length})`} icon="⚠" warn>
                 {openDefs.map(d => (
-                  <div key={d.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>{d.description}</div>
+                  <div key={d.id} style={{ padding: '7px 0', borderBottom: '1px solid var(--border)', fontSize: 13, color: 'var(--text)' }}>• {d.description}</div>
                 ))}
-              </MCard>
+              </DCard>
             )}
 
-            {/* Kozijnen */}
-            <MCard title="Kozijnen & specificaties" icon="🪟">
+            <DCard title="Kozijnen & specificaties" icon="🪟">
               {items.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontStyle: 'italic', margin: 0 }}>Geen specificaties.</p>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>Geen specificaties.</p>
               ) : items.map((item, idx) => (
-                <div key={item.id} style={{ padding: '10px 0', borderBottom: idx < items.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                  <div style={{ color: 'white', fontWeight: 600, fontSize: 14 }}>{item.description}</div>
-                  {item.quantity > 1 && <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>Aantal: {item.quantity}×</div>}
+                <div key={item.id} style={{ padding: '10px 0', borderBottom: idx < items.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{item.description}</div>
+                  {item.quantity > 1 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Aantal: {item.quantity}×</div>}
                 </div>
               ))}
-            </MCard>
+            </DCard>
 
-            {/* Bestanden EcoPro */}
             {orderFiles.length > 0 && (
-              <MCard title="Tekeningen & documenten" icon="📐">
+              <DCard title="Tekeningen & documenten" icon="📐">
                 {orderFiles.map((f, idx) => (
                   <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: idx < orderFiles.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none', textDecoration: 'none' }}>
-                    <span style={{ fontSize: 22, flexShrink: 0 }}>{f.file_type?.startsWith('image/') ? '🖼' : '📄'}</span>
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: idx < orderFiles.length - 1 ? '1px solid var(--border)' : 'none', textDecoration: 'none' }}>
+                    <span style={{ fontSize: 22 }}>{f.file_type?.startsWith('image/') ? '🖼' : '📄'}</span>
                     <div>
-                      <div style={{ color: 'white', fontWeight: 500, fontSize: 13 }}>{f.filename}</div>
-                      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 2 }}>Openen →</div>
+                      <div style={{ fontWeight: 500, fontSize: 13, color: 'var(--text)' }}>{f.filename}</div>
+                      <div style={{ fontSize: 11, color: 'var(--brand)', marginTop: 1 }}>Openen →</div>
                     </div>
                   </a>
                 ))}
-              </MCard>
+              </DCard>
             )}
           </div>
         )}
@@ -416,52 +459,46 @@ function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhotos, uploading,
         {tab === 'checklist' && <WerkChecklist />}
 
         {tab === 'fotos' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <MCard title="Foto's uploaden" icon="📷">
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '16px', border: `2px dashed ${uploading ? '#C8A96E' : 'rgba(255,255,255,0.2)'}`, borderRadius: 10, cursor: 'pointer', color: uploading ? '#C8A96E' : 'rgba(255,255,255,0.5)', fontSize: 14, transition: 'all 0.15s', marginBottom: 14 }}
-                onMouseEnter={e => { if (!uploading) { e.currentTarget.style.borderColor = '#C8A96E'; e.currentTarget.style.color = '#C8A96E' } }}
-                onMouseLeave={e => { if (!uploading) { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' } }}>
-                <input type="file" onChange={e => onUploadPhotos(e, order.id)} style={{ display: 'none' }} accept="image/*,.pdf" multiple />
-                {uploading ? '⏳ Uploaden…' : '📎 Foto\'s & bestanden toevoegen (meerdere mogelijk)'}
-              </label>
-
-              {montageFiles.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
-                  Nog geen foto's geüpload
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>
-                  {montageFiles.map(f => {
-                    const isImg = f.file_type?.startsWith('image/')
-                    return (
-                      <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
-                        style={{ display: 'block', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 9, overflow: 'hidden', textDecoration: 'none', transition: 'border-color 0.1s' }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = '#C8A96E'}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}>
-                        {isImg
-                          ? <img src={f.file_url} alt={f.filename} style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
-                          : <div style={{ width: '100%', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>📄</div>
-                        }
-                        <div style={{ padding: '6px 8px', color: 'rgba(255,255,255,0.55)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</div>
-                      </a>
-                    )
-                  })}
-                </div>
-              )}
-            </MCard>
-          </div>
+          <DCard title="Foto's uploaden" icon="📷">
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '14px', border: '2px dashed var(--border)', borderRadius: 10, cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13, transition: 'all 0.15s', marginBottom: 14 }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.color = 'var(--brand)'; e.currentTarget.style.background = 'var(--brand-muted)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'white' }}>
+              <input type="file" onChange={e => onUploadPhotos(e, order.id)} style={{ display: 'none' }} accept="image/*,.pdf" multiple />
+              {uploading ? '⏳ Uploaden…' : '📎 Foto\'s & bestanden toevoegen'}
+            </label>
+            {montageFiles.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>Nog geen foto's geüpload.</div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(120px,1fr))', gap: 8 }}>
+                {montageFiles.map(f => {
+                  const isImg = f.file_type?.startsWith('image/')
+                  return (
+                    <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
+                      style={{ display: 'block', border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', textDecoration: 'none', transition: 'box-shadow 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow)'}
+                      onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
+                      {isImg
+                        ? <img src={f.file_url} alt={f.filename} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block' }} />
+                        : <div style={{ width: '100%', height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, background: 'var(--bg)' }}>📄</div>
+                      }
+                      <div style={{ padding: '5px 8px', fontSize: 10, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.filename}</div>
+                    </a>
+                  )
+                })}
+              </div>
+            )}
+          </DCard>
         )}
 
         {tab === 'opleverbon' && (
           <OpleverBon order={order} showToast={showToast} onRefresh={onRefresh} />
         )}
       </div>
-    </div>
+    </>
   )
 }
 
-// ─── Werk checklist ───────────────────────────────────────────────────────────
+// ─── Werkchecklist ────────────────────────────────────────────────────────────
 
 function WerkChecklist() {
   const ITEMS = [
@@ -483,26 +520,27 @@ function WerkChecklist() {
   const done = Object.values(checked).filter(Boolean).length
 
   return (
-    <MCard title={`Werkchecklist ${done > 0 ? `(${done}/${ITEMS.length})` : ''}`} icon="✅">
+    <DCard title={`Werkchecklist${done > 0 ? ` — ${done}/${ITEMS.length}` : ''}`} icon="✅">
       {done > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${(done / ITEMS.length) * 100}%`, background: done === ITEMS.length ? '#10B981' : '#C8A96E', transition: 'width 0.3s' }} />
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ height: 5, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(done / ITEMS.length) * 100}%`, background: done === ITEMS.length ? 'var(--success)' : 'var(--brand)', borderRadius: 4, transition: 'width 0.3s' }} />
           </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>{done} van {ITEMS.length} afgevinkt</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>{done} van {ITEMS.length} afgevinkt</div>
         </div>
       )}
       {ITEMS.map((item, i) => (
-        <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', marginBottom: 6, borderRadius: 9, border: `1px solid ${checked[i] ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.07)'}`, background: checked[i] ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)', cursor: 'pointer', transition: 'all 0.15s' }}
+        <label key={i}
+          style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', marginBottom: 5, borderRadius: 8, border: `1px solid ${checked[i] ? 'var(--success-border)' : 'var(--border)'}`, background: checked[i] ? 'var(--success-bg)' : 'white', cursor: 'pointer', transition: 'all 0.15s', fontSize: 13 }}
           onClick={() => setChecked(p => ({ ...p, [i]: !p[i] }))}>
-          <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${checked[i] ? '#10B981' : 'rgba(255,255,255,0.18)'}`, background: checked[i] ? '#10B981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'all 0.15s' }}>
-            {checked[i] && <span style={{ color: 'white', fontSize: 12, fontWeight: 700 }}>✓</span>}
+          <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked[i] ? 'var(--success)' : 'var(--border-strong)'}`, background: checked[i] ? 'var(--success)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'all 0.15s' }}>
+            {checked[i] && <span style={{ color: 'white', fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
           </div>
-          <span style={{ color: checked[i] ? '#6EE7B7' : 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.4 }}>{item}</span>
+          <span style={{ color: checked[i] ? 'var(--success)' : 'var(--text)', lineHeight: 1.4 }}>{item}</span>
         </label>
       ))}
-      <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 8, textAlign: 'center' }}>Checklist wordt lokaal bijgehouden per sessie</p>
-    </MCard>
+      <p style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 8, textAlign: 'center' }}>Checklist wordt lokaal bijgehouden per sessie</p>
+    </DCard>
   )
 }
 
@@ -519,7 +557,6 @@ function OpleverBon({ order, showToast, onRefresh }) {
     'Werkplek is schoongemaakt en afval afgevoerd',
     'Klant heeft de kozijnen geïnspecteerd en akkoord bevonden',
   ]
-
   const [checked, setChecked] = useState({})
   const [naam,    setNaam]    = useState('')
   const [saving,  setSaving]  = useState(false)
@@ -531,8 +568,8 @@ function OpleverBon({ order, showToast, onRefresh }) {
 
   function getPos(e) {
     const rect = canvasRef.current.getBoundingClientRect()
-    const touch = e.touches?.[0] || e
-    return { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+    const src  = e.touches?.[0] || e
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top }
   }
   function startDraw(e) { drawing.current = true; lastPos.current = getPos(e) }
   function draw(e) {
@@ -540,17 +577,13 @@ function OpleverBon({ order, showToast, onRefresh }) {
     const ctx = canvasRef.current.getContext('2d')
     const pos = getPos(e)
     ctx.beginPath(); ctx.moveTo(lastPos.current.x, lastPos.current.y); ctx.lineTo(pos.x, pos.y)
-    ctx.strokeStyle = '#C8A96E'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke()
+    ctx.strokeStyle = 'var(--brand)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.stroke()
     lastPos.current = pos
   }
   function stopDraw() { drawing.current = false }
-  function clearCanvas() {
-    const ctx = canvasRef.current.getContext('2d')
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
-  }
+  function clearCanvas() { canvasRef.current.getContext('2d').clearRect(0, 0, 400, 140) }
   function hasSig() {
-    const data = canvasRef.current.getContext('2d').getImageData(0, 0, 400, 140).data
-    return Array.from(data).some((v, i) => i % 4 === 3 && v > 0)
+    return Array.from(canvasRef.current.getContext('2d').getImageData(0, 0, 400, 140).data).some((v, i) => i % 4 === 3 && v > 0)
   }
 
   async function submit() {
@@ -558,99 +591,85 @@ function OpleverBon({ order, showToast, onRefresh }) {
     if (!naam.trim()) { showToast('Vul de naam van de klant in', 'error'); return }
     if (!hasSig()) { showToast('Handtekening ontbreekt', 'error'); return }
     setSaving(true)
-    const sigData = canvasRef.current.toDataURL('image/png')
-    const now = new Date().toISOString()
-    await supabase.from('orders').update({
-      oplevering_naam: naam, oplevering_signed_at: now,
-      oplevering_punten: JSON.stringify(PUNTEN), phase: 7, completed_at: now,
-    }).eq('id', order.id)
+    const now    = new Date().toISOString()
+    const sigUrl = canvasRef.current.toDataURL('image/png')
+    await supabase.from('orders').update({ oplevering_naam: naam, oplevering_signed_at: now, oplevering_punten: JSON.stringify(PUNTEN), phase: 7, completed_at: now }).eq('id', order.id)
     await supabase.from('status_history').insert({ order_id: order.id, to_phase: 7, changed_by: 'monteur-opleverbon' })
-    const blob = await fetch(sigData).then(r => r.blob())
+    const blob = await fetch(sigUrl).then(r => r.blob())
     const path = `${order.id}/opleverbon-handtekening.png`
     const { error: upErr } = await supabase.storage.from('order-files').upload(path, blob, { upsert: true })
     if (!upErr) {
       const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-      await supabase.from('order_files').upsert({
-        order_id: order.id, filename: 'Opleverbon – handtekening.png',
-        storage_path: path, file_url: publicUrl, file_type: 'image/png',
-      }, { onConflict: 'storage_path' })
+      await supabase.from('order_files').upsert({ order_id: order.id, filename: 'Opleverbon – handtekening.png', storage_path: path, file_url: publicUrl, file_type: 'image/png' }, { onConflict: 'storage_path' })
     }
-    setSaving(false)
-    setDone(true)
-    onRefresh()
+    setSaving(false); setDone(true); onRefresh()
     showToast('Opleverbon opgeslagen & order afgerond!')
   }
 
   if (done || order.oplevering_signed_at) {
     return (
-      <MCard title="Opleverbon" icon="📋" accent="rgba(16,185,129,0.12)" accentBorder="rgba(16,185,129,0.25)">
-        <div style={{ textAlign: 'center', padding: '16px 0' }}>
-          <div style={{ fontSize: 36, marginBottom: 10 }}>✅</div>
-          <div style={{ color: '#6EE7B7', fontWeight: 700, fontSize: 16 }}>Opleverbon ondertekend</div>
-          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginTop: 6 }}>
-            {order.oplevering_naam} · {order.oplevering_signed_at ? new Date(order.oplevering_signed_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginTop: 4 }}>Zichtbaar voor klant in het portaal</div>
+      <div className="notice notice-success" style={{ textAlign: 'center', padding: '24px' }}>
+        <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+        <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>Opleverbon ondertekend</div>
+        <div style={{ fontSize: 13, opacity: 0.75 }}>
+          {order.oplevering_naam} · {order.oplevering_signed_at ? new Date(order.oplevering_signed_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
         </div>
-      </MCard>
+        <div style={{ fontSize: 12, marginTop: 4, opacity: 0.6 }}>Zichtbaar voor klant in het portaal</div>
+      </div>
     )
   }
 
   return (
-    <MCard title="Opleverbon" icon="📋">
-      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+    <DCard title="Opleverbon" icon="📋">
+      <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
         Loop samen met de klant de punten door. Vink alles af, laat de klant tekenen en sla op.
       </p>
 
-      {/* Checklist punten */}
-      <div style={{ marginBottom: 18 }}>
+      <div style={{ marginBottom: 16 }}>
         {PUNTEN.map((punt, i) => (
-          <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', marginBottom: 6, borderRadius: 9, border: `1px solid ${checked[i] ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.07)'}`, background: checked[i] ? 'rgba(16,185,129,0.08)' : 'rgba(255,255,255,0.03)', cursor: 'pointer', transition: 'all 0.15s' }}
+          <label key={i}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', marginBottom: 5, borderRadius: 8, border: `1px solid ${checked[i] ? 'var(--success-border)' : 'var(--border)'}`, background: checked[i] ? 'var(--success-bg)' : 'white', cursor: 'pointer', transition: 'all 0.15s', fontSize: 13 }}
             onClick={() => setChecked(p => ({ ...p, [i]: !p[i] }))}>
-            <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${checked[i] ? '#10B981' : 'rgba(255,255,255,0.18)'}`, background: checked[i] ? '#10B981' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'all 0.15s' }}>
-              {checked[i] && <span style={{ color: 'white', fontSize: 12, fontWeight: 700 }}>✓</span>}
+            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${checked[i] ? 'var(--success)' : 'var(--border-strong)'}`, background: checked[i] ? 'var(--success)' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, transition: 'all 0.15s' }}>
+              {checked[i] && <span style={{ color: 'white', fontSize: 11, fontWeight: 700, lineHeight: 1 }}>✓</span>}
             </div>
-            <span style={{ color: checked[i] ? '#6EE7B7' : 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 1.4 }}>{punt}</span>
+            <span style={{ color: checked[i] ? 'var(--success)' : 'var(--text)', lineHeight: 1.4 }}>{punt}</span>
           </label>
         ))}
       </div>
 
-      {/* Naam klant */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Naam klant</div>
-        <input type="text" value={naam} onChange={e => setNaam(e.target.value)} placeholder="Volledige naam klant…"
-          style={{ width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '11px 14px', color: 'white', fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+      <div style={{ marginBottom: 14 }}>
+        <label>Naam klant</label>
+        <input type="text" value={naam} onChange={e => setNaam(e.target.value)} placeholder="Volledige naam klant…" />
       </div>
 
-      {/* Handtekening */}
       <div style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 }}>
-          <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Handtekening klant</div>
-          <button onClick={clearCanvas} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Wissen</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <label style={{ margin: 0 }}>Handtekening klant</label>
+          <button onClick={clearCanvas} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', fontFamily: 'inherit' }}>Wissen</button>
         </div>
         <canvas ref={canvasRef} width={400} height={140}
           onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
           onTouchStart={e => { e.preventDefault(); startDraw(e) }}
           onTouchMove={e => { e.preventDefault(); draw(e) }}
           onTouchEnd={stopDraw}
-          style={{ width: '100%', height: 140, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(200,169,110,0.3)', borderRadius: 8, cursor: 'crosshair', touchAction: 'none', display: 'block' }} />
-        <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, marginTop: 6 }}>Laat de klant hier tekenen met de vinger of stylus</p>
+          style={{ width: '100%', height: 140, background: 'white', border: '1px solid var(--brand-border)', borderRadius: 'var(--radius)', cursor: 'crosshair', touchAction: 'none', display: 'block', boxShadow: 'var(--shadow-sm)' }} />
+        <p style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 6 }}>Laat de klant hier tekenen met de vinger of stylus</p>
       </div>
 
-      <button onClick={submit} disabled={saving || !allChecked}
-        style={{ width: '100%', padding: '14px', borderRadius: 10, border: 'none', background: allChecked ? 'linear-gradient(135deg, #C8A96E, #B8956A)' : 'rgba(255,255,255,0.08)', color: allChecked ? 'white' : 'rgba(255,255,255,0.3)', fontSize: 15, fontWeight: 700, cursor: allChecked ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'all 0.2s' }}>
+      <button onClick={submit} disabled={saving || !allChecked} className={`btn btn-full ${allChecked ? 'btn-primary' : 'btn-ghost'}`} style={{ fontSize: 15 }}>
         {saving ? 'Opslaan…' : '📋 Opleverbon opslaan & order afronden'}
       </button>
-    </MCard>
+    </DCard>
   )
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function MCard({ title, icon, children, accent = 'rgba(255,255,255,0.04)', accentBorder = 'rgba(255,255,255,0.08)' }) {
+function DCard({ title, icon, children, warn }) {
   return (
-    <div style={{ background: accent, border: `1px solid ${accentBorder}`, borderRadius: 12, padding: '16px 18px' }}>
-      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ background: 'white', border: `1px solid ${warn ? 'var(--warn-border)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '14px 16px', boxShadow: 'var(--shadow-sm)' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: warn ? 'var(--warn)' : 'var(--text-muted)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
         <span>{icon}</span> {title}
       </div>
       {children}
@@ -658,14 +677,10 @@ function MCard({ title, icon, children, accent = 'rgba(255,255,255,0.04)', accen
   )
 }
 
-function Spinner({ color = 'rgba(255,255,255,0.4)' }) {
-  return <div style={{ width: 28, height: 28, border: `2px solid ${color}`, borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-}
-
-const FASE_BADGE = {
-  3: { bg: 'rgba(59,130,246,0.15)',  color: '#93C5FD', label: 'In productie' },
-  4: { bg: 'rgba(59,130,246,0.15)',  color: '#93C5FD', label: 'Geleverd' },
-  5: { bg: 'rgba(245,158,11,0.15)',  color: '#FCD34D', label: 'Ingepland' },
-  6: { bg: 'rgba(16,185,129,0.15)',  color: '#6EE7B7', label: 'Afgerond' },
-  7: { bg: 'rgba(22,163,74,0.15)',   color: '#86EFAC', label: 'Compleet' },
+const FASE = {
+  3: { cls: 'badge-productie', label: 'In productie' },
+  4: { cls: 'badge-deposit',   label: 'Geleverd' },
+  5: { cls: 'badge-montage',   label: 'Ingepland' },
+  6: { cls: 'badge-oplevering',label: 'Afgerond' },
+  7: { cls: 'badge-compleet',  label: 'Compleet' },
 }
