@@ -1,7 +1,5 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 // Afzender — verander naar info@ecoprokozijnen.nl zodra domein geverifieerd is
 const FROM = 'EcoPro Kozijnen <onboarding@resend.dev>' // Wijzig naar info@ecoprokozijnen.nl na domeinverificatie
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app'
@@ -257,6 +255,7 @@ export async function POST(request) {
     console.log('Sending email to:', order.customer_email, 'type:', type, 'from:', FROM)
     console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY)
 
+    const resend = new Resend(process.env.RESEND_API_KEY)
     const { data, error } = await resend.emails.send({
       from: FROM,
       to: order.customer_email,
