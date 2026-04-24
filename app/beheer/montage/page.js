@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatEuro } from '@/lib/phases'
-import Link from 'next/link'
+import BeheerNav from '@/lib/BeheerNav'
 
 const MONTEURS = [
   { key: 'rudy',    naam: 'Rudy en team',   kleur: '#3B82F6', bg: 'rgba(59,130,246,0.15)' },
@@ -70,33 +70,30 @@ export default function MontagePlanningPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <BeheerNav />
 
-      {/* Header */}
-      <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Link href="/beheer" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: 13 }}>← Dashboard</Link>
-            <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src="/logo.png" alt="EcoPro" style={{ width: 28, height: 28, objectFit: 'contain', background: 'white', borderRadius: 6, padding: 3 }} />
-              <span style={{ fontWeight: 700, fontSize: 15 }}>Montage Planning</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[
-              { key: 'kalender', label: '📅 Kalender' },
-              { key: 'monteurs', label: '👷 Monteurs' },
-              { key: 'lijst',    label: '📋 Lijst' },
-            ].map(v => (
-              <button key={v.key} onClick={() => setView(v.key)}
-                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: 'none', fontFamily: 'inherit', fontWeight: view === v.key ? 700 : 400, background: view === v.key ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)', color: 'white', transition: 'all 0.1s' }}>
-                {v.label}
-              </button>
-            ))}
-          </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
+
+      {/* Topbar */}
+      <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 24px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>Montage</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Planning & monteursbeheer</div>
         </div>
-      </header>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[
+            { key: 'kalender', label: '📅 Kalender' },
+            { key: 'monteurs', label: '👷 Monteurs' },
+            { key: 'lijst',    label: '📋 Lijst' },
+          ].map(v => (
+            <button key={v.key} onClick={() => setView(v.key)}
+              style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: `1px solid ${view === v.key ? 'var(--brand)' : 'var(--border)'}`, fontFamily: 'inherit', fontWeight: view === v.key ? 700 : 400, background: view === v.key ? 'var(--brand)' : 'white', color: view === v.key ? 'white' : 'var(--text-muted)', transition: 'all 0.1s' }}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Stats balk */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', background: 'white', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
@@ -170,6 +167,7 @@ export default function MontagePlanningPage() {
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
       )}
+      </div>
     </div>
   )
 }

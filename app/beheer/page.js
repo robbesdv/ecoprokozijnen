@@ -230,7 +230,7 @@ export default function BeheerPage() {
 
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {activeView === 'klanten' ? (
-          <KlantenView orders={orders} />
+          <KlantenView orders={orders} getPhase={getPhase} />
         ) : (
         <div style={{ height: '100%', overflowY: 'auto', background: 'white' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '44px 2fr 1.3fr 1fr 36px', padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
@@ -370,6 +370,8 @@ function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
         <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', padding: '0 14px 8px' }}>Overzicht</div>
         {NAV_TOP.map(item => navItem(activeView === item.key, () => setActiveView(item.key), item.icon, item.label))}
 
+        {navItem(false, () => { window.location.href='/beheer/agenda' }, '📅', 'Agenda')}
+
         <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 4px' }} />
         <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', padding: '0 14px 8px' }}>Werkplekken</div>
         {NAV_LINKS.map(item => (
@@ -400,7 +402,9 @@ function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
   )
 }
 
-function KlantenView({ orders }) {
+function KlantenView({ orders, getPhase }) {
+  const [selectedKlant, setSelectedKlant] = useState(null)
+
   const klanten = Object.values(
     (orders || []).reduce((acc, o) => {
       const key = o.customer_email || o.customer_name
@@ -421,11 +425,11 @@ function KlantenView({ orders }) {
     <div style={{ height: '100%', overflowY: 'auto', padding: '24px 28px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
         {klanten.map((k, i) => {
-          const lastOrder = k.orders[0]
           const activeOrders = k.orders.filter(o => o.phase < 7).length
           const initColor = `hsl(${((k.name?.charCodeAt(0) || 65) * 97 + 120) % 360},40%,38%)`
           return (
-            <div key={i} style={{ background: 'white', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden', transition: 'box-shadow 0.15s' }}
+            <div key={i} onClick={() => setSelectedKlant(k)}
+              style={{ background: 'white', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'}
               onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
             >
@@ -441,25 +445,90 @@ function KlantenView({ orders }) {
               <div style={{ padding: '12px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 {[
                   { label: 'Orders', value: k.orders.length },
-                  { label: 'Actief', value: activeOrders, warn: activeOrders > 0 },
+                  { label: 'Actief', value: activeOrders, accent: activeOrders > 0 },
                   { label: 'Totaal', value: `€ ${Math.round(k.totalValue).toLocaleString('nl-NL')}` },
                 ].map(s => (
                   <div key={s.label} style={{ background: 'var(--bg)', borderRadius: 8, padding: '8px 10px' }}>
                     <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 3 }}>{s.label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: s.warn ? 'var(--brand)' : 'var(--text)' }}>{s.value}</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: s.accent ? 'var(--brand)' : 'var(--text)' }}>{s.value}</div>
                   </div>
                 ))}
               </div>
-              {(k.email || k.phone) && (
-                <div style={{ padding: '0 18px 14px', display: 'flex', gap: 10 }}>
-                  {k.email && <a href={`mailto:${k.email}`} style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>✉ {k.email}</a>}
-                  {k.phone && <a href={`tel:${k.phone}`} style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>📞 {k.phone}</a>}
-                </div>
-              )}
+              <div style={{ padding: '0 18px 12px', fontSize: 11, color: 'var(--text-muted)' }}>Klik voor details →</div>
             </div>
           )
         })}
       </div>
+
+      {/* Klant detail popup */}
+      {selectedKlant && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={e => e.target === e.currentTarget && setSelectedKlant(null)}>
+          <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 560, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ background: 'linear-gradient(135deg, #152318, #1e3a28)', color: 'white', padding: '22px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: `hsl(${((selectedKlant.name?.charCodeAt(0)||65)*97+120)%360},40%,38%)`, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
+                {(selectedKlant.name||'?')[0].toUpperCase()}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>{selectedKlant.name}</div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>{selectedKlant.address || '—'}</div>
+              </div>
+              <button onClick={() => setSelectedKlant(null)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+
+            {/* Contact */}
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {selectedKlant.email && (
+                <a href={`mailto:${selectedKlant.email}`} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', background: 'var(--bg)', borderRadius: 8, fontSize: 13, color: 'var(--brand)', textDecoration: 'none', fontWeight: 500 }}>
+                  ✉ {selectedKlant.email}
+                </a>
+              )}
+              {selectedKlant.phone && (
+                <a href={`tel:${selectedKlant.phone}`} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', background: 'var(--bg)', borderRadius: 8, fontSize: 13, color: 'var(--brand)', textDecoration: 'none', fontWeight: 500 }}>
+                  📞 {selectedKlant.phone}
+                </a>
+              )}
+            </div>
+
+            {/* Stats */}
+            <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+              {[
+                { label: 'Orders', value: selectedKlant.orders.length },
+                { label: 'Actief', value: selectedKlant.orders.filter(o => o.phase < 7).length },
+                { label: 'Totale omzet', value: `€ ${Math.round(selectedKlant.totalValue).toLocaleString('nl-NL')}` },
+              ].map(s => (
+                <div key={s.label} style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Orders lijst */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 24px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Ordergeschiedenis</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedKlant.orders.map(o => {
+                  const p = getPhase(o.phase)
+                  return (
+                    <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, border: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{o.customer_address || 'Order'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                          {new Date(o.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <span className={`badge ${p.badgeClass}`}>{p.adminLabel}</span>
+                      <div style={{ fontWeight: 700, fontSize: 13, minWidth: 70, textAlign: 'right' }}>€ {Math.round(o.total_amount||0).toLocaleString('nl-NL')}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

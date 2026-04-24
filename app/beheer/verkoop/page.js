@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { getPhase, formatEuro, formatDate } from '@/lib/phases'
 import { ralName } from '@/lib/KozijnSVG'
+import BeheerNav from '@/lib/BeheerNav'
 
 const PANE_LABEL = {
   vast: 'vast glas', draai: 'draai', kiep: 'kiep',
@@ -124,54 +124,34 @@ export default function VerkoopPage() {
   const openValue = offertes.reduce((s, o) => s + (o.total_amount || 0), 0)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <BeheerNav topSlot={
+        tab === 'kozijnlab' ? (
+          <button onClick={requestSubmit} style={{ width: '100%', background: '#22c55e', border: '1px solid #16a34a', color: 'white', padding: '9px 14px', borderRadius: 9, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+            → Zet door naar EcoPro
+          </button>
+        ) : null
+      } />
 
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em' }}>EcoPro Kozijnen</div>
-              <div style={{ fontSize: 11, opacity: 0.5, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Verkoopportaal</div>
-            </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
+        {/* Topbar */}
+        <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 24px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>Verkoop</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Leads, offertes & KozijnLAB configurator</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {tab === 'kozijnlab' && (
-              <button onClick={requestSubmit}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#22c55e', border: '1px solid #16a34a', color: 'white', padding: '7px 16px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, whiteSpace: 'nowrap' }}>
-                → Zet door naar EcoPro
+          <div style={{ display: 'flex', gap: 6 }}>
+            {NAV.map(item => (
+              <button key={item.key} onClick={() => setTab(item.key)}
+                style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: `1px solid ${tab === item.key ? 'var(--brand)' : 'var(--border)'}`, background: tab === item.key ? 'var(--brand)' : 'white', color: tab === item.key ? 'white' : 'var(--text-muted)', fontWeight: tab === item.key ? 600 : 400, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.1s' }}>
+                <span>{item.icon}</span> {item.label}
+                {item.key === 'leads' && leads.length > 0 && <span style={{ background: 'var(--warn)', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 10, padding: '1px 5px' }}>{leads.length}</span>}
               </button>
-            )}
-            <Link href="/beheer" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)', padding: '7px 14px', borderRadius: 8, fontSize: 13, textDecoration: 'none', whiteSpace: 'nowrap', fontWeight: 500 }}>
-              ← EcoPro Dashboard
-            </Link>
+            ))}
           </div>
         </div>
-      </header>
 
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-
-        {/* ── Sidebar ──────────────────────────────────────────────── */}
-        <nav style={{ width: 200, background: 'white', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-          <div style={{ padding: '10px 10px 4px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>Menu</div>
-          {NAV.map(item => (
-            <button key={item.key} onClick={() => setTab(item.key)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '11px 16px',
-                background: tab === item.key ? 'var(--brand-muted)' : 'transparent',
-                border: 'none', borderLeft: tab === item.key ? '3px solid var(--brand)' : '3px solid transparent',
-                cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', textAlign: 'left',
-                color: tab === item.key ? 'var(--brand)' : 'var(--text)',
-                fontWeight: tab === item.key ? 600 : 400, width: '100%',
-              }}>
-              <span style={{ fontSize: 15, flexShrink: 0 }}>{item.icon}</span>
-              <span style={{ flex: 1 }}>{item.label}</span>
-              {item.key === 'leads' && leads.length > 0 && (
-                <span style={{ background: 'var(--warn)', color: 'white', fontSize: 10, fontWeight: 700, borderRadius: 10, padding: '1px 6px' }}>{leads.length}</span>
-              )}
-            </button>
-          ))}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
           <div style={{ flex: 1 }} />
           <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
@@ -411,6 +391,7 @@ export default function VerkoopPage() {
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
       )}
+      </div>
     </div>
   )
 }

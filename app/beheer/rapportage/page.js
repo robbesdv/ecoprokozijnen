@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { formatEuro } from '@/lib/phases'
-import Link from 'next/link'
+import { getPhase, formatEuro } from '@/lib/phases'
+import BeheerNav from '@/lib/BeheerNav'
 
 export default function RapportagePage() {
   const [orders, setOrders] = useState([])
@@ -20,11 +20,8 @@ export default function RapportagePage() {
       })
   }, [])
 
-  // ── Berekeningen ─────────────────────────────────────────────────────────
-
   const MAANDEN = ['Jan', 'Feb', 'Mrt', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec']
 
-  // Omzet per maand (op basis van aanmaakdatum)
   const omzetPerMaand = MAANDEN.map((_, idx) => {
     const maandOrders = orders.filter(o => {
       const d = new Date(o.created_at)
@@ -39,14 +36,12 @@ export default function RapportagePage() {
 
   const maxOmzet = Math.max(...omzetPerMaand.map(m => m.omzet), 1)
 
-  // Totalen
-  const totaalOmzet     = orders.filter(o => new Date(o.created_at).getFullYear() === year).reduce((s, o) => s + (o.total_amount || 0), 0)
-  const totaalOffertes  = orders.filter(o => new Date(o.created_at).getFullYear() === year).length
-  const geaccordeerd    = orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase >= 1).length
-  const conversie       = totaalOffertes > 0 ? Math.round((geaccordeerd / totaalOffertes) * 100) : 0
+  const totaalOmzet    = orders.filter(o => new Date(o.created_at).getFullYear() === year).reduce((s, o) => s + (o.total_amount || 0), 0)
+  const totaalOffertes = orders.filter(o => new Date(o.created_at).getFullYear() === year).length
+  const geaccordeerd   = orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase >= 1).length
+  const conversie      = totaalOffertes > 0 ? Math.round((geaccordeerd / totaalOffertes) * 100) : 0
 
-  // Openstaande betalingen
-  const openAanbetaling = orders.filter(o => o.phase >= 1 && !o.deposit_confirmed)
+  const openAanbetaling  = orders.filter(o => o.phase >= 1 && !o.deposit_confirmed)
   const openRestbetaling = orders.filter(o => o.phase >= 6 && !o.main_payment_confirmed)
   const openSlot         = orders.filter(o => o.payment_split === 'split_70_10' && o.main_payment_confirmed && !o.final_payment_confirmed)
 
@@ -56,186 +51,276 @@ export default function RapportagePage() {
     ...openSlot.map(o => o.total_amount * 0.1),
   ].reduce((s, v) => s + v, 0)
 
-  // Recent (laatste 5 orders)
   const recent = [...orders].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 5)
-
   const beschikbareJaren = [...new Set(orders.map(o => new Date(o.created_at).getFullYear()))].sort((a, b) => b - a)
 
+  const topKlanten = Object.values(
+    orders.filter(o => new Date(o.created_at).getFullYear() === year).reduce((acc, o) => {
+      const k = o.customer_name || 'Onbekend'
+      if (!acc[k]) acc[k] = { name: k, total: 0, count: 0 }
+      acc[k].total += o.total_amount || 0
+      acc[k].count++
+      return acc
+    }, {})
+  ).sort((a, b) => b.total - a.total).slice(0, 6)
+
+  const faseVerdeling = [0,1,2,3,4,5,6,7].map(ph => ({
+    ph, label: getPhase(ph).adminLabel,
+    count: orders.filter(o => o.phase === ph).length,
+  })).filter(f => f.count > 0)
+  const maxFaseCount = Math.max(...faseVerdeling.map(f => f.count), 1)
+
+  const ordersPerMaand = MAANDEN.map((_, idx) => ({
+    label: MAANDEN[idx],
+    count: orders.filter(o => {
+      const d = new Date(o.created_at)
+      return d.getFullYear() === year && d.getMonth() === idx
+    }).length,
+  }))
+  const maxCount = Math.max(...ordersPerMaand.map(m => m.count), 1)
+
+  const faseKleuren = ['#94a3b8','#6366f1','#f59e0b','#3b82f6','#8b5cf6','#22c55e','#14b8a6','#64748b']
+
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--text-muted)' }}>
-      Laden…
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <BeheerNav />
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>Laden…</div>
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'var(--bg)', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <BeheerNav />
 
-      {/* Header */}
-      <header style={{ background: 'var(--brand)', color: 'white', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: 56 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Link href="/beheer" style={{ color: 'rgba(255,255,255,0.5)', textDecoration: 'none', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
-              ← Dashboard
-            </Link>
-            <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 16 }}>|</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src="/logo.png" alt="EcoPro" style={{ width: 36, height: 36, objectFit: 'contain', background: 'white', borderRadius: 8, padding: 4 }} />
-              <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.01em' }}>Rapportage</span>
-            </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
+
+        {/* Topbar */}
+        <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 28px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>Rapportage</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Omzet, conversie & betalingsoverzicht</div>
           </div>
-          <select
-            value={year}
-            onChange={e => setYear(Number(e.target.value))}
-            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '6px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', width: 'auto' }}
-          >
-            {beschikbareJaren.map(y => <option key={y} value={y} style={{ color: 'black', background: 'white' }}>{y}</option>)}
-            {!beschikbareJaren.includes(year) && <option value={year} style={{ color: 'black', background: 'white' }}>{year}</option>}
+          <select value={year} onChange={e => setYear(Number(e.target.value))}
+            style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 13, background: 'white', cursor: 'pointer', fontFamily: 'inherit' }}>
+            {beschikbareJaren.map(y => <option key={y} value={y}>{y}</option>)}
+            {!beschikbareJaren.includes(year) && <option value={year}>{year}</option>}
           </select>
         </div>
-      </header>
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 20px' }}>
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
 
-        {/* KPI kaarten */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-          {[
-            { label: 'Totale omzet', value: formatEuro(totaalOmzet), sub: `${year}`, color: 'var(--brand)' },
-            { label: 'Offertes verstuurd', value: totaalOffertes, sub: `in ${year}` },
-            { label: 'Conversie', value: `${conversie}%`, sub: `${geaccordeerd} van ${totaalOffertes} geaccordeerd`, color: conversie >= 50 ? 'var(--success)' : 'var(--warn)' },
-            { label: 'Openstaand', value: formatEuro(totaalOpenstaand), sub: `${openAanbetaling.length + openRestbetaling.length + openSlot.length} betalingen`, color: totaalOpenstaand > 0 ? 'var(--warn)' : 'var(--success)' },
-          ].map(k => (
-            <div key={k.label} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{k.label}</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: k.color || 'var(--text)', letterSpacing: '-0.02em' }}>{k.value}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{k.sub}</div>
+            {/* KPI kaarten */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+              {[
+                { label: 'Totale omzet', value: formatEuro(totaalOmzet), sub: `Jaar ${year}`, accent: 'var(--brand)' },
+                { label: 'Offertes verstuurd', value: totaalOffertes, sub: `in ${year}`, accent: '#6366f1' },
+                { label: 'Conversie', value: `${conversie}%`, sub: `${geaccordeerd} van ${totaalOffertes} akkoord`, accent: conversie >= 50 ? '#22c55e' : '#f59e0b' },
+                { label: 'Openstaand', value: formatEuro(totaalOpenstaand), sub: `${openAanbetaling.length + openRestbetaling.length + openSlot.length} betalingen`, accent: totaalOpenstaand > 0 ? '#f59e0b' : '#22c55e' },
+              ].map(k => (
+                <div key={k.label} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px', borderLeft: `4px solid ${k.accent}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>{k.label}</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1 }}>{k.value}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{k.sub}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Omzet grafiek */}
-        <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', marginBottom: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>Omzet per maand</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{year}</div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 160 }}>
-            {omzetPerMaand.map((m, idx) => {
-              const hoogte = m.omzet > 0 ? Math.max((m.omzet / maxOmzet) * 140, 4) : 0
-              const isHuidigeMaand = new Date().getMonth() === idx && new Date().getFullYear() === year
-              return (
-                <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  {m.omzet > 0 && (
-                    <div style={{ fontSize: 9, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                      {formatEuro(m.omzet).replace('€\u00a0', '€').replace(',00', '')}
+            {/* Omzet grafiek */}
+            <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', marginBottom: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>Omzet per maand</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{year}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 160 }}>
+                {omzetPerMaand.map((m, idx) => {
+                  const hoogte = m.omzet > 0 ? Math.max((m.omzet / maxOmzet) * 140, 4) : 0
+                  const isHuidigeMaand = new Date().getMonth() === idx && new Date().getFullYear() === year
+                  return (
+                    <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      {m.omzet > 0 && (
+                        <div style={{ fontSize: 9, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {formatEuro(m.omzet).replace('€ ', '€').replace(',00', '')}
+                        </div>
+                      )}
+                      <div style={{
+                        width: '100%', height: hoogte || 3,
+                        background: isHuidigeMaand ? 'var(--brand)' : hoogte > 0 ? 'var(--brand-muted)' : '#F3F4F6',
+                        borderRadius: '4px 4px 0 0',
+                        border: isHuidigeMaand ? 'none' : hoogte > 0 ? '1px solid var(--brand-border)' : 'none',
+                        transition: 'height 0.3s',
+                      }} title={`${m.label}: ${formatEuro(m.omzet)}`} />
+                      <div style={{ fontSize: 10, color: isHuidigeMaand ? 'var(--brand)' : 'var(--text-muted)', fontWeight: isHuidigeMaand ? 700 : 400 }}>{m.label}</div>
                     </div>
-                  )}
-                  <div style={{
-                    width: '100%', height: hoogte || 3,
-                    background: isHuidigeMaand ? 'var(--brand)' : hoogte > 0 ? 'var(--brand-muted)' : '#F3F4F6',
-                    borderRadius: '4px 4px 0 0',
-                    border: isHuidigeMaand ? 'none' : hoogte > 0 ? '1px solid var(--brand-border)' : 'none',
-                    transition: 'height 0.3s',
-                    cursor: m.omzet > 0 ? 'default' : 'default',
-                  }} title={`${m.label}: ${formatEuro(m.omzet)}`} />
-                  <div style={{ fontSize: 10, color: isHuidigeMaand ? 'var(--brand)' : 'var(--text-muted)', fontWeight: isHuidigeMaand ? 700 : 400 }}>{m.label}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+                  )
+                })}
+              </div>
+            </div>
 
-        {/* Twee kolommen: openstaand + funnnel */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+            {/* Orders per maand + fase verdeling */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
 
-          {/* Openstaande betalingen */}
-          <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Openstaande betalingen</div>
-            {openAanbetaling.length === 0 && openRestbetaling.length === 0 && openSlot.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>✓ Alles betaald</p>
-            ) : (
-              <>
-                {openAanbetaling.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Aanbetaling (20%)</div>
-                    {openAanbetaling.map(o => (
-                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
-                        <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * 0.2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {openRestbetaling.length > 0 && (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Restbetaling</div>
-                    {openRestbetaling.map(o => (
-                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
-                        <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * (o.payment_split === 'split_70_10' ? 0.7 : 0.8))}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {openSlot.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Slotbetaling (10%)</div>
-                    {openSlot.map(o => (
-                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
-                        <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * 0.1)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '2px solid var(--border)', fontWeight: 700 }}>
-                  <span>Totaal openstaand</span>
-                  <span style={{ color: 'var(--warn)' }}>{formatEuro(totaalOpenstaand)}</span>
+              {/* Orders per maand (aantallen) */}
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>Orders per maand</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>aantal</div>
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* Conversie funnel */}
-          <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Offerte funnel</div>
-            {[
-              { label: 'Offertes verstuurd', count: totaalOffertes, color: '#E5E7EB', pct: 100 },
-              { label: 'Geaccordeerd',       count: geaccordeerd, color: 'var(--brand-muted)', pct: totaalOffertes > 0 ? (geaccordeerd / totaalOffertes) * 100 : 0 },
-              { label: 'Aanbetaling ontvangen', count: orders.filter(o => new Date(o.created_at).getFullYear() === year && o.deposit_confirmed).length, color: '#C8E6C9', pct: totaalOffertes > 0 ? (orders.filter(o => new Date(o.created_at).getFullYear() === year && o.deposit_confirmed).length / totaalOffertes) * 100 : 0 },
-              { label: 'Volledig afgerond',  count: orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase === 7).length, color: 'var(--success-bg)', pct: totaalOffertes > 0 ? (orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase === 7).length / totaalOffertes) * 100 : 0 },
-            ].map((s, idx) => (
-              <div key={s.label} style={{ marginBottom: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>{s.label}</span>
-                  <span style={{ fontWeight: 600 }}>{s.count}</span>
-                </div>
-                <div style={{ background: '#F3F4F6', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-                  <div style={{ width: `${s.pct}%`, height: '100%', background: idx === 0 ? '#D1D5DB' : 'var(--brand)', borderRadius: 4, transition: 'width 0.5s' }} />
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 120 }}>
+                  {ordersPerMaand.map((m, idx) => {
+                    const hoogte = m.count > 0 ? Math.max((m.count / maxCount) * 100, 6) : 0
+                    const isHuidigeMaand = new Date().getMonth() === idx && new Date().getFullYear() === year
+                    return (
+                      <div key={m.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                        {m.count > 0 && <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{m.count}</div>}
+                        <div style={{
+                          width: '100%', height: hoogte || 3,
+                          background: isHuidigeMaand ? '#6366f1' : hoogte > 0 ? '#C7D2FE' : '#F3F4F6',
+                          borderRadius: '3px 3px 0 0',
+                        }} title={`${m.label}: ${m.count} orders`} />
+                        <div style={{ fontSize: 9, color: isHuidigeMaand ? '#6366f1' : 'var(--text-muted)', fontWeight: isHuidigeMaand ? 700 : 400 }}>{m.label}</div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Recente orders */}
-        <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Recente orders</div>
-          {recent.map((o, idx) => (
-            <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: idx < recent.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{o.customer_name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{o.customer_address}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 600 }}>{formatEuro(o.total_amount)}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {new Date(o.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {/* Fase verdeling */}
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Fase verdeling</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {faseVerdeling.map((f, idx) => (
+                    <div key={f.ph}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                        <span style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                        <span style={{ fontWeight: 600 }}>{f.count}</span>
+                      </div>
+                      <div style={{ background: '#F3F4F6', borderRadius: 4, height: 7, overflow: 'hidden' }}>
+                        <div style={{ width: `${(f.count / maxFaseCount) * 100}%`, height: '100%', background: faseKleuren[f.ph] || 'var(--brand)', borderRadius: 4, transition: 'width 0.5s' }} />
+                      </div>
+                    </div>
+                  ))}
+                  {faseVerdeling.length === 0 && <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Geen data</div>}
                 </div>
               </div>
             </div>
-          ))}
-        </div>
 
+            {/* Openstaande betalingen + funnel */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+
+              {/* Openstaande betalingen */}
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Openstaande betalingen</div>
+                {openAanbetaling.length === 0 && openRestbetaling.length === 0 && openSlot.length === 0 ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0' }}>✓ Alles betaald</p>
+                ) : (
+                  <>
+                    {openAanbetaling.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Aanbetaling (20%)</div>
+                        {openAanbetaling.map(o => (
+                          <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
+                            <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * 0.2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {openRestbetaling.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Restbetaling</div>
+                        {openRestbetaling.map(o => (
+                          <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
+                            <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * (o.payment_split === 'split_70_10' ? 0.7 : 0.8))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {openSlot.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Slotbetaling (10%)</div>
+                        {openSlot.map(o => (
+                          <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{o.customer_name}</span>
+                            <span style={{ fontWeight: 600 }}>{formatEuro(o.total_amount * 0.1)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, paddingTop: 10, borderTop: '2px solid var(--border)', fontWeight: 700 }}>
+                      <span>Totaal openstaand</span>
+                      <span style={{ color: 'var(--warn)' }}>{formatEuro(totaalOpenstaand)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Conversie funnel */}
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Offerte funnel</div>
+                {[
+                  { label: 'Offertes verstuurd', count: totaalOffertes, pct: 100 },
+                  { label: 'Geaccordeerd', count: geaccordeerd, pct: totaalOffertes > 0 ? (geaccordeerd / totaalOffertes) * 100 : 0 },
+                  { label: 'Aanbetaling ontvangen', count: orders.filter(o => new Date(o.created_at).getFullYear() === year && o.deposit_confirmed).length, pct: totaalOffertes > 0 ? (orders.filter(o => new Date(o.created_at).getFullYear() === year && o.deposit_confirmed).length / totaalOffertes) * 100 : 0 },
+                  { label: 'Volledig afgerond', count: orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase === 7).length, pct: totaalOffertes > 0 ? (orders.filter(o => new Date(o.created_at).getFullYear() === year && o.phase === 7).length / totaalOffertes) * 100 : 0 },
+                ].map((s, idx) => (
+                  <div key={s.label} style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: 'var(--text-muted)' }}>{s.label}</span>
+                      <span style={{ fontWeight: 600 }}>{s.count}</span>
+                    </div>
+                    <div style={{ background: '#F3F4F6', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                      <div style={{ width: `${s.pct}%`, height: '100%', background: idx === 0 ? '#D1D5DB' : 'var(--brand)', borderRadius: 4, transition: 'width 0.5s' }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Top klanten */}
+            {topKlanten.length > 0 && (
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', marginBottom: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Top klanten {year}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  {topKlanten.map((k, idx) => (
+                    <div key={k.name} style={{ background: 'var(--bg)', borderRadius: 10, padding: '12px 14px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: idx === 0 ? 'var(--brand)' : idx === 1 ? '#6366f1' : '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+                        {idx + 1}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{k.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600, marginTop: 1 }}>{formatEuro(k.total)}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{k.count} order{k.count !== 1 ? 's' : ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recente orders */}
+            <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', marginBottom: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Recente orders</div>
+              {recent.map((o, idx) => (
+                <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: idx < recent.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{o.customer_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{o.customer_address}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 600 }}>{formatEuro(o.total_amount)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {new Date(o.created_at).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </div>
       </div>
     </div>
   )
