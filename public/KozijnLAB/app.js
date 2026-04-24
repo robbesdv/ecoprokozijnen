@@ -104,7 +104,7 @@ function newElement(type = 'kozijn', name = '') {
     base.doorSubtype = 'voordeur';
     base.doorOptions = {};
     base.doorPanels = [defaultDoorPanel('panel')];
-    base.columns = [{ widthPct: 100, rows: [{ paneType: 'deur', hinge: 'left', fill: 'panel', heightPct: 100 }] }];
+    base.columns = [{ widthPct: 100, rows: [{ paneType: 'deur', hinge: 'left', hingeStyle: 'flag', fill: 'panel', heightPct: 100 }] }];
   }
   if (type === 'schuifpui' || type === 'hefschuif') {
     base.widthMM = 3000; base.heightMM = 2300;
@@ -233,6 +233,7 @@ function tuindeurRowFrom(el) {
   return {
     paneType: doorPaneTypeFor(el),
     hinge: src.hinge || 'left',
+    hingeStyle: src.hingeStyle || 'flag',
     fill: src.fill || (el.doorPanels?.[0]?.fill || 'panel'),
     heightPct: 100,
     glassPack: src.glassPack || el.glassPack || 'HR++',
@@ -674,6 +675,41 @@ function drawFlagHinges(svg, side, edgeX, y, h, profilePx) {
   });
 }
 
+function drawRollerBandHinges(svg, side, edgeX, y, h, profilePx) {
+  const barrelW = Math.max(5, Math.min(11, profilePx * 0.22));
+  const hingeH = Math.max(15, Math.min(30, h * 0.06));
+  const capH = Math.max(2, Math.min(4, hingeH * 0.16));
+  const x = edgeX - barrelW / 2;
+  const positions = [0.18, 0.5, 0.82];
+
+  positions.forEach(pos => {
+    const hy = y + h * pos - hingeH / 2;
+    svg.appendChild(svgEl('rect', { x, y: hy, width: barrelW, height: hingeH, class: 'svg-hinge-roller', rx: barrelW / 2 }));
+    svg.appendChild(svgEl('line', { x1: x + 1, y1: hy + capH, x2: x + barrelW - 1, y2: hy + capH, class: 'svg-hinge-cap' }));
+    svg.appendChild(svgEl('line', { x1: x + 1, y1: hy + hingeH - capH, x2: x + barrelW - 1, y2: hy + hingeH - capH, class: 'svg-hinge-cap' }));
+  });
+}
+
+function drawDoorHinges(svg, style, side, edgeX, y, h, profilePx) {
+  if (style === 'roller') drawRollerBandHinges(svg, side, edgeX, y, h, profilePx);
+  else drawFlagHinges(svg, side, edgeX, y, h, profilePx);
+}
+
+function drawDoorHandle(svg, edgeX, centerY, side, profilePx) {
+  const plateW = Math.max(3, Math.min(5, profilePx * 0.1));
+  const plateH = Math.max(12, Math.min(24, profilePx * 0.38));
+  const leverW = Math.max(10, Math.min(22, profilePx * 0.42));
+  const leverH = Math.max(2.5, Math.min(4.5, profilePx * 0.09));
+  const plateX = side === 'left' ? edgeX : edgeX - plateW;
+  const plateY = centerY - plateH / 2;
+  const leverY = centerY - leverH / 2;
+  const leverX = side === 'left' ? plateX + plateW - 1 : plateX - leverW + 1;
+
+  svg.appendChild(svgEl('rect', { x: plateX, y: plateY, width: plateW, height: plateH, class: 'svg-door-handle', rx: 1 }));
+  svg.appendChild(svgEl('rect', { x: leverX, y: leverY, width: leverW, height: leverH, class: 'svg-door-handle', rx: leverH / 2 }));
+  svg.appendChild(svgEl('circle', { cx: side === 'left' ? plateX + plateW : plateX, cy: centerY, r: Math.max(1.6, leverH * 0.55), class: 'svg-door-handle' }));
+}
+
 function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   const isFactory = !!opts.isFactory;
   const pType = row.paneType;
@@ -712,6 +748,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
 
   const sx = x + inset, sy = y + inset, sw = w - 2 * inset, sh = h - 2 * inset;
   const hinge = row.hinge || 'left';
+  const hingeStyle = row.hingeStyle || 'flag';
 
   if (pType === 'draai' || pType === 'draaikiep') {
     const hx = hinge === 'left' ? sx : sx + sw;
@@ -723,10 +760,8 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     const handleX = hinge === 'left' ? x + w : x;
     drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx);
     svg.appendChild(svgEl('path', { d: `M ${hx} ${y} L ${handleX} ${y + h / 2} L ${hx} ${y + h}`, class: 'svg-op' }));
-    const hdy = sy + sh * 0.5;
-    const hdx = hinge === 'left' ? sx + sw - 8 : sx + 8;
-    svg.appendChild(svgEl('rect', { x: hdx - 2, y: hdy - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
-    drawFlagHinges(svg, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? x : x + w, y, h, doorPaneProfilePx);
+    drawDoorHandle(svg, hinge === 'left' ? sx + sw : sx, sy + sh * 0.5, hinge === 'left' ? 'right' : 'left', doorPaneProfilePx);
+    drawDoorHinges(svg, hingeStyle, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? x : x + w, y, h, doorPaneProfilePx);
   }
   if (pType === 'kiep' || pType === 'draaikiep') {
     svg.appendChild(svgEl('path', { d: `M ${sx} ${sy + sh} L ${sx + sw / 2} ${sy} L ${sx + sw} ${sy + sh}`, class: 'svg-op' }));
@@ -758,13 +793,10 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx);
     svg.appendChild(svgEl('path', { d: `M ${x} ${y} L ${seamX} ${y + h / 2} L ${x} ${y + h}`, class: 'svg-op' }));
     svg.appendChild(svgEl('path', { d: `M ${x + w} ${y} L ${seamX} ${y + h / 2} L ${x + w} ${y + h}`, class: 'svg-op' }));
-    const handleH = Math.max(12, sh * 0.045);
-    const handleW = Math.max(3, inset * 0.22);
-    const handleY = sy + sh * 0.5 - handleH / 2;
-    svg.appendChild(svgEl('rect', { x: seamX - gap - handleW, y: handleY, width: handleW, height: handleH, class: 'svg-door-handle', rx: 1 }));
-    svg.appendChild(svgEl('rect', { x: seamX + gap, y: handleY, width: handleW, height: handleH, class: 'svg-door-handle', rx: 1 }));
-    drawFlagHinges(svg, 'left', x, y, h, doorPaneProfilePx);
-    drawFlagHinges(svg, 'right', x + w, y, h, doorPaneProfilePx);
+    drawDoorHandle(svg, seamX - gap / 2, sy + sh * 0.5, 'right', doorPaneProfilePx);
+    drawDoorHandle(svg, seamX + gap / 2, sy + sh * 0.5, 'left', doorPaneProfilePx);
+    drawDoorHinges(svg, hingeStyle, 'left', x, y, h, doorPaneProfilePx);
+    drawDoorHinges(svg, hingeStyle, 'right', x + w, y, h, doorPaneProfilePx);
   }
   if (pType === 'vast' && (isFactory || row.fill === 'glass')) {
     const cxm = x + w / 2, cym = y + h / 2;
@@ -1191,6 +1223,11 @@ function renderConfig() {
   hingeField.style.display = showHinge ? '' : 'none';
   if (showHinge) hingeField.querySelector('select').value = activeRow.hinge || 'left';
 
+  const hingeStyleField = root.querySelector('#hinge-style-field');
+  const showHingeStyle = isDoorPaneType(activeRow.paneType);
+  hingeStyleField.style.display = showHingeStyle ? '' : 'none';
+  if (showHingeStyle) hingeStyleField.querySelector('select').value = activeRow.hingeStyle || 'flag';
+
   const fillField = root.querySelector('#fill-field');
   const showFill = ['vast', 'draai', 'draaikiep', 'kiep', 'deur', 'deur2'].includes(activeRow.paneType);
   fillField.style.display = showFill ? '' : 'none';
@@ -1205,6 +1242,7 @@ function renderConfig() {
   }
   if (isDoor) {
     hingeField.style.display = 'none';
+    hingeStyleField.style.display = 'none';
     fillField.style.display = 'none';
     glassFields.style.display = 'none';
   }
@@ -1242,6 +1280,7 @@ function renderDoorPanelControls(root, el) {
   const hingeField = root.querySelector('#door-hinge-field');
   hingeField.style.display = (el.doorSubtype || 'voordeur') === 'tuindeur' ? 'none' : '';
   root.querySelector('#door-hinge').value = mainRow.hinge || 'left';
+  root.querySelector('#door-hinge-style').value = mainRow.hingeStyle || 'flag';
   if (document.activeElement?.id !== 'door-panels-count') root.querySelector('#door-panels-count').value = panels.length;
 
   const dims = root.querySelector('#door-panel-dims');
@@ -1354,6 +1393,7 @@ function buildConfigShell() {
         <div class="field"><label class="label">Selecteer vak <span class="label-hint">· of klik op vak in tekening</span></label><div class="vak-tabs" id="vak-tabs"></div></div>
         <div class="field"><label class="label">Type vak</label><select class="select" id="pane-type"></select></div>
         <div class="field" id="hinge-field" style="display:none"><label class="label">Scharnierzijde</label><select class="select"><option value="left">Links</option><option value="right">Rechts</option></select></div>
+        <div class="field" id="hinge-style-field" style="display:none"><label class="label">Scharnier type</label><select class="select"><option value="flag">Vlagscharnier</option><option value="roller">Rollerbandscharnier</option></select></div>
         <div class="field" id="fill-field" style="display:none"><label class="label">Vulling</label><select class="select"><option value="glass">Glas</option><option value="panel">Paneel</option></select></div>
         <div id="glass-fields" style="display:none">
           <div class="field-row">
@@ -1367,6 +1407,7 @@ function buildConfigShell() {
         </div>
         <div id="door-vakken-fields" style="display:none">
           <div class="field" id="door-hinge-field"><label class="label">Scharnierzijde</label><select class="select" id="door-hinge"><option value="left">Links</option><option value="right">Rechts</option></select></div>
+          <div class="field"><label class="label">Scharnier type</label><select class="select" id="door-hinge-style"><option value="flag">Vlagscharnier</option><option value="roller">Rollerbandscharnier</option></select></div>
           <div class="field"><label class="label">Aantal deurvakken</label><input class="input mono" id="door-panels-count" type="number" min="1" max="6" step="1"/></div>
           <div class="field"><label class="label">Deurvak hoogtes</label><div class="dim-list" id="door-panel-dims"></div></div>
           <div class="divider"></div>
@@ -1434,6 +1475,11 @@ function bindConfigShell() {
       if (row) row.hinge = t.value;
       render(); return;
     }
+    if (t.id === 'door-hinge-style') {
+      const row = el.columns?.[0]?.rows?.[0];
+      if (row) row.hingeStyle = t.value;
+      render(); return;
+    }
     if (t.id === 'door-panel-fill') {
       normalizeDoorPanels(el);
       el.doorPanels[el._activeDoorPanelIdx || 0].fill = t.value;
@@ -1469,6 +1515,7 @@ function bindConfigShell() {
       const r = el.columns[el._activeColIdx].rows[el._activeRowIdx];
       if (!r.fill) r.fill = 'glass';
       if (!r.hinge) r.hinge = 'left';
+      if (isDoorPaneType(r.paneType) && !r.hingeStyle) r.hingeStyle = 'flag';
       render(); return;
     }
     if (t.id === 'color-outside') { el.colorOutside = t.value; render(); return; }
@@ -1481,6 +1528,7 @@ function bindConfigShell() {
     if (t.id === 'discount') { state.discountPct = +t.value || 0; render(); return; }
     if (t.id?.startsWith('cust-')) { state.customer[t.id.replace('cust-', '')] = t.value; render(); return; }
     if (t.closest('#hinge-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].hinge = t.value; render(); return; }
+    if (t.closest('#hinge-style-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].hingeStyle = t.value; render(); return; }
     if (t.closest('#fill-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].fill = t.value; render(); return; }
   });
   root.addEventListener('change', e => {
@@ -1488,6 +1536,11 @@ function bindConfigShell() {
     if (e.target.id === 'door-hinge') {
       const row = el.columns?.[0]?.rows?.[0];
       if (row) row.hinge = e.target.value;
+      render(); return;
+    }
+    if (e.target.id === 'door-hinge-style') {
+      const row = el.columns?.[0]?.rows?.[0];
+      if (row) row.hingeStyle = e.target.value;
       render(); return;
     }
     if (e.target.id === 'door-panel-fill') {
@@ -1503,6 +1556,10 @@ function bindConfigShell() {
     if (e.target.id === 'door-panel-glass-finish') {
       normalizeDoorPanels(el);
       el.doorPanels[el._activeDoorPanelIdx || 0].glassFinish = e.target.value;
+      render(); return;
+    }
+    if (e.target.closest('#hinge-style-field')) {
+      el.columns[el._activeColIdx].rows[el._activeRowIdx].hingeStyle = e.target.value;
       render(); return;
     }
     if (['pane-type', 'color-outside', 'color-inside'].includes(e.target.id)) render();
@@ -1775,6 +1832,7 @@ function buildExportPayload() {
             heightMM: Math.round(el.heightMM * r.heightPct / 100),
             heightPct: +r.heightPct.toFixed(2),
             paneType: r.paneType, fill: r.fill, hinge: r.hinge,
+            hingeStyle: r.hingeStyle || 'flag',
             glassPack: r.glassPack, glassFinish: r.glassFinish,
           };
           const doorPanels = exportDoorPanelsForRow(el, r);
@@ -1833,6 +1891,7 @@ function importFromJSON(data) {
           heightPct: r.heightPct || 100,
           fill: r.fill || 'glass',
           hinge: r.hinge || 'left',
+          hingeStyle: r.hingeStyle || 'flag',
           glassPack: r.glassPack || 'HR++',
           glassFinish: r.glassFinish || 'clear',
           doorPanels: Array.isArray(r.doorPanels) ? r.doorPanels.map(p => ({
