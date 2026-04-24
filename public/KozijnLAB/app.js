@@ -20,7 +20,6 @@ const ELEMENT_TYPES = [
   { id: 'kozijn', label: 'Kozijn', icon: 'kozijn' },
   { id: 'deur', label: 'Deur', icon: 'deur' },
   { id: 'schuifpui', label: 'Schuifpui', icon: 'schuif' },
-  { id: 'hefschuif', label: 'Hefschuif', icon: 'schuif' },
   { id: 'dakraam', label: 'Dakraam', icon: 'dak' },
 ];
 
@@ -165,6 +164,15 @@ function activeElement() {
   return state.elements.find(e => e.id === state.activeElementId) || state.elements[0];
 }
 
+function normalizeElementType(el) {
+  if (!el) return el;
+  if (el.type === 'hefschuif') {
+    el.type = 'schuifpui';
+    el.slideSystem = 'hst';
+  }
+  return el;
+}
+
 function drawingProfile(el) {
   const p = el.profile || defaultProfile();
   const keepOriginal = el?.type === 'schuifpui' || el?.type === 'hefschuif';
@@ -268,6 +276,7 @@ function kozijnMatrixBaseIncl(vakken, widthMM, heightMM) {
 
 function priceElement(el) {
   if (!el) return 0;
+  normalizeElementType(el);
   let base = 0;
   const wM = el.widthMM / 1000, hM = el.heightMM / 1000;
   const m2 = wM * hM;
@@ -335,8 +344,11 @@ function priceElement(el) {
       if (opts.bovenlicht)    base += 515;
     }
 
-  } else if (el.type === 'schuifpui') base = 2266 + m2 * 876;
-  else if (el.type === 'hefschuif') base = 3502 + m2 * 1133;
+  } else if (el.type === 'schuifpui') {
+    base = (el.slideSystem || 'hst') === 'hst'
+      ? 3502 + m2 * 1133
+      : 2266 + m2 * 876;
+  }
   else if (el.type === 'dakraam') base = 597 + m2 * 227;
 
   return (base / 1.21) * el.qty;
@@ -696,10 +708,10 @@ function drawDoorHinges(svg, style, side, edgeX, y, h, profilePx) {
 }
 
 function drawDoorHandle(svg, edgeX, centerY, side, profilePx) {
-  const plateW = Math.max(3, Math.min(5, profilePx * 0.1));
-  const plateH = Math.max(12, Math.min(24, profilePx * 0.38));
-  const leverW = Math.max(10, Math.min(22, profilePx * 0.42));
-  const leverH = Math.max(2.5, Math.min(4.5, profilePx * 0.09));
+  const plateW = Math.max(4, Math.min(7, profilePx * 0.13));
+  const plateH = Math.max(16, Math.min(30, profilePx * 0.48));
+  const leverW = Math.max(16, Math.min(30, profilePx * 0.56));
+  const leverH = Math.max(3.5, Math.min(6, profilePx * 0.12));
   const plateX = side === 'left' ? edgeX : edgeX - plateW;
   const plateY = centerY - plateH / 2;
   const leverY = centerY - leverH / 2;
@@ -1018,6 +1030,7 @@ function render() {
   saveState();
 }
 function _render() {
+  state.elements.forEach(normalizeElementType);
   state.elements.forEach(applyDoorSubtypeLayout);
   renderConfig();
   renderProject();
@@ -1028,6 +1041,7 @@ function _render() {
 }
 
 function renderDrawingOnly() {
+  state.elements.forEach(normalizeElementType);
   state.elements.forEach(applyDoorSubtypeLayout);
   renderProject();
   renderTotals();
@@ -1049,6 +1063,7 @@ function typeIconSvg(type) {
 function renderConfig() {
   const el = activeElement();
   if (!el) return;
+  normalizeElementType(el);
 
   const root = document.getElementById('config-root');
   if (!root.dataset.built) {
@@ -1071,7 +1086,7 @@ function renderConfig() {
   });
 
   const slideField = root.querySelector('#slide-system-field');
-  slideField.style.display = (el.type === 'schuifpui' || el.type === 'hefschuif') ? '' : 'none';
+  slideField.style.display = el.type === 'schuifpui' ? '' : 'none';
   slideField.querySelectorAll('#slide-seg button').forEach(b => {
     b.classList.toggle('is-active', b.dataset.v === (el.slideSystem || 'hst'));
   });
@@ -1805,6 +1820,7 @@ function exportDoorPanelsForRow(el, row) {
 }
 
 function buildExportPayload() {
+  state.elements.forEach(normalizeElementType);
   state.elements.forEach(applyDoorSubtypeLayout);
   const t = projectTotals();
   return {
@@ -1821,7 +1837,7 @@ function buildExportPayload() {
       profile: el.profile,
       finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, finishOutside: el.finishOutside, finishInside: el.finishInside },
       hardware: el.hardware,
-      slideSystem: (el.type === 'schuifpui' || el.type === 'hefschuif') ? el.slideSystem : undefined,
+      slideSystem: el.type === 'schuifpui' ? (el.slideSystem || 'hst') : undefined,
       columns: el.columns.map((col, ci) => ({
         index: ci + 1,
         widthMM: Math.round(el.widthMM * col.widthPct / 100),
@@ -1865,7 +1881,7 @@ function importFromJSON(data) {
     return {
       id: e.id || uid(),
       name: e.name || '',
-      type: e.type || 'kozijn',
+      type: e.type === 'hefschuif' ? 'schuifpui' : (e.type || 'kozijn'),
       qty: e.qty || 1,
       widthMM: dims.widthMM || e.widthMM || 1200,
       heightMM: dims.heightMM || e.heightMM || 1400,
@@ -1875,7 +1891,7 @@ function importFromJSON(data) {
       finishOutside: finish.finishOutside || e.finishOutside || 'smooth',
       finishInside: finish.finishInside || e.finishInside || 'smooth',
       hardware: e.hardware || 'siegenia',
-      slideSystem: e.slideSystem || 'hst',
+      slideSystem: e.type === 'hefschuif' ? 'hst' : (e.slideSystem || 'hst'),
       doorSubtype: e.doorSubtype || 'voordeur',
       doorOptions: e.doorOptions || {},
       doorPanels: Array.isArray(e.doorPanels) ? e.doorPanels.map(p => ({
