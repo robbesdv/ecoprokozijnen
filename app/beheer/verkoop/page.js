@@ -289,7 +289,7 @@ export default function VerkoopPage() {
       customer_email:   c.email || '',
       customer_phone:   c.phone || '',
       customer_address: address,
-      total_amount:     totals.gross || 0,
+      total_amount:     totals.net || 0,
       montage_notes:    kl.project?.notes || '',
       crm_reference:    kl.offerCode || null,
     }
@@ -347,7 +347,7 @@ export default function VerkoopPage() {
         customer_email:   c.email || '',
         customer_phone:   c.phone || '',
         customer_address: address,
-        total_amount:     totals.gross || 0,
+        total_amount:     totals.net || 0,
         phase: 0,
         montage_notes: kl.project?.notes || '',
       })
@@ -721,7 +721,7 @@ export default function VerkoopPage() {
 
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700 }}>Totaal incl. BTW</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand)', fontSize: 18 }}>{fmtEuro(confirmData.totals?.gross)}</span>
+                <span style={{ fontWeight: 700, color: 'var(--brand)', fontSize: 18 }}>{fmtEuro(confirmData.totals?.net)}</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Offerte {confirmData.offerCode}</div>
             </div>
