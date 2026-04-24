@@ -707,6 +707,10 @@ function drawDoorHinges(svg, style, side, edgeX, y, h, profilePx) {
   else drawFlagHinges(svg, side, edgeX, y, h, profilePx);
 }
 
+function shouldDrawDoorHinges(el) {
+  return !(el?.type === 'deur' && (el.doorSubtype || 'voordeur') === 'voordeur');
+}
+
 function drawDoorHandle(svg, edgeX, centerY, side, profilePx) {
   const plateW = Math.max(4, Math.min(7, profilePx * 0.13));
   const plateH = Math.max(16, Math.min(30, profilePx * 0.48));
@@ -773,7 +777,9 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx);
     svg.appendChild(svgEl('path', { d: `M ${hx} ${y} L ${handleX} ${y + h / 2} L ${hx} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, hinge === 'left' ? sx + sw : sx, sy + sh * 0.5, hinge === 'left' ? 'right' : 'left', doorPaneProfilePx);
-    drawDoorHinges(svg, hingeStyle, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? x : x + w, y, h, doorPaneProfilePx);
+    if (shouldDrawDoorHinges(el)) {
+      drawDoorHinges(svg, hingeStyle, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? x : x + w, y, h, doorPaneProfilePx);
+    }
   }
   if (pType === 'kiep' || pType === 'draaikiep') {
     svg.appendChild(svgEl('path', { d: `M ${sx} ${sy + sh} L ${sx + sw / 2} ${sy} L ${sx + sw} ${sy + sh}`, class: 'svg-op' }));
@@ -807,8 +813,10 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     svg.appendChild(svgEl('path', { d: `M ${x + w} ${y} L ${seamX} ${y + h / 2} L ${x + w} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, seamX - gap / 2, sy + sh * 0.5, 'right', doorPaneProfilePx);
     drawDoorHandle(svg, seamX + gap / 2, sy + sh * 0.5, 'left', doorPaneProfilePx);
-    drawDoorHinges(svg, hingeStyle, 'left', x, y, h, doorPaneProfilePx);
-    drawDoorHinges(svg, hingeStyle, 'right', x + w, y, h, doorPaneProfilePx);
+    if (shouldDrawDoorHinges(el)) {
+      drawDoorHinges(svg, hingeStyle, 'left', x, y, h, doorPaneProfilePx);
+      drawDoorHinges(svg, hingeStyle, 'right', x + w, y, h, doorPaneProfilePx);
+    }
   }
   if (pType === 'vast' && (isFactory || row.fill === 'glass')) {
     const cxm = x + w / 2, cym = y + h / 2;
@@ -1295,7 +1303,10 @@ function renderDoorPanelControls(root, el) {
   const hingeField = root.querySelector('#door-hinge-field');
   hingeField.style.display = (el.doorSubtype || 'voordeur') === 'tuindeur' ? 'none' : '';
   root.querySelector('#door-hinge').value = mainRow.hinge || 'left';
-  root.querySelector('#door-hinge-style').value = mainRow.hingeStyle || 'flag';
+  const hingeStyleSelect = root.querySelector('#door-hinge-style');
+  const hingeStyleWrap = hingeStyleSelect.closest('.field');
+  hingeStyleWrap.style.display = (el.doorSubtype || 'voordeur') === 'voordeur' ? 'none' : '';
+  hingeStyleSelect.value = mainRow.hingeStyle || 'flag';
   if (document.activeElement?.id !== 'door-panels-count') root.querySelector('#door-panels-count').value = panels.length;
 
   const dims = root.querySelector('#door-panel-dims');
