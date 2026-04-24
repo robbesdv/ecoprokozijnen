@@ -36,6 +36,20 @@ function buildItemDescription(el) {
   return `Premium Schüco Living Variant ${vaksStr}, ${typesStr}, ${w} × ${h}mm bxh, Kleur: ${kleurStr}, HR++`
 }
 
+function buildExtraDescription(ex) {
+  const name = String(ex?.name || '').trim()
+  return `Extra: ${name || 'Project extra'}`
+}
+
+function toExportExtra(item) {
+  return {
+    id: item.id,
+    name: String(item.description || '').replace(/^Extra:\s*/i, '') || 'Project extra',
+    qty: item.quantity || 1,
+    unitPrice: Number(item.unit_price) || 0,
+  }
+}
+
 const NAV = [
   { key: 'dashboard',  label: 'Dashboard',    icon: '▣' },
   { key: 'kozijnlab',  label: 'KozijnLAB',    icon: '⚡' },
@@ -193,7 +207,9 @@ export default function VerkoopPage() {
         discountPct: 0,
         vatRate: 0.21,
       },
-      extras: [],
+      extras: items
+        .filter(it => !it.element_config)
+        .map(toExportExtra),
       elements: items
         .filter(it => it.element_config)
         .map((it, idx) => toExportElement(it.element_config || {}, it, idx)),
@@ -235,7 +251,7 @@ export default function VerkoopPage() {
   }
 
   function buildOrderItems(orderId, kl) {
-    return (kl.elements || []).map((el, idx) => ({
+    const elementItems = (kl.elements || []).map((el, idx) => ({
       order_id:      orderId,
       description:   buildItemDescription(el),
       quantity:      el.qty || 1,
@@ -243,6 +259,17 @@ export default function VerkoopPage() {
       sort_order:    idx,
       element_config: el,
     }))
+    const extraItems = (kl.extras || [])
+      .filter(ex => String(ex.name || '').trim() || Number(ex.unitPrice) > 0)
+      .map((ex, idx) => ({
+        order_id:      orderId,
+        description:   buildExtraDescription(ex),
+        quantity:      ex.qty || 1,
+        unit_price:    Number(ex.unitPrice) || 0,
+        sort_order:    elementItems.length + idx,
+        element_config: null,
+      }))
+    return [...elementItems, ...extraItems]
   }
 
   async function updateExistingOrder(orderId, kl) {
@@ -567,16 +594,23 @@ export default function VerkoopPage() {
               {/* Elementen */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
                 {offerteItems.map((item, idx) => {
+                  const hasElementConfig = !!item.element_config
                   const cfg = item.element_config || {}
                   const unitPrice = Number(editPrices[item.id] ?? item.unit_price) || 0
                   return (
                     <div key={item.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-                      <div style={{ flexShrink: 0, width: 200, background: 'var(--bg)', borderRadius: 8, padding: 8 }}>
-                        <KozijnSVG element={cfg} width={200} height={140} showDims={false} />
-                      </div>
+                      {hasElementConfig ? (
+                        <div style={{ flexShrink: 0, width: 200, background: 'var(--bg)', borderRadius: 8, padding: 8 }}>
+                          <KozijnSVG element={cfg} width={200} height={140} showDims={false} />
+                        </div>
+                      ) : (
+                        <div style={{ flexShrink: 0, width: 200, background: 'var(--bg)', borderRadius: 8, padding: 18, minHeight: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          Extra onderdeel
+                        </div>
+                      )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>
-                          {cfg.name || `Element ${idx + 1}`}
+                          {hasElementConfig ? (cfg.name || `Element ${idx + 1}`) : item.description}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.6 }}>{item.description}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: 13, alignItems: 'center' }}>
@@ -666,6 +700,20 @@ export default function VerkoopPage() {
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: i < confirmData.elements.length - 1 ? '1px solid var(--border)' : 'none' }}>
                       <span>{el.qty}× {el.name} <span style={{ color: 'var(--text-muted)' }}>({el.dimensions?.widthMM}×{el.dimensions?.heightMM}mm)</span></span>
                       <span style={{ fontWeight: 600 }}>{fmtEuro(el.priceTotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(confirmData.extras || []).length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Extra's ({confirmData.extras.length})
+                  </div>
+                  {confirmData.extras.map((ex, i) => (
+                    <div key={ex.id || i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0', borderBottom: i < confirmData.extras.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <span>{ex.qty || 1}Ã— {ex.name || 'Project extra'}</span>
+                      <span style={{ fontWeight: 600 }}>{fmtEuro((ex.qty || 1) * (ex.unitPrice || 0))}</span>
                     </div>
                   ))}
                 </div>
