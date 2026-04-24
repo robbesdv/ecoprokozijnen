@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { getPhase, formatEuro, formatDate } from '@/lib/phases'
-import { ralName } from '@/lib/KozijnSVG'
+import { ralName, KozijnSVG } from '@/lib/KozijnSVG'
 import BeheerNav from '@/lib/BeheerNav'
 
 const PANE_LABEL = {
@@ -46,6 +46,10 @@ export default function VerkoopPage() {
   const [toast, setToast]           = useState(null)
   const [confirmData, setConfirmData] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [selectedOfferte, setSelectedOfferte] = useState(null)
+  const [offerteItems, setOfferteItems] = useState([])
+  const [editPrices, setEditPrices] = useState({})
+  const [savingOfferte, setSavingOfferte] = useState(false)
   const iframeRef = useRef(null)
 
   const loadOrders = useCallback(async () => {
@@ -66,6 +70,35 @@ export default function VerkoopPage() {
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
   }, [])
+
+  async function openOfferte(order) {
+    const { data } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', order.id)
+      .order('sort_order')
+    const items = data || []
+    setOfferteItems(items)
+    setEditPrices(Object.fromEntries(items.map(it => [it.id, it.unit_price])))
+    setSelectedOfferte(order)
+  }
+
+  async function saveOfferteChanges() {
+    setSavingOfferte(true)
+    for (const it of offerteItems) {
+      const newPrice = Number(editPrices[it.id])
+      if (!isNaN(newPrice)) {
+        await supabase.from('order_items').update({ unit_price: newPrice }).eq('id', it.id)
+      }
+    }
+    const newExcl = offerteItems.reduce((s, it) => s + (Number(editPrices[it.id]) || 0) * (it.quantity || 1), 0)
+    const newTotal = Math.round(newExcl * 1.21 * 100) / 100
+    await supabase.from('orders').update({ total_amount: newTotal }).eq('id', selectedOfferte.id)
+    setSelectedOfferte(prev => ({ ...prev, total_amount: newTotal }))
+    await loadOrders()
+    setSavingOfferte(false)
+    showToast('Wijzigingen opgeslagen')
+  }
 
   function showToast(msg, type = 'success') {
     setToast({ msg, type })
@@ -269,8 +302,8 @@ export default function VerkoopPage() {
             </div>
           )}
 
-          {/* Offertes */}
-          {tab === 'offertes' && (
+          {/* Offertes — lijst */}
+          {tab === 'offertes' && !selectedOfferte && (
             <div style={{ padding: 32, height: '100%', overflowY: 'auto' }}>
               <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 20 }}>
                 Offertes <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 14 }}>({offertes.length})</span>
@@ -286,7 +319,7 @@ export default function VerkoopPage() {
                   {offertes.map((o, i) => {
                     const ph = getPhase(o.phase)
                     return (
-                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: i < offertes.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
+                      <div key={o.id} onClick={() => openOfferte(o)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: i < offertes.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13, cursor: 'pointer' }}>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14 }}>{o.customer_name}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 3 }}>📍 {o.customer_address}</div>
@@ -295,13 +328,89 @@ export default function VerkoopPage() {
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <div style={{ fontWeight: 700, color: 'var(--brand)', fontSize: 14 }}>{formatEuro(o.total_amount)}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>{formatDate(o.created_at)}</div>
-                          <Link href="/beheer" style={{ fontSize: 11, color: 'var(--brand)', textDecoration: 'none', marginTop: 4, display: 'block' }}>Beheer →</Link>
+                          <span style={{ fontSize: 11, color: 'var(--brand)', marginTop: 4, display: 'block' }}>Bekijk & bewerk →</span>
                         </div>
                       </div>
                     )
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Offerte detail */}
+          {tab === 'offertes' && selectedOfferte && (
+            <div style={{ padding: 32, height: '100%', overflowY: 'auto' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <button onClick={() => setSelectedOfferte(null)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--text-muted)' }}>
+                  ← Terug
+                </button>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>{selectedOfferte.customer_name}</div>
+              </div>
+
+              {/* Klantinfo */}
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 20px', marginBottom: 20, fontSize: 13 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
+                  {selectedOfferte.customer_address && <div><span style={{ color: 'var(--text-muted)' }}>Adres: </span>{selectedOfferte.customer_address}</div>}
+                  {selectedOfferte.customer_email && <div><span style={{ color: 'var(--text-muted)' }}>E-mail: </span>{selectedOfferte.customer_email}</div>}
+                  {selectedOfferte.customer_phone && <div><span style={{ color: 'var(--text-muted)' }}>Tel: </span>{selectedOfferte.customer_phone}</div>}
+                  <div><span style={{ color: 'var(--text-muted)' }}>Datum: </span>{formatDate(selectedOfferte.created_at)}</div>
+                </div>
+              </div>
+
+              {/* Elementen */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+                {offerteItems.map((item, idx) => {
+                  const cfg = item.element_config || {}
+                  const unitPrice = Number(editPrices[item.id] ?? item.unit_price) || 0
+                  return (
+                    <div key={item.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+                      <div style={{ flexShrink: 0, width: 200, background: 'var(--bg)', borderRadius: 8, padding: 8 }}>
+                        <KozijnSVG element={cfg} width={200} height={140} showDims={false} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 6 }}>
+                          {cfg.name || `Element ${idx + 1}`}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.6 }}>{item.description}</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: 13, alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>Aantal</span>
+                          <span>{item.quantity}×</span>
+                          <span style={{ color: 'var(--text-muted)' }}>Eenheidsprijs (excl. BTW)</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ color: 'var(--text-muted)' }}>€</span>
+                            <input
+                              type="number"
+                              value={editPrices[item.id] ?? item.unit_price}
+                              onChange={e => setEditPrices(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              style={{ width: 110, padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }}
+                            />
+                          </div>
+                          <span style={{ color: 'var(--text-muted)' }}>Totaal incl. 21% BTW</span>
+                          <span style={{ fontWeight: 600, color: 'var(--brand)' }}>
+                            {fmtEuro(unitPrice * (item.quantity || 1) * 1.21)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Totaal + opslaan */}
+              <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Totaal incl. BTW</div>
+                  <div style={{ fontWeight: 700, fontSize: 22, color: 'var(--brand)' }}>
+                    {fmtEuro(offerteItems.reduce((s, it) => s + (Number(editPrices[it.id]) || it.unit_price) * (it.quantity || 1) * 1.21, 0))}
+                  </div>
+                </div>
+                <button onClick={saveOfferteChanges} disabled={savingOfferte}
+                  style={{ background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 13, fontWeight: 600, cursor: savingOfferte ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: savingOfferte ? 0.7 : 1 }}>
+                  {savingOfferte ? 'Opslaan…' : '💾 Wijzigingen opslaan'}
+                </button>
+              </div>
             </div>
           )}
 
