@@ -36,6 +36,7 @@ const PANE_TYPES = {
   ],
   deur: [
     { id: 'deur', label: 'Openslaand' },
+    { id: 'deur2', label: 'Dubbele deur' },
     { id: 'vast', label: 'Vast / bovenlicht' },
   ],
   schuifpui: [
@@ -67,6 +68,15 @@ function defaultProfile() {
   return { frameMM: 70, sashMM: 60, mullionMM: 60, transomMM: 60 };
 }
 
+function defaultDoorPanel(fill = 'panel') {
+  return {
+    heightPct: 100,
+    fill,
+    glassPack: 'HR++',
+    glassFinish: 'clear',
+  };
+}
+
 function newElement(type = 'kozijn', name = '') {
   const base = {
     id: uid(),
@@ -93,6 +103,7 @@ function newElement(type = 'kozijn', name = '') {
     base.widthMM = 1000; base.heightMM = 2300;
     base.doorSubtype = 'voordeur';
     base.doorOptions = {};
+    base.doorPanels = [defaultDoorPanel('panel')];
     base.columns = [{ widthPct: 100, rows: [{ paneType: 'deur', hinge: 'left', fill: 'panel', heightPct: 100 }] }];
   }
   if (type === 'schuifpui' || type === 'hefschuif') {
@@ -152,6 +163,84 @@ function saveState() {
 
 function activeElement() {
   return state.elements.find(e => e.id === state.activeElementId) || state.elements[0];
+}
+
+function drawingProfile(el) {
+  const p = el.profile || defaultProfile();
+  if (el?.type !== 'deur') return p;
+  return {
+    frameMM: (p.frameMM || 70) * 2,
+    sashMM: (p.sashMM || 60) * 2,
+    mullionMM: (p.mullionMM || 60) * 2,
+    transomMM: (p.transomMM || p.mullionMM || 60) * 2,
+  };
+}
+
+function doorPaneTypeFor(el) {
+  return (el?.doorSubtype || 'voordeur') === 'tuindeur' ? 'deur2' : 'deur';
+}
+
+function normalizeDoorPanels(el) {
+  if (!el || el.type !== 'deur') return;
+  let panels = Array.isArray(el.doorPanels) ? el.doorPanels : null;
+  if (!panels || panels.length === 0) {
+    const rows = (el.columns || []).flatMap(col => col.rows || []);
+    const source = rows.length > 1 ? rows : [rows[0] || {}];
+    panels = source.map((r, i) => ({
+      heightPct: r.heightPct || (100 / source.length),
+      fill: r.fill || (isDoorPaneType(r.paneType) ? 'panel' : 'glass'),
+      glassPack: r.glassPack || el.glassPack || 'HR++',
+      glassFinish: r.glassFinish || 'clear',
+      _active: i === 0,
+    }));
+  }
+
+  panels = panels.slice(0, 6).map((p) => ({
+    heightPct: Math.max(1, Number(p.heightPct) || 0),
+    fill: p.fill === 'glass' ? 'glass' : 'panel',
+    glassPack: p.glassPack || el.glassPack || 'HR++',
+    glassFinish: p.glassFinish || 'clear',
+  }));
+  const sum = panels.reduce((a, p) => a + p.heightPct, 0);
+  if (!sum) panels = [defaultDoorPanel('panel')];
+  else panels.forEach(p => { p.heightPct = (p.heightPct / sum) * 100; });
+
+  el.doorPanels = panels;
+  if (typeof el._activeDoorPanelIdx !== 'number' || el._activeDoorPanelIdx >= panels.length) el._activeDoorPanelIdx = 0;
+}
+
+function setDoorPanelCount(el, count) {
+  normalizeDoorPanels(el);
+  const n = Math.max(1, Math.min(6, Number(count) || 1));
+  while (el.doorPanels.length < n) el.doorPanels.push(defaultDoorPanel('glass'));
+  while (el.doorPanels.length > n) el.doorPanels.pop();
+  el.doorPanels.forEach(p => { p.heightPct = 100 / n; });
+  if (el._activeDoorPanelIdx >= n) el._activeDoorPanelIdx = n - 1;
+}
+
+function tuindeurRowFrom(el) {
+  const rows = (el.columns || []).flatMap(col => col.rows || []);
+  const src = rows.find(r => isDoorPaneType(r.paneType)) || rows[0] || {};
+  return {
+    paneType: doorPaneTypeFor(el),
+    hinge: src.hinge || 'left',
+    fill: src.fill || (el.doorPanels?.[0]?.fill || 'panel'),
+    heightPct: 100,
+    glassPack: src.glassPack || el.glassPack || 'HR++',
+    glassFinish: src.glassFinish || 'clear',
+  };
+}
+
+function applyDoorSubtypeLayout(el) {
+  if (!el || el.type !== 'deur') return;
+  normalizeDoorPanels(el);
+  const row = tuindeurRowFrom(el);
+  row.paneType = doorPaneTypeFor(el);
+  row.heightPct = 100;
+  row.fill = el.doorPanels?.some(p => p.fill === 'glass') ? 'glass' : 'panel';
+  el.columns = [{ widthPct: 100, rows: [row] }];
+  el._activeColIdx = 0;
+  el._activeRowIdx = 0;
 }
 
 // ============================================================
@@ -260,6 +349,10 @@ function svgEl(tag, attrs = {}) {
   return e;
 }
 
+function isDoorPaneType(type) {
+  return type === 'deur' || type === 'deur2';
+}
+
 // Geometry cache for drag interactions
 let drawGeom = null;
 
@@ -283,18 +376,39 @@ function drawElement(svg, el, opts = {}) {
   const fy = padT + (availH - fh) / 2;
   const scale = fw / el.widthMM;
 
-  const profile = el.profile || defaultProfile();
+  const baseProfile = el.profile || defaultProfile();
+  const profile = drawingProfile(el);
   const framePx = profile.frameMM * scale;
   const sashPx = profile.sashMM * scale;
   const mullPx = profile.mullionMM * scale;
   const transPx = profile.transomMM * scale;
+  const thresholdSourcePx = (baseProfile.mullionMM || 60) * scale;
   const isSchuif = el.type === 'schuifpui' || el.type === 'hefschuif';
+  const cols = el.columns;
+  const hasDoorThreshold = cols.some(col => {
+    const rows = col.rows || [];
+    const lastRow = rows[rows.length - 1];
+    return lastRow && isDoorPaneType(lastRow.paneType);
+  });
+  const thresholdPx = Math.max(3, thresholdSourcePx * 0.55);
+
+  const ix = fx + framePx, iy = fy + framePx;
+  const iw = fw - 2 * framePx;
+  const ih = Math.max(1, fh - framePx - (hasDoorThreshold ? thresholdPx : framePx));
+
+  const colWPct = cols.map(c => c.widthPct);
+  const sumW = colWPct.reduce((a, b) => a + b, 0) || 100;
+  const innerW = iw - mullPx * (cols.length - 1);
+  const colWPx = colWPct.map(p => innerW * (p / sumW));
+  const colXPx = [];
+  let cx = ix;
+  colWPx.forEach((w, i) => { colXPx.push(cx); cx += w + mullPx; });
 
   // Outer frame
   svg.appendChild(svgEl('rect', { x: fx, y: fy, width: fw, height: fh, class: 'svg-frame', rx: 2 }));
   svg.appendChild(svgEl('rect', {
-    x: fx + framePx, y: fy + framePx,
-    width: fw - 2 * framePx, height: fh - 2 * framePx,
+    x: ix, y: iy,
+    width: iw, height: ih,
     class: 'svg-frame-inner', rx: 1
   }));
 
@@ -305,18 +419,6 @@ function drawElement(svg, el, opts = {}) {
       r.setAttribute('stroke', shade(colorObj.hex, -25));
     });
   }
-
-  const ix = fx + framePx, iy = fy + framePx;
-  const iw = fw - 2 * framePx, ih = fh - 2 * framePx;
-
-  const cols = el.columns;
-  const colWPct = cols.map(c => c.widthPct);
-  const sumW = colWPct.reduce((a, b) => a + b, 0) || 100;
-  const innerW = iw - mullPx * (cols.length - 1);
-  const colWPx = colWPct.map(p => innerW * (p / sumW));
-  const colXPx = [];
-  let cx = ix;
-  colWPx.forEach((w, i) => { colXPx.push(cx); cx += w + mullPx; });
 
   // Mullions
   const mullionLines = []; // capture positions for drag
@@ -354,11 +456,39 @@ function drawElement(svg, el, opts = {}) {
         transomLines.push({ colIdx: ci, rowIdx: ri - 1, cyPx: cyPos - transPx / 2, cxPx, cwPx });
       }
       rowGeoms.push({ x: cxPx, y: cyPos, w: cwPx, h: rh, row: r });
-      drawPane(svg, cxPx, cyPos, cwPx, rh, r, el, sashPx, isFactory);
+      drawPane(svg, cxPx, cyPos, cwPx, rh, r, el, sashPx, {
+        isFactory,
+      });
       cyPos += rh + transPx;
     });
     rowsGeom.push(rowGeoms);
   });
+
+  if (hasDoorThreshold) {
+    const thresholdY = fy + fh - thresholdPx;
+    const returnW = framePx;
+    const returnH = Math.max(6, thresholdPx * 1.35);
+    svg.appendChild(svgEl('rect', {
+      x: fx, y: thresholdY,
+      width: fw, height: thresholdPx,
+      class: 'svg-threshold', rx: 1
+    }));
+    svg.appendChild(svgEl('rect', {
+      x: fx, y: thresholdY - returnH,
+      width: returnW, height: returnH + thresholdPx,
+      class: 'svg-threshold-return', rx: 1
+    }));
+    svg.appendChild(svgEl('rect', {
+      x: fx + fw - returnW, y: thresholdY - returnH,
+      width: returnW, height: returnH + thresholdPx,
+      class: 'svg-threshold-return', rx: 1
+    }));
+    svg.appendChild(svgEl('line', {
+      x1: fx, y1: thresholdY,
+      x2: fx + fw, y2: thresholdY,
+      class: 'svg-threshold-top'
+    }));
+  }
 
   // Sliding system rail
   if (isSchuif) {
@@ -457,8 +587,75 @@ function drawElement(svg, el, opts = {}) {
   };
 }
 
-function drawPane(svg, x, y, w, h, row, el, sashPx, isFactory) {
-  if (row.fill === 'panel') {
+function doorPanelsFor(el, row) {
+  const panels = (Array.isArray(el.doorPanels) && el.doorPanels.length)
+    ? el.doorPanels
+    : [defaultDoorPanel(row.fill === 'glass' ? 'glass' : 'panel')];
+  const sum = panels.reduce((a, p) => a + (Number(p.heightPct) || 0), 0) || 100;
+  return panels.map(p => ({
+    heightPct: ((Number(p.heightPct) || 0) / sum) * 100,
+    fill: p.fill === 'glass' ? 'glass' : 'panel',
+    glassPack: p.glassPack || 'HR++',
+    glassFinish: p.glassFinish || 'clear',
+  }));
+}
+
+function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx) {
+  const rail = Math.max(4, Math.min(18, profilePx * 0.34, Math.min(w, h) * 0.16));
+  const gap = panels.length > 1 ? Math.max(3, Math.min(12, profilePx * 0.24)) : 0;
+  const innerX = x + rail;
+  const innerY = y + rail;
+  const innerW = Math.max(1, w - 2 * rail);
+  const innerH = Math.max(1, h - 2 * rail - gap * (panels.length - 1));
+  let cy = innerY;
+
+  panels.forEach((panel, i) => {
+    const ph = innerH * (panel.heightPct / 100);
+    if (panel.fill === 'glass') {
+      svg.appendChild(svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-glass svg-door-panel-fill', rx: 1 }));
+      if (panel.glassFinish === 'satinato') {
+        for (let ly = cy + 4; ly < cy + ph - 2; ly += 6) {
+          svg.appendChild(svgEl('line', { x1: innerX + 4, y1: ly, x2: innerX + innerW - 4, y2: ly, stroke: 'rgba(255,255,255,.62)', 'stroke-width': .5 }));
+        }
+      }
+    } else {
+      svg.appendChild(svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-door-panel', rx: 1 }));
+      svg.appendChild(svgEl('rect', { x: innerX + 4, y: cy + 4, width: Math.max(1, innerW - 8), height: Math.max(1, ph - 8), class: 'svg-door-panel-inner', rx: 1 }));
+    }
+    if (i < panels.length - 1) {
+      svg.appendChild(svgEl('rect', { x: x + rail * 0.45, y: cy + ph, width: w - rail * 0.9, height: gap, class: 'svg-door-profile', rx: 1 }));
+    }
+    cy += ph + gap;
+  });
+}
+
+function drawFlagHinges(svg, side, sashEdgeX, y, h, profilePx) {
+  const halfW = Math.max(4, Math.min(12, profilePx * 0.22));
+  const hingeH = Math.max(13, Math.min(34, h * 0.075));
+  const positions = [0.18, 0.5, 0.82];
+
+  positions.forEach(pos => {
+    const hy = y + h * pos - hingeH / 2;
+    if (side === 'left') {
+      svg.appendChild(svgEl('rect', { x: sashEdgeX - halfW - 1, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-frame', rx: 1 }));
+      svg.appendChild(svgEl('rect', { x: sashEdgeX, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-leaf', rx: 1 }));
+    } else {
+      svg.appendChild(svgEl('rect', { x: sashEdgeX - halfW, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-leaf', rx: 1 }));
+      svg.appendChild(svgEl('rect', { x: sashEdgeX + 1, y: hy, width: halfW, height: hingeH, class: 'svg-hinge-frame', rx: 1 }));
+    }
+  });
+}
+
+function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
+  const isFactory = !!opts.isFactory;
+  const pType = row.paneType;
+  const isDoorPane = isDoorPaneType(pType);
+  if (isDoorPane) {
+    svg.appendChild(svgEl('rect', {
+      x: x + 4, y: y + 4, width: w - 8, height: h - 8,
+      fill: 'var(--surface-1)', stroke: 'var(--draw-glass-edge)', 'stroke-width': 1, rx: 2
+    }));
+  } else if (row.fill === 'panel') {
     svg.appendChild(svgEl('rect', {
       x: x + 4, y: y + 4, width: w - 8, height: h - 8,
       fill: 'var(--surface-3)', stroke: 'var(--draw-mull)', 'stroke-width': 1, rx: 2
@@ -475,8 +672,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, isFactory) {
     }
   }
 
-  const pType = row.paneType;
-  const inset = Math.max(4, Math.min(sashPx, Math.min(w, h) * 0.12));
+  const inset = Math.max(4, Math.min(sashPx, Math.min(w, h) * (isDoorPane ? 0.16 : 0.12)));
   const isOpenable = ['draai', 'kiep', 'draaikiep', 'deur', 'schuif'].includes(pType);
   if (isOpenable) {
     svg.appendChild(svgEl('rect', {
@@ -491,11 +687,15 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, isFactory) {
   if (pType === 'draai' || pType === 'draaikiep' || pType === 'deur') {
     const hx = hinge === 'left' ? sx : sx + sw;
     const handleX = hinge === 'left' ? sx + sw : sx;
+    if (pType === 'deur') {
+      drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), sashPx);
+    }
     svg.appendChild(svgEl('path', { d: `M ${hx} ${sy} L ${handleX} ${sy + sh / 2} L ${hx} ${sy + sh}`, class: 'svg-op' }));
     if (pType === 'deur') {
       const hdy = sy + sh * 0.5;
       const hdx = hinge === 'left' ? sx + sw - 8 : sx + 8;
       svg.appendChild(svgEl('rect', { x: hdx - 2, y: hdy - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
+      drawFlagHinges(svg, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? sx : sx + sw, sy, sh, sashPx);
     }
   }
   if (pType === 'kiep' || pType === 'draaikiep') {
@@ -519,12 +719,22 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, isFactory) {
     const lw = sw / 2 - gap / 2;
     const rox = sx + sw / 2 + gap / 2;
     const rw = sw - lw - gap;
+    const seamX = sx + sw / 2;
     svg.appendChild(svgEl('rect', { x: sx,  y: sy, width: lw, height: sh, class: 'svg-sash', rx: 1 }));
     svg.appendChild(svgEl('rect', { x: rox, y: sy, width: rw, height: sh, class: 'svg-sash', rx: 1 }));
+    svg.appendChild(svgEl('line', { x1: seamX, y1: sy, x2: seamX, y2: sy + sh, class: 'svg-sash' }));
+    const panels = doorPanelsFor(el, row);
+    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, sashPx);
+    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, sashPx);
     svg.appendChild(svgEl('path', { d: `M ${sx} ${sy} L ${sx + lw} ${sy + sh / 2} L ${sx} ${sy + sh}`, class: 'svg-op' }));
-    svg.appendChild(svgEl('rect', { x: sx + lw - 8, y: sy + sh * 0.5 - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
     svg.appendChild(svgEl('path', { d: `M ${rox + rw} ${sy} L ${rox} ${sy + sh / 2} L ${rox + rw} ${sy + sh}`, class: 'svg-op' }));
-    svg.appendChild(svgEl('rect', { x: rox + 4, y: sy + sh * 0.5 - 6, width: 4, height: 12, fill: 'var(--draw-sash)', rx: 1 }));
+    const handleH = Math.max(12, sh * 0.045);
+    const handleW = Math.max(3, inset * 0.22);
+    const handleY = sy + sh * 0.5 - handleH / 2;
+    svg.appendChild(svgEl('rect', { x: seamX - gap - handleW, y: handleY, width: handleW, height: handleH, class: 'svg-door-handle', rx: 1 }));
+    svg.appendChild(svgEl('rect', { x: seamX + gap, y: handleY, width: handleW, height: handleH, class: 'svg-door-handle', rx: 1 }));
+    drawFlagHinges(svg, 'left', sx, sy, sh, sashPx);
+    drawFlagHinges(svg, 'right', sx + sw, sy, sh, sashPx);
   }
   if (pType === 'vast' && (isFactory || row.fill === 'glass')) {
     const cxm = x + w / 2, cym = y + h / 2;
@@ -746,6 +956,7 @@ function render() {
   saveState();
 }
 function _render() {
+  state.elements.forEach(applyDoorSubtypeLayout);
   renderConfig();
   renderProject();
   renderExtras();
@@ -842,6 +1053,17 @@ function renderConfig() {
       };
     });
   }
+
+  const isDoor = el.type === 'deur';
+  ['#cols-count', '#col-dims', '#col-tabs', '#rows-count', '#row-dims', '#vak-tabs', '#pane-type'].forEach(sel => {
+    const node = root.querySelector(sel);
+    const field = node?.closest('.field');
+    if (field) field.style.display = isDoor ? 'none' : '';
+  });
+  const normalVakDivider = root.querySelector('#vak-tabs')?.closest('.field')?.previousElementSibling;
+  if (normalVakDivider?.classList?.contains('divider')) normalVakDivider.style.display = isDoor ? 'none' : '';
+  root.querySelector('#door-vakken-fields').style.display = isDoor ? '' : 'none';
+  if (isDoor) renderDoorPanelControls(root, el);
 
   if (document.activeElement?.id !== 'elem-name') root.querySelector('#elem-name').value = el.name;
   if (document.activeElement?.id !== 'elem-qty') root.querySelector('#elem-qty').value = el.qty;
@@ -943,6 +1165,11 @@ function renderConfig() {
     glassFields.querySelector('#glass-pack').value = activeRow.glassPack || 'HR++';
     glassFields.querySelector('#glass-finish').value = activeRow.glassFinish || 'clear';
   }
+  if (isDoor) {
+    hingeField.style.display = 'none';
+    fillField.style.display = 'none';
+    glassFields.style.display = 'none';
+  }
 
   root.querySelector('#color-outside').value = el.colorOutside;
   root.querySelector('#color-inside').value = el.colorInside;
@@ -964,6 +1191,63 @@ function renderConfig() {
     const i = root.querySelector(`#cust-${k}`);
     if (i && document.activeElement !== i) i.value = state.customer[k] || '';
   });
+}
+
+function renderDoorPanelControls(root, el) {
+  normalizeDoorPanels(el);
+  const panels = el.doorPanels;
+  const activeIdx = Math.min(el._activeDoorPanelIdx || 0, panels.length - 1);
+  el._activeDoorPanelIdx = activeIdx;
+  const activePanel = panels[activeIdx];
+  const mainRow = el.columns?.[0]?.rows?.[0] || {};
+
+  const hingeField = root.querySelector('#door-hinge-field');
+  hingeField.style.display = (el.doorSubtype || 'voordeur') === 'tuindeur' ? 'none' : '';
+  root.querySelector('#door-hinge').value = mainRow.hinge || 'left';
+  if (document.activeElement?.id !== 'door-panels-count') root.querySelector('#door-panels-count').value = panels.length;
+
+  const dims = root.querySelector('#door-panel-dims');
+  dims.innerHTML = panels.map((p, i) => `
+    <div class="dim-row">
+      <span class="dim-tag">D${i + 1}</span>
+      <div class="input-wrap">
+        <input class="input mono door-panel-h" data-i="${i}" type="number" value="${Math.round(el.heightMM * p.heightPct / 100)}" step="1"/>
+        <span class="input-suffix">mm</span>
+      </div>
+      <button class="btn btn-sm btn-ghost" data-door-eq="${i}">â‡‹</button>
+    </div>`).join('');
+  dims.querySelectorAll('.door-panel-h').forEach(inp => {
+    inp.oninput = () => {
+      const i = +inp.dataset.i;
+      const v = Math.max(120, +inp.value || 0);
+      const others = panels.filter((_, j) => j !== i);
+      const remPct = Math.max(0, 100 - (v / el.heightMM) * 100);
+      const otherSum = others.reduce((a, p) => a + p.heightPct, 0);
+      panels[i].heightPct = Math.min(100, (v / el.heightMM) * 100);
+      others.forEach(p => { p.heightPct = otherSum > 0 ? (p.heightPct / otherSum) * remPct : remPct / Math.max(1, others.length); });
+      render();
+    };
+  });
+  dims.querySelectorAll('[data-door-eq]').forEach(b => {
+    b.onclick = () => { panels.forEach(p => { p.heightPct = 100 / panels.length; }); render(); };
+  });
+
+  const tabs = root.querySelector('#door-panel-tabs');
+  tabs.innerHTML = panels.map((p, i) => {
+    const lbl = p.fill === 'glass' ? 'Glas' : 'Paneel';
+    return `<button class="vak-tab ${i === activeIdx ? 'is-active' : ''}" data-door-panel="${i}">D${i + 1}<span class="vak-tag">${lbl}</span></button>`;
+  }).join('');
+  tabs.querySelectorAll('[data-door-panel]').forEach(b => {
+    b.onclick = () => { el._activeDoorPanelIdx = +b.dataset.doorPanel; render(); };
+  });
+
+  root.querySelector('#door-panel-fill').value = activePanel.fill || 'panel';
+  const glassFields = root.querySelector('#door-glass-fields');
+  glassFields.style.display = activePanel.fill === 'glass' ? '' : 'none';
+  if (activePanel.fill === 'glass') {
+    root.querySelector('#door-panel-glass-pack').value = activePanel.glassPack || 'HR++';
+    root.querySelector('#door-panel-glass-finish').value = activePanel.glassFinish || 'clear';
+  }
 }
 
 function buildConfigShell() {
@@ -1051,6 +1335,24 @@ function buildConfigShell() {
             </div>
           </div>
         </div>
+        <div id="door-vakken-fields" style="display:none">
+          <div class="field" id="door-hinge-field"><label class="label">Scharnierzijde</label><select class="select" id="door-hinge"><option value="left">Links</option><option value="right">Rechts</option></select></div>
+          <div class="field"><label class="label">Aantal deurvakken</label><input class="input mono" id="door-panels-count" type="number" min="1" max="6" step="1"/></div>
+          <div class="field"><label class="label">Deurvak hoogtes</label><div class="dim-list" id="door-panel-dims"></div></div>
+          <div class="divider"></div>
+          <div class="field"><label class="label">Selecteer deurvak</label><div class="vak-tabs" id="door-panel-tabs"></div></div>
+          <div class="field"><label class="label">Vulling</label><select class="select" id="door-panel-fill"><option value="glass">Glas</option><option value="panel">Paneel</option></select></div>
+          <div id="door-glass-fields" style="display:none">
+            <div class="field-row">
+              <div class="field"><label class="label">Beglazing</label>
+                <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option></select>
+              </div>
+              <div class="field"><label class="label">Afwerking</label>
+                <select class="select" id="door-panel-glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1096,6 +1398,27 @@ function bindConfigShell() {
     if (t.id === 'elem-qty') { el.qty = Math.max(1, +t.value || 1); render(); return; }
     if (t.id === 'width-mm') { el.widthMM = Math.max(400, +t.value || 1200); render(); return; }
     if (t.id === 'height-mm') { el.heightMM = Math.max(400, +t.value || 1400); render(); return; }
+    if (t.id === 'door-panels-count') { setDoorPanelCount(el, t.value); render(); return; }
+    if (t.id === 'door-hinge') {
+      const row = el.columns?.[0]?.rows?.[0];
+      if (row) row.hinge = t.value;
+      render(); return;
+    }
+    if (t.id === 'door-panel-fill') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].fill = t.value;
+      render(); return;
+    }
+    if (t.id === 'door-panel-glass-pack') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].glassPack = t.value;
+      render(); return;
+    }
+    if (t.id === 'door-panel-glass-finish') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].glassFinish = t.value;
+      render(); return;
+    }
     if (t.id === 'cols-count') {
       const n = Math.max(1, Math.min(6, +t.value || 1));
       while (el.columns.length < n) el.columns.push({ widthPct: 100 / n, rows: [{ paneType: 'vast', heightPct: 100, fill: 'glass' }] });
@@ -1131,6 +1454,10 @@ function bindConfigShell() {
     if (t.closest('#fill-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].fill = t.value; render(); return; }
   });
   root.addEventListener('change', e => {
+    if (['door-hinge', 'door-panel-fill', 'door-panel-glass-pack', 'door-panel-glass-finish'].includes(e.target.id)) {
+      e.target.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
     if (['pane-type', 'color-outside', 'color-inside'].includes(e.target.id)) render();
   });
   root.addEventListener('click', e => {
@@ -1142,10 +1469,9 @@ function bindConfigShell() {
       el.doorSubtype = doorSeg.dataset.v;
       el.doorOptions = {};
       if (doorSeg.dataset.v === 'tuindeur') {
-        el.columns = [
-          { widthPct: 50, rows: [{ paneType: 'deur', hinge: 'right', fill: 'glass', heightPct: 100 }] },
-          { widthPct: 50, rows: [{ paneType: 'deur', hinge: 'left',  fill: 'glass', heightPct: 100 }] },
-        ];
+        el.columns = [{ widthPct: 100, rows: [tuindeurRowFrom(el)] }];
+        el._activeColIdx = 0;
+        el._activeRowIdx = 0;
       } else {
         el.columns = [{ widthPct: 100, rows: [{ paneType: 'deur', hinge: 'left', fill: 'panel', heightPct: 100 }] }];
       }
@@ -1342,14 +1668,23 @@ function toast(msg) {
 // EXPORT JSON
 // ============================================================
 function buildExportPayload() {
+  state.elements.forEach(applyDoorSubtypeLayout);
   const t = projectTotals();
   return {
-    version: 'kozijnlab.v2', offerCode: state.offerCode, createdAt: new Date().toISOString(),
+    version: 'kozijnlab.v2', offerCode: state.offerCode, editOrderId: state.editOrderId, createdAt: new Date().toISOString(),
     customer: state.customer,
     project: { notes: state.notes, montageEuro: state.montageEuro, discountPct: state.discountPct, vatRate: state.vatRate },
     extras: (state.extras || []).map(ex => ({ id: ex.id, name: ex.name, qty: ex.qty, unitPrice: ex.unitPrice })),
     elements: state.elements.map(el => ({
       id: el.id, name: el.name, type: el.type, qty: el.qty,
+      doorSubtype: el.type === 'deur' ? (el.doorSubtype || 'voordeur') : undefined,
+      doorOptions: el.type === 'deur' ? (el.doorOptions || {}) : undefined,
+      doorPanels: el.type === 'deur' ? (el.doorPanels || []).map(p => ({
+        heightPct: p.heightPct,
+        fill: p.fill,
+        glassPack: p.glassPack,
+        glassFinish: p.glassFinish,
+      })) : undefined,
       dimensions: { widthMM: el.widthMM, heightMM: el.heightMM, areaM2: +(el.widthMM * el.heightMM / 1e6).toFixed(3) },
       profile: el.profile,
       finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, finishOutside: el.finishOutside, finishInside: el.finishInside },
@@ -1405,6 +1740,12 @@ function importFromJSON(data) {
       slideSystem: e.slideSystem || 'hst',
       doorSubtype: e.doorSubtype || 'voordeur',
       doorOptions: e.doorOptions || {},
+      doorPanels: Array.isArray(e.doorPanels) ? e.doorPanels.map(p => ({
+        heightPct: p.heightPct || 100,
+        fill: p.fill === 'glass' ? 'glass' : 'panel',
+        glassPack: p.glassPack || 'HR++',
+        glassFinish: p.glassFinish || 'clear',
+      })) : undefined,
       columns: (e.columns || []).map(col => ({
         widthPct: col.widthPct || 50,
         rows: (col.rows || []).map(r => ({
@@ -1438,6 +1779,18 @@ function importFromJSON(data) {
   delete root.dataset.built;
   render();
   toast('Project geladen ✓');
+}
+
+function loadProjectPayload(data) {
+  importFromJSON(data);
+  if (data.editOrderId) {
+    state.editOrderId = data.editOrderId;
+    state.editingExistingOrder = true;
+  } else {
+    delete state.editOrderId;
+    delete state.editingExistingOrder;
+  }
+  render();
 }
 
 // ============================================================
@@ -1481,6 +1834,7 @@ function updateThemeToggleIcon() {
 window.addEventListener('message', (e) => {
   if (e.data?.type === '__activate_edit_mode') document.getElementById('tweaks-panel').classList.add('is-open');
   if (e.data?.type === '__deactivate_edit_mode') document.getElementById('tweaks-panel').classList.remove('is-open');
+  if (e.data?.type === 'KOZIJNLAB_LOAD_PROJECT') loadProjectPayload(e.data.data);
 });
 
 function bindTweaks() {
@@ -1522,7 +1876,11 @@ function init() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = ev => {
-      try { importFromJSON(JSON.parse(ev.target.result)); }
+      try {
+        const imported = JSON.parse(ev.target.result);
+        importFromJSON(imported);
+        window.parent.postMessage({ type: 'KOZIJNLAB_PROJECT_STATE', editOrderId: imported.editOrderId || null }, '*');
+      }
       catch (_) { toast('Kon bestand niet lezen'); }
     };
     reader.readAsText(file);
@@ -1537,7 +1895,10 @@ function init() {
   document.getElementById('btn-new-offer').onclick = () => {
     if (!confirm('Nieuwe offerte starten? Huidige wordt opgeslagen in lokale opslag.')) return;
     state = newProject();
+    delete state.editOrderId;
+    delete state.editingExistingOrder;
     render();
+    window.parent.postMessage({ type: 'KOZIJNLAB_PROJECT_STATE', editOrderId: null }, '*');
     toast('Nieuwe offerte');
   };
 

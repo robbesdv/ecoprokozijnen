@@ -10,14 +10,19 @@ import BeheerNav from '@/lib/BeheerNav'
 const PANE_LABEL = {
   vast: 'vast glas', draai: 'draai', kiep: 'kiep',
   draaikiep: 'draai-kiep', vent: 'ventilatie', deur: 'deur', schuif: 'schuif',
+  glas: 'glas', paneel: 'paneel',
 }
 
 function buildItemDescription(el) {
   const cols = el.columns || []
   const allRows = cols.flatMap(c => c.rows || [])
-  const nVaks = allRows.length
+  const doorPanels = el.type === 'deur' && Array.isArray(el.doorPanels) ? el.doorPanels : []
+  const nVaks = doorPanels.length || allRows.length
   const seenTypes = []
-  allRows.forEach(r => {
+  const typeRows = doorPanels.length
+    ? doorPanels.map(p => ({ paneType: p.fill === 'glass' ? 'glas' : 'paneel' }))
+    : allRows
+  typeRows.forEach(r => {
     const label = PANE_LABEL[r.paneType] || r.paneType
     if (!seenTypes.includes(label)) seenTypes.push(label)
   })
@@ -45,12 +50,15 @@ export default function VerkoopPage() {
   const [loading, setLoading]       = useState(true)
   const [toast, setToast]           = useState(null)
   const [confirmData, setConfirmData] = useState(null)
+  const [editingOrder, setEditingOrder] = useState(null)
+  const [initialEditId, setInitialEditId] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [selectedOfferte, setSelectedOfferte] = useState(null)
   const [offerteItems, setOfferteItems] = useState([])
   const [editPrices, setEditPrices] = useState({})
   const [savingOfferte, setSavingOfferte] = useState(false)
   const iframeRef = useRef(null)
+  const pendingKozijnPayloadRef = useRef(null)
 
   const loadOrders = useCallback(async () => {
     const { data } = await supabase
@@ -64,8 +72,31 @@ export default function VerkoopPage() {
   useEffect(() => { loadOrders() }, [loadOrders])
 
   useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('edit')
+    if (id) setInitialEditId(id)
+  }, [])
+
+  useEffect(() => {
+    if (!initialEditId || loading) return
+    const order = orders.find(o => o.id === initialEditId)
+    if (!order) return
+    setInitialEditId(null)
+    openInKozijnLab(order)
+  }, [initialEditId, loading, orders]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     const handler = (e) => {
       if (e.data?.type === 'KOZIJNLAB_SUBMIT') setConfirmData(e.data.data)
+      if (e.data?.type === '__edit_mode_available' && pendingKozijnPayloadRef.current) {
+        postProjectToKozijnLab(pendingKozijnPayloadRef.current)
+      }
+      if (e.data?.type === 'KOZIJNLAB_PROJECT_STATE' && !e.data.editOrderId) {
+        setEditingOrder(null)
+        pendingKozijnPayloadRef.current = null
+        if (window.location.search.includes('edit=')) {
+          window.history.replaceState(null, '', '/beheer/verkoop')
+        }
+      }
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
@@ -109,7 +140,174 @@ export default function VerkoopPage() {
     iframeRef.current?.contentWindow?.postMessage({ type: 'REQUEST_SUBMIT' }, '*')
   }
 
+  function orderCanEditInKozijnLab(order) {
+    return Number(order?.phase || 0) === 0 && !order?.quote_accepted_at
+  }
+
+  function toExportElement(cfg, item, idx) {
+    if (typeof cfg === 'string') {
+      try { cfg = JSON.parse(cfg) } catch { cfg = {} }
+    }
+    const dimensions = cfg.dimensions || {
+      widthMM: cfg.widthMM || 1200,
+      heightMM: cfg.heightMM || 1400,
+    }
+    const finish = cfg.finish || {
+      colorOutside: cfg.colorOutside || 'RAL7016',
+      colorInside: cfg.colorInside || 'same',
+      finishOutside: cfg.finishOutside || 'smooth',
+      finishInside: cfg.finishInside || 'smooth',
+    }
+    return {
+      ...cfg,
+      id: cfg.id || `edit_${item.id || idx}`,
+      name: cfg.name || `Element ${idx + 1}`,
+      type: cfg.type || 'kozijn',
+      qty: cfg.qty || item.quantity || 1,
+      dimensions,
+      finish,
+      profile: cfg.profile || { frameMM: 70, sashMM: 60, mullionMM: 60, transomMM: 60 },
+      columns: cfg.columns || [],
+      pricePerUnit: Number(item.unit_price) || 0,
+      priceTotal: (Number(item.unit_price) || 0) * (item.quantity || 1),
+    }
+  }
+
+  function buildKozijnLabPayload(order, items) {
+    const [address = '', postcode = '', city = ''] = String(order.customer_address || '').split(',').map(s => s.trim())
+    return {
+      version: 'kozijnlab.v2',
+      offerCode: order.crm_reference || `ORD-${String(order.id).slice(0, 8).toUpperCase()}`,
+      editOrderId: order.id,
+      customer: {
+        name: order.customer_name || '',
+        email: order.customer_email || '',
+        phone: order.customer_phone || '',
+        address,
+        postcode,
+        city,
+      },
+      project: {
+        notes: order.montage_notes || '',
+        montageEuro: 0,
+        discountPct: 0,
+        vatRate: 0.21,
+      },
+      extras: [],
+      elements: items
+        .filter(it => it.element_config)
+        .map((it, idx) => toExportElement(it.element_config || {}, it, idx)),
+    }
+  }
+
+  function postProjectToKozijnLab(payload) {
+    const msg = { type: 'KOZIJNLAB_LOAD_PROJECT', data: payload }
+    iframeRef.current?.contentWindow?.postMessage(msg, '*')
+    setTimeout(() => iframeRef.current?.contentWindow?.postMessage(msg, '*'), 400)
+    setTimeout(() => { if (pendingKozijnPayloadRef.current === payload) pendingKozijnPayloadRef.current = null }, 1200)
+  }
+
+  async function openInKozijnLab(order) {
+    if (!orderCanEditInKozijnLab(order)) {
+      showToast('Deze offerte is al geaccordeerd en kan niet meer in KozijnLAB worden aangepast.', 'error')
+      return
+    }
+    const { data, error } = await supabase
+      .from('order_items')
+      .select('*')
+      .eq('order_id', order.id)
+      .order('sort_order')
+    if (error) { showToast('Kon offerte niet laden: ' + error.message, 'error'); return }
+
+    const payload = buildKozijnLabPayload(order, data || [])
+    if (!payload.elements.length) {
+      showToast('Deze offerte bevat geen KozijnLAB elementdata om te openen.', 'error')
+      return
+    }
+
+    setEditingOrder(order)
+    setSelectedOfferte(null)
+    setTab('kozijnlab')
+    pendingKozijnPayloadRef.current = payload
+    window.history.replaceState(null, '', `/beheer/verkoop?edit=${order.id}`)
+    setTimeout(() => postProjectToKozijnLab(payload), 80)
+    showToast(`Offerte van ${order.customer_name} geopend in KozijnLAB`)
+  }
+
+  function buildOrderItems(orderId, kl) {
+    return (kl.elements || []).map((el, idx) => ({
+      order_id:      orderId,
+      description:   buildItemDescription(el),
+      quantity:      el.qty || 1,
+      unit_price:    el.pricePerUnit || 0,
+      sort_order:    idx,
+      element_config: el,
+    }))
+  }
+
+  async function updateExistingOrder(orderId, kl) {
+    setSubmitting(true)
+    const current = orders.find(o => o.id === orderId)
+    if (current && !orderCanEditInKozijnLab(current)) {
+      showToast('Deze offerte is inmiddels geaccordeerd en is niet aangepast.', 'error')
+      setSubmitting(false)
+      return
+    }
+
+    const c = kl.customer || {}
+    const totals = kl.totals || {}
+    const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
+    const updates = {
+      customer_name:    c.name || 'Onbekend',
+      customer_email:   c.email || '',
+      customer_phone:   c.phone || '',
+      customer_address: address,
+      total_amount:     totals.gross || 0,
+      montage_notes:    kl.project?.notes || '',
+      crm_reference:    kl.offerCode || null,
+    }
+
+    const { error: orderError } = await supabase.from('orders').update(updates).eq('id', orderId)
+    if (orderError) { showToast('Fout: ' + orderError.message, 'error'); setSubmitting(false); return }
+
+    const { data: oldItems, error: oldItemsError } = await supabase
+      .from('order_items')
+      .select('id')
+      .eq('order_id', orderId)
+    if (oldItemsError) { showToast('Bestaande offerteregels konden niet worden gelezen: ' + oldItemsError.message, 'error'); setSubmitting(false); return }
+
+    const items = buildOrderItems(orderId, kl)
+    if (items.length) {
+      const { error: itemsError } = await supabase.from('order_items').insert(items)
+      if (itemsError) { showToast('Offerteregels niet opgeslagen: ' + itemsError.message, 'error'); setSubmitting(false); return }
+    }
+    const oldItemIds = (oldItems || []).map(it => it.id)
+    if (oldItemIds.length) {
+      const { error: deleteItemsError } = await supabase.from('order_items').delete().in('id', oldItemIds)
+      if (deleteItemsError) { showToast('Oude offerteregels konden niet worden opgeruimd: ' + deleteItemsError.message, 'error'); setSubmitting(false); return }
+    }
+
+    await supabase.from('status_history').insert({
+      order_id: orderId,
+      to_phase: current?.phase ?? 0,
+      note: `Offerte bijgewerkt vanuit KozijnLAB (${kl.offerCode})`,
+      changed_by: 'verkoop',
+    })
+
+    setSubmitting(false)
+    setConfirmData(null)
+    setEditingOrder(null)
+    await loadOrders()
+    setTab('offertes')
+    window.history.replaceState(null, '', '/beheer/verkoop')
+    showToast(`Offerte bijgewerkt voor ${c.name || current?.customer_name || 'klant'}`)
+  }
+
   async function createOrder(kl) {
+    if (kl.editOrderId) {
+      await updateExistingOrder(kl.editOrderId, kl)
+      return
+    }
     setSubmitting(true)
     const c = kl.customer || {}
     const totals = kl.totals || {}
@@ -130,14 +328,9 @@ export default function VerkoopPage() {
 
     if (error) { showToast('Fout: ' + error.message, 'error'); setSubmitting(false); return }
 
-    const items = (kl.elements || []).map((el, idx) => ({
-      order_id:      order.id,
-      description:   buildItemDescription(el),
-      quantity:      el.qty || 1,
-      unit_price:    el.pricePerUnit || 0,
-      sort_order:    idx,
-      element_config: el,
-    }))
+    await supabase.from('orders').update({ crm_reference: kl.offerCode || null }).eq('id', order.id)
+
+    const items = buildOrderItems(order.id, kl)
     if (items.length) await supabase.from('order_items').insert(items)
 
     await supabase.from('status_history').insert({
@@ -162,7 +355,7 @@ export default function VerkoopPage() {
       <BeheerNav topSlot={
         tab === 'kozijnlab' ? (
           <button onClick={requestSubmit} style={{ width: '100%', background: '#22c55e', border: '1px solid #16a34a', color: 'white', padding: '9px 14px', borderRadius: 9, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
-            → Zet door naar EcoPro
+            {editingOrder ? 'Offerte bijwerken' : '→ Zet door naar EcoPro'}
           </button>
         ) : null
       } />
@@ -328,6 +521,12 @@ export default function VerkoopPage() {
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                           <div style={{ fontWeight: 700, color: 'var(--brand)', fontSize: 14 }}>{formatEuro(o.total_amount)}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>{formatDate(o.created_at)}</div>
+                          {orderCanEditInKozijnLab(o) && (
+                            <button onClick={(e) => { e.stopPropagation(); openInKozijnLab(o) }}
+                              style={{ display: 'block', marginTop: 6, marginLeft: 'auto', background: 'var(--brand-muted)', border: '1px solid var(--brand-border)', color: 'var(--brand)', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+                              Open in KozijnLAB
+                            </button>
+                          )}
                           <span style={{ fontSize: 11, color: 'var(--brand)', marginTop: 4, display: 'block' }}>Bekijk & bewerk →</span>
                         </div>
                       </div>
@@ -347,6 +546,12 @@ export default function VerkoopPage() {
                   ← Terug
                 </button>
                 <div style={{ fontWeight: 700, fontSize: 18 }}>{selectedOfferte.customer_name}</div>
+                {orderCanEditInKozijnLab(selectedOfferte) && (
+                  <button onClick={() => openInKozijnLab(selectedOfferte)}
+                    style={{ marginLeft: 'auto', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
+                    Open in KozijnLAB
+                  </button>
+                )}
               </div>
 
               {/* Klantinfo */}
@@ -431,9 +636,13 @@ export default function VerkoopPage() {
       {confirmData && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
           <div style={{ background: 'white', borderRadius: 16, width: '100%', maxWidth: 480, padding: 28, boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>Doorsturen naar EcoPro?</div>
+            <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
+              {confirmData.editOrderId ? 'Offerte bijwerken?' : 'Doorsturen naar EcoPro?'}
+            </div>
             <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
-              De KozijnLAB offerte wordt omgezet naar een nieuwe order in het dashboard.
+              {confirmData.editOrderId
+                ? 'De bestaande offerte wordt bijgewerkt met de aanpassingen uit KozijnLAB.'
+                : 'De KozijnLAB offerte wordt omgezet naar een nieuwe order in het dashboard.'}
             </div>
 
             <div style={{ background: 'var(--bg)', borderRadius: 10, padding: 16, marginBottom: 20, fontSize: 13 }}>
@@ -476,7 +685,7 @@ export default function VerkoopPage() {
               </button>
               <button onClick={() => createOrder(confirmData)} disabled={submitting}
                 style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: 'var(--brand)', color: 'white', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700 }}>
-                {submitting ? 'Aanmaken…' : '→ Maak order aan'}
+                {submitting ? 'Opslaan…' : confirmData.editOrderId ? 'Werk offerte bij' : '→ Maak order aan'}
               </button>
             </div>
           </div>

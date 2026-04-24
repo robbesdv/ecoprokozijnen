@@ -149,7 +149,7 @@ export default function LoginPage() {
         </div>
 
         <p style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>
-          EcoPro Kozijnen B.V. · Plataanstraat 20H, Enschede
+          EcoPro Kozijnen B.V. · Plataanstraat 20H, Enschede · KozijnSuite
         </p>
       </div>
 

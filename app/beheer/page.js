@@ -691,6 +691,20 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
 
         {tab === 'order' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {order.phase === 0 && (
+              <Section title="Offerte aanpassen">
+                <Link
+                  href={`/beheer/verkoop?edit=${order.id}`}
+                  className="btn btn-secondary btn-full"
+                  style={{ textDecoration: 'none' }}
+                >
+                  Open project in KozijnLAB
+                </Link>
+                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                  Beschikbaar zolang de offerte nog niet is geaccordeerd.
+                </p>
+              </Section>
+            )}
             <Section title="Status bijwerken">
               <select value={phase} onChange={e => setPhase(Number(e.target.value))}>
                 {PHASES.map(p => <option key={p.id} value={p.id}>{p.id}. {p.adminLabel}</option>)}
