@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { getPhase, formatEuro, formatDate } from '@/lib/phases'
 import { ralName } from '@/lib/KozijnSVG'
@@ -151,18 +152,6 @@ export default function VerkoopPage() {
           </div>
         </div>
 
-        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-
-          <div style={{ flex: 1 }} />
-          <div style={{ padding: 12, borderTop: '1px solid var(--border)' }}>
-            <button onClick={() => setTab('kozijnlab')}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 8, padding: '10px 14px', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
-              ⚡ Nieuwe verkoop
-            </button>
-          </div>
-        </nav>
-
-        {/* ── Main ─────────────────────────────────────────────────── */}
         <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
 
           {/* KozijnLAB iframe — altijd gemount, alleen getoond als actief */}
