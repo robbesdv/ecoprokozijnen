@@ -1690,6 +1690,8 @@ function buildExportPayload() {
       finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, finishOutside: el.finishOutside, finishInside: el.finishInside },
       hardware: el.hardware,
       slideSystem: (el.type === 'schuifpui' || el.type === 'hefschuif') ? el.slideSystem : undefined,
+      doorSubtype: el.type === 'deur' ? (el.doorSubtype || 'voordeur') : undefined,
+      doorPanels: el.type === 'deur' ? (el.doorPanels || []) : undefined,
       columns: el.columns.map((col, ci) => ({
         index: ci + 1,
         widthMM: Math.round(el.widthMM * col.widthPct / 100),
