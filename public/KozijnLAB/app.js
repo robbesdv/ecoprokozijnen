@@ -1776,14 +1776,27 @@ function renderTotals() {
 // ============================================================
 // PREVIEW
 // ============================================================
-let previewState = { showDims: true, showFieldDims: false, showLabels: false, mode: 'sales' };
+let previewState = { showDims: true, showFieldDims: false, showLabels: false, mode: 'sales', view: '2d' };
 
 function renderPreview() {
   const el = activeElement();
   if (!el) return;
   const svg = document.getElementById('preview-svg');
+  const stage = document.getElementById('preview-stage');
+  const preview3d = document.getElementById('preview-3d');
+  const view = previewState.view || '2d';
+  if (stage) {
+    stage.classList.toggle('is-2d', view === '2d');
+    stage.classList.toggle('is-3d', view === '3d');
+    stage.classList.toggle('is-house', view === 'house');
+  }
+  if (svg) svg.hidden = view !== '2d';
+  if (preview3d) preview3d.hidden = view === '2d';
   svg.dataset.mode = previewState.mode;
   drawElement(svg, el, previewState);
+  if (preview3d && view !== '2d' && window.Kozijn3D) {
+    window.Kozijn3D.render(preview3d, el, { mode: view === 'house' ? 'house' : 'free', showModeControls: false });
+  }
 
   document.getElementById('stat-dims').textContent = `${el.widthMM} × ${el.heightMM} mm`;
   document.getElementById('stat-area').textContent = ((el.widthMM * el.heightMM) / 1e6).toFixed(2) + ' m²';
@@ -2081,6 +2094,13 @@ function init() {
       renderPreview();
     };
   });
+  document.querySelectorAll('[data-preview-opt]').forEach(b => {
+    b.onclick = () => {
+      previewState.view = b.dataset.previewOpt || '2d';
+      document.querySelectorAll('[data-preview-opt]').forEach(x => x.classList.toggle('is-active', x === b));
+      renderPreview();
+    };
+  });
   document.getElementById('toggle-dims').onclick = (e) => { previewState.showDims = !previewState.showDims; e.currentTarget.classList.toggle('is-active', previewState.showDims); renderPreview(); };
   document.getElementById('toggle-fielddims').onclick = (e) => { previewState.showFieldDims = !previewState.showFieldDims; e.currentTarget.classList.toggle('is-active', previewState.showFieldDims); renderPreview(); };
   document.getElementById('toggle-labels').onclick = (e) => { previewState.showLabels = !previewState.showLabels; e.currentTarget.classList.toggle('is-active', previewState.showLabels); renderPreview(); };
@@ -2130,6 +2150,7 @@ function init() {
   });
 
   document.querySelector('[data-mode-opt="sales"]').classList.add('is-active');
+  document.querySelector('[data-preview-opt="2d"]')?.classList.add('is-active');
   if (previewState.showDims) document.getElementById('toggle-dims').classList.add('is-active');
 
   installDragHandlers();

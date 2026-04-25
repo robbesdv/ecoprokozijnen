@@ -265,7 +265,7 @@ export default function VerkoopPage() {
         order_id:      orderId,
         description:   buildExtraDescription(ex),
         quantity:      ex.qty || 1,
-        unit_price:    Number(ex.unitPrice) || 0,
+        unit_price:    Number(ex.unitPrice) / 1.21 || 0,
         sort_order:    elementItems.length + idx,
         element_config: null,
       }))
@@ -283,13 +283,15 @@ export default function VerkoopPage() {
 
     const c = kl.customer || {}
     const totals = kl.totals || {}
+    const d = 1 - ((kl.project?.discountPct || 0) / 100)
+    const total_amount = (totals.gross || 0) - (totals.extrasTotal || 0) * d * 0.21
     const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
     const updates = {
       customer_name:    c.name || 'Onbekend',
       customer_email:   c.email || '',
       customer_phone:   c.phone || '',
       customer_address: address,
-      total_amount:     totals.net || 0,
+      total_amount,
       montage_notes:    kl.project?.notes || '',
       crm_reference:    kl.offerCode || null,
     }
@@ -338,6 +340,8 @@ export default function VerkoopPage() {
     setSubmitting(true)
     const c = kl.customer || {}
     const totals = kl.totals || {}
+    const d = 1 - ((kl.project?.discountPct || 0) / 100)
+    const total_amount = (totals.gross || 0) - (totals.extrasTotal || 0) * d * 0.21
     const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
 
     const { data: order, error } = await supabase
@@ -347,7 +351,7 @@ export default function VerkoopPage() {
         customer_email:   c.email || '',
         customer_phone:   c.phone || '',
         customer_address: address,
-        total_amount:     totals.net || 0,
+        total_amount,
         phase: 0,
         montage_notes: kl.project?.notes || '',
       })
@@ -376,6 +380,13 @@ export default function VerkoopPage() {
   const leads    = orders.filter(o => o.phase === 0)
   const offertes = orders.filter(o => o.phase <= 1)
   const openValue = offertes.reduce((s, o) => s + (o.total_amount || 0), 0)
+
+  const confirmAdjustedTotal = (() => {
+    if (!confirmData) return 0
+    const t = confirmData.totals || {}
+    const dd = 1 - ((confirmData.project?.discountPct || 0) / 100)
+    return (t.gross || 0) - (t.extrasTotal || 0) * dd * 0.21
+  })()
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -721,7 +732,7 @@ export default function VerkoopPage() {
 
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: '2px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 700 }}>Totaal incl. BTW</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand)', fontSize: 18 }}>{fmtEuro(confirmData.totals?.net)}</span>
+                <span style={{ fontWeight: 700, color: 'var(--brand)', fontSize: 18 }}>{fmtEuro(confirmAdjustedTotal)}</span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Offerte {confirmData.offerCode}</div>
             </div>

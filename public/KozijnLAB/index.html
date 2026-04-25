@@ -67,14 +67,20 @@
         <button class="tool-btn" data-mode-opt="factory">Fabriek</button>
       </div>
       <div class="tool-group">
+        <button class="tool-btn" data-preview-opt="2d">2D</button>
+        <button class="tool-btn" data-preview-opt="3d">3D</button>
+        <button class="tool-btn" data-preview-opt="house">In huis</button>
+      </div>
+      <div class="tool-group">
         <button class="tool-btn" id="toggle-dims" title="Maatvoering">📏 Maat</button>
         <button class="tool-btn" id="toggle-fielddims" title="Veldmaten">⊞ Veldmaten</button>
         <button class="tool-btn" id="toggle-labels" title="Labels">🏷 Labels</button>
       </div>
     </div>
 
-    <div class="preview-stage">
+    <div class="preview-stage is-2d" id="preview-stage">
       <svg id="preview-svg" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="preview-3d" hidden></div>
     </div>
 
     <div class="preview-footer">
@@ -183,6 +189,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="kozijn3d.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
