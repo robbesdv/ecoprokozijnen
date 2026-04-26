@@ -186,10 +186,10 @@ function drawingProfile(el) {
     };
   }
   return {
-    frameMM: (p.frameMM || 70) * scale * 2,
-    sashMM: (p.sashMM || 60) * scale * 2,
-    mullionMM: (p.mullionMM || 60) * scale * 2,
-    transomMM: (p.transomMM || p.mullionMM || 60) * scale * 2,
+    frameMM: (p.frameMM || 70) * scale,
+    sashMM: (p.sashMM || 60) * scale,
+    mullionMM: (p.mullionMM || 60) * scale,
+    transomMM: (p.transomMM || p.mullionMM || 60) * scale,
   };
 }
 

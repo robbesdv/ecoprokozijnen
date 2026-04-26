@@ -126,6 +126,15 @@
     return RAL[raw] || RAL[String(raw).replace(/\s+/g, "")] || "#383e42";
   }
 
+  function colorFromInside(source) {
+    var opts = (source && source.elementOptions) || {};
+    var raw  = source && (source.colorInside || opts.colorInside);
+    var custom = opts.colorCodeInside || source.colorCodeInside;
+    if (!raw) return null;  // null = same as outside
+    if (String(raw).toLowerCase() === "custom" && custom) return "#e8e4de";
+    return RAL[raw] || RAL[String(raw).replace(/\s+/g, "")] || null;
+  }
+
   function normalizeElement(source) {
     source = source || {};
     if (source.element && !source.widthMM) source = source.element;
@@ -169,6 +178,7 @@
         hvl: profileSystem === "living_variant", gasketCount: 2
       },
       color: colorFrom(source),
+      colorInside: colorFromInside(source),
       columns: normalizeColumns(source, type),
       doorPanels: doorPanels3d
     };
@@ -277,8 +287,8 @@
 
     for (var i = 0; i < layers; i++) {
       var z = zInner + i * spacing;
-      // outdoor pane slightly more opaque, inner panes more transparent
-      var a = (i === layers - 1) ? .40 : .22;
+      // outdoor pane more solid, inner panes slightly visible for depth cue
+      var a = (i === layers - 1) ? .76 : .52;
       addFace(scene, rectPoints(x1,y1,x2,y2,z), glassBase, a, "rgba(96,165,250,.22)");
       addLine(scene,[{x:x1,y:y2,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(255,255,255,.48)",0.9,.76);
       addLine(scene,[{x:x2,y:y1,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(15,23,42,.14)",0.7,.50);
@@ -297,7 +307,7 @@
       {x:x1+Math.max(28,(x2-x1)*.20), y:y2-Math.max(10,(y2-y1)*.07), z:zOuter+1},
       {x:x1+Math.max(12,(x2-x1)*.09), y:y2-Math.max(50,(y2-y1)*.52), z:zOuter+1},
       {x:x1+Math.max(2,  (x2-x1)*.01), y:y2-Math.max(50,(y2-y1)*.52), z:zOuter+1}
-    ], "#cee8ff", .30, "transparent");
+    ], "#e0f0ff", .22, "transparent");
   }
 
   // Tilt-turn / handle (suppressed in house mode)
@@ -320,9 +330,10 @@
     if (x2<=x1||y2<=y1||z2<=z1) return;
     var alpha  = options.alpha  == null ? 1 : options.alpha;
     var stroke = options.stroke || "rgba(15,23,42,.18)";
-    // face brightness based on light direction (top-left-front)
-    addFace(scene, rectPoints(x1,y1,x2,y2,z2), shade(color,1.08), alpha, stroke);        // front (brightest)
-    addFace(scene, rectPoints(x2,y1,x1,y2,z1), shade(color,.68),  alpha, stroke);        // back
+    var ci     = options.colorInside || color;  // indoor face color (back face at z1)
+    // face brightness: light source top-left-front (z2 = outdoor face)
+    addFace(scene, rectPoints(x1,y1,x2,y2,z2), shade(color,1.08), alpha, stroke);        // front / outdoor (brightest)
+    addFace(scene, rectPoints(x2,y1,x1,y2,z1), shade(ci,.72),     alpha, stroke);        // back  / indoor
     addFace(scene, [{x:x1,y:y1,z:z1},{x:x1,y:y1,z:z2},{x:x1,y:y2,z:z2},{x:x1,y:y2,z:z1}], shade(color,.84), alpha, stroke); // left
     addFace(scene, [{x:x2,y:y1,z:z2},{x:x2,y:y1,z:z1},{x:x2,y:y2,z:z1},{x:x2,y:y2,z:z2}], shade(color,.92), alpha, stroke); // right
     addFace(scene, [{x:x1,y:y2,z:z2},{x:x2,y:y2,z:z2},{x:x2,y:y2,z:z1},{x:x1,y:y2,z:z1}], shade(color,1.18), alpha, stroke); // top (lit)
@@ -387,11 +398,10 @@
     addBox(scene, -sillW/2, -h/2-sillH, sillW/2, -h/2, z, z+depth*.42, "#ccc8c0", {alpha:1,stroke:"rgba(60,55,48,.2)"});
   }
 
-  function addPaneDetails(scene, cell, row, depth, colors) {
+  function addPaneDetails(scene, cell, row, z, colors) {
     var x1=cell.x1, x2=cell.x2, y1=cell.y1, y2=cell.y2;
     var p = row.paneType;
     var cx=(x1+x2)/2, cy=(y1+y2)/2;
-    var z = depth/2 + 20;
     if (p==="draai"||p==="draaikiep"||p==="deur") {
       var hx = row.hinge==="right" ? x2 : x1;
       var tx = row.hinge==="right" ? x1 : x2;
@@ -470,7 +480,9 @@
     var zSashBack  = Math.max(zBack + 6, zSashFront - sashDepth);  // sash indoor  face (z1 in addBox)
     var zGlassCtr  = (zSashFront + zSashBack) * 0.5;               // glass unit center
 
-    var color  = model.color;
+    var color       = model.color;
+    var colorInside = model.colorInside || color;  // indoor face color (may differ from outside)
+    var insideOpts  = (colorInside !== color) ? { colorInside: colorInside } : {};
     var colors = { motion: "#e11d48" };
     var isHouse   = mode === "house";
     var isSliding = model.type === "schuifpui" || model.type === "hefschuif";
@@ -478,11 +490,11 @@
 
     if (isHouse) addHouse(scene, model, depth);
 
-    // ── Outer frame ──────────────────────────────────────────────────────────
-    addBox(scene, -w/2,-h/2, -w/2+frame, h/2, zBack,zFront, color);
-    addBox(scene,  w/2-frame,-h/2,  w/2, h/2, zBack,zFront, color);
-    addBox(scene, -w/2, h/2-frame,  w/2, h/2, zBack,zFront, color);
-    addBox(scene, -w/2,-h/2,  w/2,-h/2+frame, zBack,zFront, color);
+    // ── Outer frame — inside faces get colorInside ────────────────────────────
+    addBox(scene, -w/2,-h/2, -w/2+frame, h/2, zBack,zFront, color, insideOpts);
+    addBox(scene,  w/2-frame,-h/2,  w/2, h/2, zBack,zFront, color, insideOpts);
+    addBox(scene, -w/2, h/2-frame,  w/2, h/2, zBack,zFront, color, insideOpts);
+    addBox(scene, -w/2,-h/2,  w/2,-h/2+frame, zBack,zFront, color, insideOpts);
 
     // Schüco Living Variant: chamfer on outdoor face
     addChamferFace(scene, -w/2,-h/2, w/2,h/2, zFront, zFront-chamferW*2, chamferW, shade(color,1.04));
@@ -643,7 +655,7 @@
           addGasket(scene, px1,py1,px2,py2, zGlassCtr+16);
           addGlassPocket(scene, px1,py1,px2,py2, zGlassCtr-14, zGlassCtr+14, color);
           addGlassUnit(scene, px1, py1, px2, py2, zGlassCtr, row);
-          addPaneDetails(scene, {x1:px1,x2:px2,y1:py1,y2:py2}, row, depth, colors);
+          addPaneDetails(scene, {x1:px1,x2:px2,y1:py1,y2:py2}, row, zSashFront + 4, colors);
           if (showHandles) addHandle(scene, px1,py1,px2,py2, row, zSashFront+2, 1);
         }
 
