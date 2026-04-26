@@ -144,6 +144,19 @@
     var contourAngle  = profileShape === "straight" ? 0 : (profileShape === "6deg" ? 6 : 15);
     var depthMM     = numberOr(profile.depthMM,     profileSystem === "living_variant" ? 120 : 82);
     var sashDepthMM = numberOr(profile.sashDepthMM, profileSystem === "living_variant" ?  80 : 70);
+    var srcPanels = Array.isArray(source.doorPanels) ? source.doorPanels : null;
+    var doorPanels3d = null;
+    if (srcPanels && srcPanels.length) {
+      var dpSum = srcPanels.reduce(function(s,p){ return s + Math.max(0, numberOr(p.heightPct,0)); }, 0) || 100;
+      doorPanels3d = srcPanels.map(function(p) {
+        return {
+          heightPct: Math.max(0.5, numberOr(p.heightPct, 100/srcPanels.length)) / dpSum * 100,
+          fill: p.fill === 'glass' ? 'glass' : 'panel',
+          glassPack: String(p.glassPack || 'HR++'),
+          glassFinish: String(p.glassFinish || 'clear')
+        };
+      });
+    }
     return {
       type: type,
       widthMM:  clamp(source.widthMM,  300, 14000),
@@ -156,7 +169,8 @@
         hvl: profileSystem === "living_variant", gasketCount: 2
       },
       color: colorFrom(source),
-      columns: normalizeColumns(source, type)
+      columns: normalizeColumns(source, type),
+      doorPanels: doorPanels3d
     };
   }
 
@@ -237,12 +251,11 @@
 
   function addGlassPocket(scene, x1, y1, x2, y2, z1, z2, color) {
     if (x2 <= x1 || y2 <= y1) return;
-    var pocket = clamp(Math.min(x2-x1,y2-y1)*.07, 8, 24);
-    var s = stroke => stroke;
-    addBox(scene, x1-pocket,y1-pocket,x2+pocket,y1, z1,z2, shade(color,.76), {alpha:.65, stroke:"rgba(15,23,42,.14)"});
-    addBox(scene, x1-pocket,y2,x2+pocket,y2+pocket, z1,z2, shade(color,1.10), {alpha:.70, stroke:"rgba(15,23,42,.12)"});
-    addBox(scene, x1-pocket,y1,x1,y2, z1,z2, shade(color,.86), {alpha:.65, stroke:"rgba(15,23,42,.12)"});
-    addBox(scene, x2,y1,x2+pocket,y2, z1,z2, shade(color,.70), {alpha:.65, stroke:"rgba(15,23,42,.12)"});
+    var pocket = clamp(Math.min(x2-x1,y2-y1)*.07, 6, 20);
+    addBox(scene, x1-pocket,y1-pocket,x2+pocket,y1, z1,z2, shade(color,.76), {alpha:.55, stroke:"rgba(15,23,42,.12)"});
+    addBox(scene, x1-pocket,y2,x2+pocket,y2+pocket, z1,z2, shade(color,1.10), {alpha:.60, stroke:"rgba(15,23,42,.10)"});
+    addBox(scene, x1-pocket,y1,x1,y2, z1,z2, shade(color,.86), {alpha:.55, stroke:"rgba(15,23,42,.10)"});
+    addBox(scene, x2,y1,x2+pocket,y2, z1,z2, shade(color,.70), {alpha:.55, stroke:"rgba(15,23,42,.10)"});
   }
 
   function glassLayerCount(pack) {
@@ -251,35 +264,40 @@
     return 2;
   }
 
-  // Glass unit — clear float glass with blue-green tint
+  // Glass unit — insulating glass with spacer bars and sky reflection
   function addGlassUnit(scene, x1, y1, x2, y2, zCenter, row) {
     var layers  = glassLayerCount(row.glassPack);
-    var spacing = layers === 3 ? 16 : 20;
+    var spacing = layers === 3 ? 14 : 18;   // mm between pane faces
     var isSatin = row.glassFinish === "satinato";
     var glassBase = isSatin ? "#cfdce6" : "#8fcce8";
-    var glassEdge = isSatin ? "#b8ccd6" : "#5ba8d8";
+
+    // Outdoor pane (highest z in the unit = closest to viewer)
+    var zOuter = zCenter + spacing * (layers - 1) * 0.5;
+    var zInner = zCenter - spacing * (layers - 1) * 0.5;
 
     for (var i = 0; i < layers; i++) {
-      var z = zCenter + (i - (layers-1)/2) * spacing;
-      var a = i === 0 ? .38 : (layers===3&&i===1 ? .22 : .30);
-      addFace(scene, rectPoints(x1,y1,x2,y2,z), glassBase, a, "rgba(96,165,250,.28)");
-      // top highlight
-      addLine(scene,[{x:x1,y:y2,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(255,255,255,.52)",1,.78);
-      // right shadow
-      addLine(scene,[{x:x2,y:y1,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(15,23,42,.16)",0.8,.52);
+      var z = zInner + i * spacing;
+      // outdoor pane slightly more opaque, inner panes more transparent
+      var a = (i === layers - 1) ? .40 : .22;
+      addFace(scene, rectPoints(x1,y1,x2,y2,z), glassBase, a, "rgba(96,165,250,.22)");
+      addLine(scene,[{x:x1,y:y2,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(255,255,255,.48)",0.9,.76);
+      addLine(scene,[{x:x2,y:y1,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(15,23,42,.14)",0.7,.50);
     }
-    // edge spacer bar visible from side
-    addLine(scene,[
-      {x:x2+6,y:y1,z:zCenter-spacing*.55},{x:x2+6,y:y1,z:zCenter+spacing*.55},
-      {x:x2+6,y:y2,z:zCenter+spacing*.55},{x:x2+6,y:y2,z:zCenter-spacing*.55}
-    ], "rgba(30,41,59,.32)", 1, .62);
-    // sky reflection highlight (diagonal stripe)
+
+    // Aluminium spacer bar lines visible on the right and top edges (IGU edge)
+    var spacerColor = "rgba(30,41,59,.36)";
+    if (layers >= 2) {
+      addLine(scene,[{x:x2+4,y:y1,z:zInner},{x:x2+4,y:y1,z:zOuter},{x:x2+4,y:y2,z:zOuter},{x:x2+4,y:y2,z:zInner}], spacerColor, 1.2, .65);
+      addLine(scene,[{x:x1,y:y2+4,z:zInner},{x:x1,y:y2+4,z:zOuter},{x:x2,y:y2+4,z:zOuter},{x:x2,y:y2+4,z:zInner}], spacerColor, 1.2, .58);
+    }
+
+    // Sky reflection diagonal stripe on the outdoor pane
     addFace(scene, [
-      {x:x1+Math.max(12,(x2-x1)*.08), y:y2-Math.max(12,(y2-y1)*.08), z:zCenter+spacing*.5+2},
-      {x:x1+Math.max(30,(x2-x1)*.22), y:y2-Math.max(12,(y2-y1)*.08), z:zCenter+spacing*.5+2},
-      {x:x1+Math.max(14,(x2-x1)*.10), y:y2-Math.max(55,(y2-y1)*.55), z:zCenter+spacing*.5+2},
-      {x:x1+Math.max(4, (x2-x1)*.02), y:y2-Math.max(55,(y2-y1)*.55), z:zCenter+spacing*.5+2}
-    ], "#d0eeff", .28, "transparent");
+      {x:x1+Math.max(10,(x2-x1)*.07), y:y2-Math.max(10,(y2-y1)*.07), z:zOuter+1},
+      {x:x1+Math.max(28,(x2-x1)*.20), y:y2-Math.max(10,(y2-y1)*.07), z:zOuter+1},
+      {x:x1+Math.max(12,(x2-x1)*.09), y:y2-Math.max(50,(y2-y1)*.52), z:zOuter+1},
+      {x:x1+Math.max(2,  (x2-x1)*.01), y:y2-Math.max(50,(y2-y1)*.52), z:zOuter+1}
+    ], "#cee8ff", .30, "transparent");
   }
 
   // Tilt-turn / handle (suppressed in house mode)
@@ -395,6 +413,37 @@
     }
   }
 
+  // ─── Door panel sections helper ─────────────────────────────────────────────
+
+  function renderDoorPanelsInArea(scene, x1, y1, x2, y2, panels, zGlassCtr, zSashBack, zSashFront, color) {
+    // panels ordered top→bottom; y increases upward in 3D so panels[0] = highest y
+    var totalH = y2 - y1;
+    var yTop   = y2;
+    for (var pi = 0; pi < panels.length; pi++) {
+      var panel = panels[pi];
+      var panH  = totalH * panel.heightPct / 100;
+      var panY2 = yTop;
+      var panY1 = pi === panels.length - 1 ? y1 : yTop - panH;
+      if (panY1 >= panY2) { yTop = panY1; continue; }
+
+      if (pi > 0) {
+        addLine(scene,[{x:x1,y:panY2,z:zSashFront},{x:x2,y:panY2,z:zSashFront}],"rgba(15,23,42,.44)",1.8,.90);
+      }
+
+      if (panel.fill === 'glass') {
+        addGlassPocket(scene, x1,panY1,x2,panY2, zGlassCtr-14, zGlassCtr+14, color);
+        addGlassUnit(scene, x1, panY1, x2, panY2, zGlassCtr, {glassPack:panel.glassPack, glassFinish:panel.glassFinish});
+      } else {
+        var inset2 = Math.max(8, Math.min((panY2-panY1)*.10, (x2-x1)*.07));
+        addBox(scene, x1, panY1, x2, panY2, zSashBack+4, zSashFront-2, shade(color,1.16), {alpha:.96, stroke:"rgba(15,23,42,.16)"});
+        if ((panY2-panY1) > 36 && (x2-x1) > 36) {
+          addProfileGroove(scene, x1+inset2, panY1+inset2, x2-inset2, panY2-inset2, zSashFront, color);
+        }
+      }
+      yTop = panY1;
+    }
+  }
+
   // ─── Main scene builder ──────────────────────────────────────────────────────
 
   function buildScene(model, mode) {
@@ -406,40 +455,48 @@
     var mull  = Math.min(p.mullionMM, w*.18);
     var trans = Math.min(p.transomMM, h*.18);
     var depth     = clamp(p.depthMM     || 120, 80, 180);
-    var sashDepth = clamp(p.sashDepthMM ||  80, 55, depth);
-    var chamferW  = frame * .18;           // 15° profile chamfer width
-    var zBack     = -depth/2;
-    var zFront    =  depth/2;
-    var zChamfer  = zFront + depth*.10;    // floats slightly in front of frame face for painter's algo
-    // Sash sits proud of outer frame on interior side
-    var zSashBack  = zFront - sashDepth;
-    var zSashFront = zFront + Math.max(14, sashDepth*.18);
+    var sashDepth = clamp(p.sashDepthMM ||  80, 40, depth - 20);
+    var chamferW  = frame * .18;
+
+    // z convention: zFront = OUTDOOR face (highest z, closest to viewer from outside)
+    //               zBack  = INDOOR  face (lowest  z, away from viewer)
+    var zFront = depth/2;
+    var zBack  = -depth/2;
+    var zChamfer = zFront + 2;  // just in front of outdoor face for painter's sort
+
+    // Sash recessed from outdoor face — correct Schüco behavior, sash sits inside frame
+    var sashRecess = Math.max(8, depth * 0.09);
+    var zSashFront = zFront - sashRecess;                           // sash outdoor face (z2 in addBox)
+    var zSashBack  = Math.max(zBack + 6, zSashFront - sashDepth);  // sash indoor  face (z1 in addBox)
+    var zGlassCtr  = (zSashFront + zSashBack) * 0.5;               // glass unit center
+
     var color  = model.color;
-    var light  = isLight(color);
     var colors = { motion: "#e11d48" };
-    var isHouse = mode === "house";
+    var isHouse   = mode === "house";
+    var isSliding = model.type === "schuifpui" || model.type === "hefschuif";
     var showHandles = !isHouse;
 
     if (isHouse) addHouse(scene, model, depth);
 
-    // ── Outer frame (4 bars) ─────────────────────────────────────────────────
-    // Left bar
+    // ── Outer frame ──────────────────────────────────────────────────────────
     addBox(scene, -w/2,-h/2, -w/2+frame, h/2, zBack,zFront, color);
-    // Right bar
     addBox(scene,  w/2-frame,-h/2,  w/2, h/2, zBack,zFront, color);
-    // Top bar
     addBox(scene, -w/2, h/2-frame,  w/2, h/2, zBack,zFront, color);
-    // Bottom bar
     addBox(scene, -w/2,-h/2,  w/2,-h/2+frame, zBack,zFront, color);
 
-    // Schüco Living chamfer faces on frame outer edges (the angled 15° profile face)
-    addChamferFace(scene, -w/2,-h/2, w/2,h/2, zBack, zBack+chamferW*2, chamferW, shade(color,1.04));
-
-    // Profile groove and corner joints on front face
+    // Schüco Living Variant: chamfer on outdoor face
+    addChamferFace(scene, -w/2,-h/2, w/2,h/2, zFront, zFront-chamferW*2, chamferW, shade(color,1.04));
     addProfileGroove(scene, -w/2,-h/2, w/2,h/2, zChamfer, color);
     addCornerJoints(scene, -w/2,-h/2, w/2,h/2, frame, zChamfer+1);
 
-    // ── Inner area (columns/rows) ────────────────────────────────────────────
+    // Schuifpui: horizontal track rails instead of vertical mullion
+    if (isSliding) {
+      var railH = Math.max(10, frame * 0.16);
+      addBox(scene, -w/2+frame, -h/2+frame, w/2-frame, -h/2+frame+railH, zBack, zFront, shade(color,.84));
+      addBox(scene, -w/2+frame,  h/2-frame-railH, w/2-frame,  h/2-frame, zBack, zFront, shade(color,.90));
+    }
+
+    // ── Inner area (columns / rows) ──────────────────────────────────────────
     var innerX1 = -w/2+frame, innerX2 = w/2-frame;
     var innerY1 = -h/2+frame, innerY2 = h/2-frame;
     var innerW  = Math.max(1, innerX2-innerX1);
@@ -452,11 +509,16 @@
       var cellX2 = x + colW;
 
       if (colIndex > 0) {
-        addBox(scene, x-mull/2,innerY1, x+mull/2,innerY2, zBack,zFront, color);
-        addProfileGroove(scene, x-mull/2,innerY1, x+mull/2,innerY2, zChamfer+1, color);
-        cellX1 += mull/2;
+        if (isSliding) {
+          // Schuifpui: slim track divider line, no structural mullion
+          addLine(scene,[{x:x,y:innerY1,z:zSashFront+2},{x:x,y:innerY2,z:zSashFront+2}],"rgba(15,23,42,.28)",1.2,.72);
+        } else {
+          addBox(scene, x-mull/2,innerY1, x+mull/2,innerY2, zBack,zFront, color);
+          addProfileGroove(scene, x-mull/2,innerY1, x+mull/2,innerY2, zChamfer+1, color);
+          cellX1 += mull/2;
+        }
       }
-      if (colIndex < model.columns.length-1) cellX2 -= mull/2;
+      if (colIndex < model.columns.length-1 && !isSliding) cellX2 -= mull/2;
 
       var yTop = innerY2;
       col.rows.forEach(function (row, rowIndex) {
@@ -471,53 +533,118 @@
         }
         if (rowIndex < col.rows.length-1) y1 += trans/2;
 
-        var isPanel  = row.fill==="panel" || row.paneType==="deur";
-        var openable = ["draai","kiep","draaikiep","deur","schuif"].indexOf(row.paneType) >= 0;
+        var isDoor2  = row.paneType === "deur2";
+        var openable = ["draai","kiep","draaikiep","deur","deur2","schuif"].indexOf(row.paneType) >= 0;
+        // Vast panels in a schuifpui also show a visible sash frame (both tracks)
+        var drawSash = openable || (row.paneType === "vast" && isSliding);
+        var isPanel  = row.fill === "panel" || row.paneType === "deur" || isDoor2;
 
-        // inset from inner frame to glass/panel edge
-        var paneInset = isPanel ? Math.max(5,Math.min(20,sash*.12)) : Math.max(12,Math.min(40,sash*.22));
-        // sash bar width on screen
-        var sashBar   = openable ? Math.max(22,Math.min(68,sash*.46)) : Math.max(14,Math.min(38,sash*.22));
+        var paneInset = drawSash ? Math.max(4,Math.min(18,sash*.10)) : Math.max(8,Math.min(28,sash*.16));
+        var sashBar   = drawSash ? Math.max(18,Math.min(60,sash*.42)) : Math.max(8,Math.min(24,sash*.16));
 
-        // Sash frame (4 bars, only for openable panels)
-        if (openable) {
-          var sx1 = cellX1 + paneInset*.32;
-          var sx2 = cellX2 - paneInset*.32;
-          var sy1 = y1     + paneInset*.32;
-          var sy2 = y2     - paneInset*.32;
-          addBox(scene, sx1,sy1,sx2,sy1+sashBar, zSashBack,zSashFront, color);
-          addBox(scene, sx1,sy2-sashBar,sx2,sy2, zSashBack,zSashFront, color);
-          addBox(scene, sx1,sy1,sx1+sashBar,sy2, zSashBack,zSashFront, color);
-          addBox(scene, sx2-sashBar,sy1,sx2,sy2, zSashBack,zSashFront, color);
-          addProfileGroove(scene, sx1,sy1,sx2,sy2, zSashFront+6, color);
-          addCornerJoints(scene, sx1,sy1,sx2,sy2, sashBar, zSashFront+7);
-          // Gasket between frame and sash (critical Schüco detail)
-          addGasket(scene, sx1,sy1,sx2,sy2, zFront+2);
-        }
+        // ── Sash frame ────────────────────────────────────────────────────
+        var sx1, sx2, sy1, sy2;
+        if (drawSash) {
+          sx1 = cellX1 + paneInset * .32;
+          sx2 = cellX2 - paneInset * .32;
+          sy1 = y1     + paneInset * .32;
+          sy2 = y2     - paneInset * .32;
 
-        // Glass or panel area
-        var px1 = cellX1 + paneInset;
-        var px2 = cellX2 - paneInset;
-        var py1 = y1     + paneInset;
-        var py2 = y2     - paneInset;
-        if (openable) {
-          var ob = sashBar*.85;
-          px1 = cellX1+paneInset*.32+ob; px2 = cellX2-paneInset*.32-ob;
-          py1 = y1+paneInset*.32+ob;     py2 = y2-paneInset*.32-ob;
-        }
-
-        if (px2 > px1 && py2 > py1) {
-          if (isPanel) {
-            addGasket(scene, px1,py1,px2,py2, zSashFront+7);
-            addBox(scene, px1,py1,px2,py2, zSashBack+6,zSashFront+2, shade(color,1.22), {alpha:.98,stroke:"rgba(15,23,42,.18)"});
-            addProfileGroove(scene, px1+14,py1+14,px2-14,py2-14, zSashFront+9, color);
+          if (isDoor2) {
+            var seamX = (sx1 + sx2) / 2;
+            // Shared top and bottom rails
+            addBox(scene, sx1,sy2-sashBar,sx2,sy2, zSashBack,zSashFront, color);
+            addBox(scene, sx1,sy1,sx2,sy1+sashBar, zSashBack,zSashFront, color);
+            // Left leaf stiles
+            addBox(scene, sx1,sy1,sx1+sashBar,sy2, zSashBack,zSashFront, color);
+            addBox(scene, seamX-sashBar*.5,sy1, seamX+sashBar*.5,sy2, zSashBack,zSashFront, color);
+            // Right leaf outer stile
+            addBox(scene, sx2-sashBar,sy1,sx2,sy2, zSashBack,zSashFront, color);
+            // Center seam detail
+            addLine(scene,[{x:seamX,y:sy1,z:zSashFront+1},{x:seamX,y:sy2,z:zSashFront+1}],"rgba(15,23,42,.38)",1.4,.88);
+            addGasket(scene, sx1,sy1,sx2,sy2, zSashFront);
+            // Opening arrows for each leaf
+            addLine(scene,[{x:sx1,y:sy2,z:zGlassCtr},{x:sx1*0.35+seamX*0.65,y:(sy1+sy2)/2,z:zGlassCtr},{x:sx1,y:sy1,z:zGlassCtr}], colors.motion, 2, .85);
+            addLine(scene,[{x:sx2,y:sy2,z:zGlassCtr},{x:sx2*0.35+seamX*0.65,y:(sy1+sy2)/2,z:zGlassCtr},{x:sx2,y:sy1,z:zGlassCtr}], colors.motion, 2, .85);
+          } else if (row.paneType === "schuif") {
+            // Sliding panel: offset in z to suggest separate track (slightly in front)
+            var szF = zSashFront + 7, szB = zSashBack + 7;
+            addBox(scene, sx1,sy1,sx2,sy1+sashBar, szB,szF, color);
+            addBox(scene, sx1,sy2-sashBar,sx2,sy2, szB,szF, color);
+            addBox(scene, sx1,sy1,sx1+sashBar,sy2, szB,szF, color);
+            addBox(scene, sx2-sashBar,sy1,sx2,sy2, szB,szF, color);
+            addProfileGroove(scene, sx1,sy1,sx2,sy2, szF+2, color);
+            addGasket(scene, sx1,sy1,sx2,sy2, szF);
           } else {
-            addGasket(scene, px1,py1,px2,py2, zSashFront+6);
-            addGlassPocket(scene, px1,py1,px2,py2, zSashBack+6,zSashBack+22, color);
-            addGlassUnit(scene, px1,py1,px2,py2, zFront-14, row);
+            // Standard sash (draai, kiep, draaikiep, deur, vast in schuifpui)
+            addBox(scene, sx1,sy1,sx2,sy1+sashBar, zSashBack,zSashFront, color);
+            addBox(scene, sx1,sy2-sashBar,sx2,sy2, zSashBack,zSashFront, color);
+            addBox(scene, sx1,sy1,sx1+sashBar,sy2, zSashBack,zSashFront, color);
+            addBox(scene, sx2-sashBar,sy1,sx2,sy2, zSashBack,zSashFront, color);
+            addProfileGroove(scene, sx1,sy1,sx2,sy2, zSashFront+2, color);
+            addCornerJoints(scene, sx1,sy1,sx2,sy2, sashBar, zSashFront+3);
+            addGasket(scene, sx1,sy1,sx2,sy2, zSashFront);
           }
+        }
+
+        // ── Glass / panel area ────────────────────────────────────────────
+        var px1, px2, py1, py2;
+        if (drawSash) {
+          var ob = sashBar * .85;
+          px1 = cellX1 + paneInset*.32 + ob; px2 = cellX2 - paneInset*.32 - ob;
+          py1 = y1     + paneInset*.32 + ob; py2 = y2     - paneInset*.32 - ob;
+        } else {
+          px1 = cellX1 + paneInset; px2 = cellX2 - paneInset;
+          py1 = y1     + paneInset; py2 = y2     - paneInset;
+        }
+
+        if (px2 <= px1 || py2 <= py1) { yTop -= rowH; return; }
+
+        var doorPanels = model.doorPanels;
+        var usePanels  = isPanel && doorPanels && doorPanels.length > 0;
+
+        if (isDoor2) {
+          // Double door: split glass/panel area into two leaves
+          var leafMidX = (px1 + px2) / 2;
+          var leafGap  = Math.max(1, sashBar * 0.10);
+          var sides    = [[px1, leafMidX - leafGap], [leafMidX + leafGap, px2]];
+          sides.forEach(function(side) {
+            var lx1 = side[0], lx2 = side[1];
+            if (lx2 <= lx1) return;
+            if (usePanels) {
+              renderDoorPanelsInArea(scene, lx1, py1, lx2, py2, doorPanels, zGlassCtr, zSashBack, zSashFront, color);
+            } else if (isPanel) {
+              addBox(scene, lx1,py1,lx2,py2, zSashBack+4,zSashFront-2, shade(color,1.18), {alpha:.97,stroke:"rgba(15,23,42,.16)"});
+              addProfileGroove(scene, lx1+10,py1+8,lx2-10,py2-8, zSashFront, color);
+            } else {
+              addGlassPocket(scene, lx1,py1,lx2,py2, zGlassCtr-14, zGlassCtr+14, color);
+              addGlassUnit(scene, lx1, py1, lx2, py2, zGlassCtr, row);
+            }
+          });
+          // Handles for double door
+          if (showHandles) {
+            var lRow = { paneType:"deur", hinge:"left",  glassPack:row.glassPack, glassFinish:row.glassFinish };
+            var rRow = { paneType:"deur", hinge:"right", glassPack:row.glassPack, glassFinish:row.glassFinish };
+            var lx2h = leafMidX - leafGap;
+            var rx1h = leafMidX + leafGap;
+            addHandle(scene, px1, py1, lx2h, py2, lRow, zSashFront+2, 0.85);
+            addHandle(scene, rx1h, py1, px2, py2, rRow, zSashFront+2, 0.85);
+          }
+        } else if (usePanels) {
+          renderDoorPanelsInArea(scene, px1, py1, px2, py2, doorPanels, zGlassCtr, zSashBack, zSashFront, color);
+          if (showHandles) addHandle(scene, px1,py1,px2,py2, row, zSashFront+2, 1);
+        } else if (isPanel) {
+          addGasket(scene, px1,py1,px2,py2, zSashFront-1);
+          addBox(scene, px1,py1,px2,py2, zSashBack+4,zSashFront-2, shade(color,1.18), {alpha:.97,stroke:"rgba(15,23,42,.18)"});
+          addProfileGroove(scene, px1+12,py1+10,px2-12,py2-10, zSashFront, color);
+          if (showHandles) addHandle(scene, px1,py1,px2,py2, row, zSashFront+2, 1);
+        } else {
+          // Glass
+          addGasket(scene, px1,py1,px2,py2, zGlassCtr+16);
+          addGlassPocket(scene, px1,py1,px2,py2, zGlassCtr-14, zGlassCtr+14, color);
+          addGlassUnit(scene, px1, py1, px2, py2, zGlassCtr, row);
           addPaneDetails(scene, {x1:px1,x2:px2,y1:py1,y2:py2}, row, depth, colors);
-          if (showHandles) addHandle(scene, px1,py1,px2,py2, row, zSashFront+7, 1);
+          if (showHandles) addHandle(scene, px1,py1,px2,py2, row, zSashFront+2, 1);
         }
 
         yTop -= rowH;
