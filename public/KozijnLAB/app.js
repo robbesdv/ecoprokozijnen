@@ -79,6 +79,39 @@ const PANE_TYPES = {
   ],
 };
 
+const DOOR_PRESETS = [
+  { id: 'vol-paneel',      label: 'Volpaneel',    panels: [{fill:'panel', heightPct:100}] },
+  { id: 'smal-glas',       label: 'Smal glas',    panels: [{fill:'glass', heightPct:12, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:88}] },
+  { id: 'klein-glas',      label: 'Klein glas',   panels: [{fill:'glass', heightPct:22, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:78}] },
+  { id: 'glas-boven',      label: 'Glas boven',   panels: [{fill:'glass', heightPct:38, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:62}] },
+  { id: 'half-glas',       label: 'Half glas',    panels: [{fill:'glass', heightPct:50, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:50}] },
+  { id: 'groot-glas',      label: 'Groot glas',   panels: [{fill:'glass', heightPct:65, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:35}] },
+  { id: 'vol-glas',        label: 'Vol glas',     panels: [{fill:'glass', heightPct:100, glassPack:'HR++', glassFinish:'clear'}] },
+  { id: 'glas-midden',     label: 'Glas midden',  panels: [{fill:'panel', heightPct:25},{fill:'glass', heightPct:50, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:25}] },
+  { id: 'breed-glas',      label: 'Breed glas',   panels: [{fill:'panel', heightPct:20},{fill:'glass', heightPct:60, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:20}] },
+  { id: 'smal-glas-m',     label: 'Smal m.',      panels: [{fill:'panel', heightPct:35},{fill:'glass', heightPct:30, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:35}] },
+  { id: 'klassiek',        label: 'Klassiek',     panels: [{fill:'panel', heightPct:30},{fill:'glass', heightPct:40, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:30}] },
+  { id: 'gpg',             label: 'Glas-P-Glas',  panels: [{fill:'glass', heightPct:30, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:40},{fill:'glass', heightPct:30, glassPack:'HR++', glassFinish:'clear'}] },
+  { id: 'glas-onder',      label: 'Glas onder',   panels: [{fill:'panel', heightPct:60},{fill:'glass', heightPct:40, glassPack:'HR++', glassFinish:'clear'}] },
+  { id: 'twin-glas',       label: 'Twin glas',    panels: [{fill:'glass', heightPct:28, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:16},{fill:'glass', heightPct:40, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:16}] },
+  { id: 'vier-vakken',     label: '4 vakken',     panels: [{fill:'glass', heightPct:25, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:25},{fill:'glass', heightPct:25, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:25}] },
+  { id: 'dubbel-glas',     label: 'Dubbel glas',  panels: [{fill:'glass', heightPct:20, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:22},{fill:'glass', heightPct:38, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:20}] },
+];
+
+function presetThumbSvg(panels) {
+  const W = 22, H = 38, fr = 2.5;
+  const innerH = H - 2 * fr;
+  let y = fr;
+  const rects = panels.map(p => {
+    const ph = Math.max(1, Math.round(innerH * (p.heightPct / 100)));
+    const fill = p.fill === 'glass' ? '#bfdbfe' : '#cbd5e1';
+    const r = `<rect x="${fr}" y="${y}" width="${W - 2 * fr}" height="${ph}" fill="${fill}"/>`;
+    y += ph;
+    return r;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect x=".75" y=".75" width="${W - 1.5}" height="${H - 1.5}" fill="none" stroke="#1f2937" stroke-width="1.5" rx="1"/>${rects}</svg>`;
+}
+
 function uid() { return 'e_' + Math.random().toString(36).slice(2, 9); }
 
 function newOfferCode() {
@@ -1457,6 +1490,10 @@ function renderDoorPanelControls(root, el) {
   const activePanel = panels[activeIdx];
   const mainRow = doorMainRow(el) || {};
 
+  root.querySelectorAll('#door-preset-grid [data-preset]').forEach(btn => {
+    btn.classList.toggle('is-active', btn.dataset.preset === (el._doorPreset || ''));
+  });
+
   const hingeField = root.querySelector('#door-hinge-field');
   hingeField.style.display = (el.doorSubtype || 'voordeur') === 'tuindeur' ? 'none' : '';
   root.querySelector('#door-hinge').value = mainRow.hinge || 'left';
@@ -1485,6 +1522,7 @@ function renderDoorPanelControls(root, el) {
       const otherSum = others.reduce((a, p) => a + p.heightPct, 0);
       panels[i].heightPct = Math.min(100, (v / el.heightMM) * 100);
       others.forEach(p => { p.heightPct = otherSum > 0 ? (p.heightPct / otherSum) * remPct : remPct / Math.max(1, others.length); });
+      el._doorPreset = null;
       renderDrawingOnly();
     };
   });
@@ -1589,6 +1627,11 @@ function buildConfigShell() {
           </div>
         </div>
         <div id="door-vakken-fields" style="display:none">
+          <div class="field">
+            <label class="label">Deurindeling</label>
+            <div class="preset-grid" id="door-preset-grid">${DOOR_PRESETS.map(p => `<button class="preset-btn" data-preset="${p.id}" title="${p.label}">${presetThumbSvg(p.panels)}<span class="preset-label">${p.label}</span></button>`).join('')}</div>
+          </div>
+          <div class="divider"></div>
           <div class="field" id="door-hinge-field"><label class="label">Scharnierzijde</label><select class="select" id="door-hinge"><option value="left">Links</option><option value="right">Rechts</option></select></div>
           <div class="field"><label class="label">Scharnier type</label><select class="select" id="door-hinge-style"><option value="flag">Vlagscharnier</option><option value="roller">Rollerbandscharnier</option></select></div>
           <div class="field"><label class="label">Aantal deurvakken</label><input class="input mono" id="door-panels-count" type="number" min="1" max="6" step="1"/></div>
@@ -1652,7 +1695,7 @@ function bindConfigShell() {
     if (t.id === 'elem-qty') { el.qty = Math.max(1, +t.value || 1); render(); return; }
     if (t.id === 'width-mm') { el.widthMM = Math.max(400, +t.value || 1200); render(); return; }
     if (t.id === 'height-mm') { el.heightMM = Math.max(400, +t.value || 1400); render(); return; }
-    if (t.id === 'door-panels-count') { setDoorPanelCount(el, t.value); render(); return; }
+    if (t.id === 'door-panels-count') { setDoorPanelCount(el, t.value); el._doorPreset = null; render(); return; }
     if (t.id === 'door-hinge') {
       const row = doorMainRow(el);
       if (row) row.hinge = t.value;
@@ -1666,6 +1709,7 @@ function bindConfigShell() {
     if (t.id === 'door-panel-fill') {
       normalizeDoorPanels(el);
       el.doorPanels[el._activeDoorPanelIdx || 0].fill = t.value;
+      el._doorPreset = null;
       render(); return;
     }
     if (t.id === 'door-panel-glass-pack') {
@@ -1748,6 +1792,19 @@ function bindConfigShell() {
     if (['pane-type', 'color-outside', 'color-inside'].includes(e.target.id)) render();
   });
   root.addEventListener('click', e => {
+    const presetBtn = e.target.closest('[data-preset]');
+    if (presetBtn) {
+      const el = activeElement();
+      const preset = DOOR_PRESETS.find(p => p.id === presetBtn.dataset.preset);
+      if (preset) {
+        normalizeDoorPanels(el);
+        el.doorPanels = preset.panels.map(p => ({ ...p }));
+        el._activeDoorPanelIdx = 0;
+        el._doorPreset = preset.id;
+        render();
+      }
+      return;
+    }
     const doorPanelTab = e.target.closest('[data-door-panel]');
     if (doorPanelTab) {
       const el = activeElement();

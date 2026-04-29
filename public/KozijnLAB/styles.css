@@ -653,6 +653,43 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
 }
 .vak-tab.is-active .vak-tag { background: rgba(255,255,255,.6); color: var(--acc-600); }
 
+/* Door presets */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px 5px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+  font-family: inherit;
+}
+.preset-btn:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.preset-btn.is-active {
+  border-color: var(--acc-500);
+  background: var(--acc-50);
+}
+.preset-label {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.preset-btn.is-active .preset-label { color: var(--acc-600); }
+[data-theme="dark"] .preset-btn.is-active { background: color-mix(in srgb, var(--acc-500) 15%, transparent); }
+
 .divider {
   height: 1px;
   background: var(--border);
