@@ -36,10 +36,11 @@ const COLORS = [
   { code: 'RAL3009', name: 'Oxidrood',        hex: '#6c3028' },
   // Schüco speciaal / folie
   { code: 'DB703',       name: 'DB Zilvergrijs',  hex: '#8a8d8f' },
-  { code: 'GoudenEik',   name: 'Gouden Eik',      hex: '#9b7032' },
-  { code: 'IersEik',     name: 'Iers Eik',        hex: '#8b6743' },
-  { code: 'Palissander', name: 'Palissander',     hex: '#4a2b1a' },
-  { code: 'Mahonie',     name: 'Mahonie',         hex: '#5c2d19' },
+  { code: 'GoudenEik',   name: 'Gouden Eik',                   hex: '#9b7032' },
+  { code: 'IersEik',     name: 'Iers Eik',                    hex: '#8b6743' },
+  { code: 'DonkerEik',   name: 'Donker Eik (Chêne Foncé)',    hex: '#4a3520' },
+  { code: 'Palissander', name: 'Palissander',                 hex: '#4a2b1a' },
+  { code: 'Mahonie',     name: 'Mahonie',                     hex: '#5c2d19' },
 ];
 
 const ELEMENT_TYPES = [
