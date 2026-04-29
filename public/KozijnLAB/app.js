@@ -7,13 +7,39 @@
 const STORAGE_KEY = 'KL_V2_STATE';
 
 const COLORS = [
-  { code: 'RAL9016', name: 'Verkeerswit', hex: '#f6f6f3' },
-  { code: 'RAL9001', name: 'Crème', hex: '#f0ead6' },
-  { code: 'RAL7016', name: 'Antraciet', hex: '#383e42' },
-  { code: 'RAL7039', name: 'Quartzgrijs', hex: '#6c6960' },
-  { code: 'RAL7012', name: 'Basaltgrijs', hex: '#51565a' },
-  { code: 'RAL7038', name: 'Agate grijs', hex: '#b2b4b3' },
-  { code: 'RAL9005', name: 'Zwart', hex: '#0a0a0d' },
+  // Wit / crème
+  { code: 'RAL9016', name: 'Verkeerswit',     hex: '#f6f6f3' },
+  { code: 'RAL9001', name: 'Crèmewit',        hex: '#f0ead6' },
+  { code: 'RAL1013', name: 'Parelwit',        hex: '#ebe2c8' },
+  { code: 'RAL1015', name: 'Licht ivoor',     hex: '#e8dcc9' },
+  // Grijs
+  { code: 'RAL7035', name: 'Lichtgrijs',      hex: '#d3d3cb' },
+  { code: 'RAL7038', name: 'Agaatgrijs',      hex: '#b2b4b3' },
+  { code: 'RAL7030', name: 'Steengrijs',      hex: '#969083' },
+  { code: 'RAL7039', name: 'Quartzgrijs',     hex: '#6c6960' },
+  { code: 'RAL7012', name: 'Basaltgrijs',     hex: '#51565a' },
+  { code: 'RAL7015', name: 'Leisteengrijs',   hex: '#434b4d' },
+  { code: 'RAL7016', name: 'Antracietgrijs',  hex: '#383e42' },
+  { code: 'RAL7021', name: 'Zwartgrijs',      hex: '#2b2c2c' },
+  // Zwart
+  { code: 'RAL9005', name: 'Diepzwart',       hex: '#0a0a0d' },
+  // Bruin
+  { code: 'RAL8019', name: 'Grijsbruin',      hex: '#403635' },
+  { code: 'RAL8017', name: 'Chocoladebruin',  hex: '#442f29' },
+  { code: 'RAL8014', name: 'Sepiabruin',      hex: '#4e3b2d' },
+  // Groen
+  { code: 'RAL6009', name: 'Dennegroen',      hex: '#28352a' },
+  { code: 'RAL6005', name: 'Mosgroen',        hex: '#114232' },
+  // Blauw
+  { code: 'RAL5010', name: 'Gentiaanblauw',   hex: '#0e518d' },
+  // Rood
+  { code: 'RAL3009', name: 'Oxidrood',        hex: '#6c3028' },
+  // Schüco speciaal / folie
+  { code: 'DB703',       name: 'DB Zilvergrijs',  hex: '#8a8d8f' },
+  { code: 'GoudenEik',   name: 'Gouden Eik',      hex: '#9b7032' },
+  { code: 'IersEik',     name: 'Iers Eik',        hex: '#8b6743' },
+  { code: 'Palissander', name: 'Palissander',     hex: '#4a2b1a' },
+  { code: 'Mahonie',     name: 'Mahonie',         hex: '#5c2d19' },
 ];
 
 const ELEMENT_TYPES = [
