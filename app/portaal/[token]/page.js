@@ -45,6 +45,13 @@ export default function PortaalPage({ params: paramsPromise }) {
     loadOrder()
   }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function withComputedTotal(orderData) {
+    const exclSum = (orderData.order_items || []).reduce(
+      (s, i) => s + (i.unit_price || 0) * (i.quantity || 1), 0
+    )
+    return { ...orderData, total_amount: Math.round(exclSum * 1.21 * 100) / 100 }
+  }
+
   async function loadOrder() {
     const { data } = await supabase
       .from('orders')
@@ -59,7 +66,7 @@ export default function PortaalPage({ params: paramsPromise }) {
       return
     }
 
-    setOrder(data)
+    setOrder(withComputedTotal(data))
 
     supabase
       .from('orders')
@@ -75,7 +82,7 @@ export default function PortaalPage({ params: paramsPromise }) {
       .eq('portal_token', token)
       .single()
 
-    if (data) setOrder(data)
+    if (data) setOrder(withComputedTotal(data))
   }
 
   function showToast(msg, type = 'success') {
@@ -762,7 +769,7 @@ function Phase0({ order, onRefresh, showToast }) {
     y += 6
 
     const aanhefText =
-      'Hartelijk dank voor uw interesse in EcoPro Kozijnen. Hierbij bieden wij u onze offerte aan voor het leveren en monteren van hoogwaardige kunststof kozijnen van het merk Schüco, inclusief bijbehorende waterslagen en afwerkingen.'
+      'Hartelijk dank voor uw interesse in EcoPro Kozijnen. Hierbij bieden wij u onze offerte aan voor het leveren en monteren van hoogwaardige kunststof kozijnen van het merk Schüco, inclusief afwerkingen.'
     const aanhefLines = doc.splitTextToSize(aanhefText, W - 2 * M)
 
     doc.setFontSize(9)
