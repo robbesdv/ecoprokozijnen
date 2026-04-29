@@ -254,7 +254,8 @@ function doorColIndex(el) {
   return idx >= 0 ? idx : 0;
 }
 function doorMainRow(el) {
-  return el?.columns?.[doorColIndex(el)]?.rows?.[0];
+  const col = el?.columns?.[doorColIndex(el)];
+  return col?.rows?.find(r => isDoorPaneType(r.paneType)) || col?.rows?.[0];
 }
 
 function applyDoorSubtypeLayout(el) {
@@ -262,31 +263,51 @@ function applyDoorSubtypeLayout(el) {
   normalizeDoorPanels(el);
   const row = tuindeurRowFrom(el);
   row.paneType = doorPaneTypeFor(el);
-  row.heightPct = 100;
   row.fill = el.doorPanels?.some(p => p.fill === 'glass') ? 'glass' : 'panel';
 
   const opts = el.doorOptions || {};
+  const sub = el.doorSubtype || 'voordeur';
   const zijlichtKant = opts.zijlichtKant || (opts.zijlicht ? 'rechts' : null);
-  const sidelightCol = (pct) => ({
-    widthPct: pct,
-    _isSidelight: true,
-    rows: [{ paneType: 'vast', fill: 'glass', heightPct: 100, glassPack: 'HR++', glassFinish: 'clear' }],
-  });
+  const hasBovenlicht = !!opts.bovenlicht;
+  const bovPct = hasBovenlicht ? 20 : 0;
+  const glasRow = (pct) => ({ paneType: 'vast', fill: 'glass', heightPct: pct, glassPack: 'HR++', glassFinish: 'clear' });
 
-  if (zijlichtKant === 'beide') {
-    el.columns = [sidelightCol(20), { widthPct: 60, rows: [row] }, sidelightCol(20)];
+  // Build rows for a column: optional bovenlicht on top, then main row below
+  const colRows = (mainRow) => hasBovenlicht
+    ? [glasRow(bovPct), { ...mainRow, heightPct: 100 - bovPct }]
+    : [{ ...mainRow, heightPct: 100 }];
+
+  const sidelightRows = () => hasBovenlicht
+    ? [glasRow(bovPct), glasRow(100 - bovPct)]
+    : [glasRow(100)];
+
+  const sidelightCol = (pct) => ({ widthPct: pct, _isSidelight: true, rows: sidelightRows() });
+
+  // Tuindeur sidelight (zijlichtKlein / zijlichtGroot) — always to the right
+  if (sub === 'tuindeur') {
+    const sidePct = opts.zijlichtGroot ? 30 : opts.zijlichtKlein ? 20 : 0;
+    if (sidePct) {
+      el.columns = [{ widthPct: 100 - sidePct, rows: colRows(row) }, sidelightCol(sidePct)];
+      el._activeColIdx = 0;
+    } else {
+      el.columns = [{ widthPct: 100, rows: colRows(row) }];
+      el._activeColIdx = 0;
+    }
+  } else if (zijlichtKant === 'beide') {
+    el.columns = [sidelightCol(20), { widthPct: 60, rows: colRows(row) }, sidelightCol(20)];
     el._activeColIdx = 1;
   } else if (zijlichtKant === 'links') {
-    el.columns = [sidelightCol(25), { widthPct: 75, rows: [row] }];
+    el.columns = [sidelightCol(25), { widthPct: 75, rows: colRows(row) }];
     el._activeColIdx = 1;
   } else if (zijlichtKant === 'rechts') {
-    el.columns = [{ widthPct: 75, rows: [row] }, sidelightCol(25)];
+    el.columns = [{ widthPct: 75, rows: colRows(row) }, sidelightCol(25)];
     el._activeColIdx = 0;
   } else {
-    el.columns = [{ widthPct: 100, rows: [row] }];
+    el.columns = [{ widthPct: 100, rows: colRows(row) }];
     el._activeColIdx = 0;
   }
-  el._activeRowIdx = 0;
+  // Point activeRowIdx to the door row (index 1 when bovenlicht is present, else 0)
+  el._activeRowIdx = hasBovenlicht ? 1 : 0;
 }
 
 // ============================================================
@@ -810,6 +831,23 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     drawDoorHandle(svg, hinge === 'left' ? sx + sw : sx, sy + sh * 0.5, hinge === 'left' ? 'right' : 'left', doorPaneProfilePx);
     if (shouldDrawDoorHinges(el)) {
       drawDoorHinges(svg, hingeStyle, hinge === 'left' ? 'left' : 'right', hinge === 'left' ? x : x + w, y, h, doorPaneProfilePx);
+    }
+    // Detail overlays on the door leaf
+    const doorOpts = el.doorOptions || {};
+    const slotW = Math.min(sw * 0.42, 60), slotCx = sx + sw / 2;
+    if (doorOpts.briefklep || doorOpts.briefbak) {
+      const slotH = doorOpts.briefbak ? Math.max(8, sh * 0.045) : Math.max(5, sh * 0.025);
+      const slotY = sy + sh * 0.72 - slotH / 2;
+      svg.appendChild(svgEl('rect', { x: slotCx - slotW / 2, y: slotY, width: slotW, height: slotH, fill: 'var(--surface-3)', stroke: 'var(--draw-mull)', 'stroke-width': 1, rx: 1 }));
+    }
+    if (doorOpts.paneelSierrooster) {
+      const grillY = sy + sh * 0.18, grillH = sh * 0.28, grillX = sx + sw * 0.12, grillW = sw * 0.76;
+      const bars = 5;
+      for (let i = 0; i < bars; i++) {
+        const ly = grillY + grillH * (i / (bars - 1));
+        svg.appendChild(svgEl('line', { x1: grillX, y1: ly, x2: grillX + grillW, y2: ly, stroke: 'var(--draw-mull)', 'stroke-width': 1 }));
+      }
+      svg.appendChild(svgEl('rect', { x: grillX, y: grillY, width: grillW, height: grillH, fill: 'none', stroke: 'var(--draw-mull)', 'stroke-width': 1, rx: 1 }));
     }
   }
   if (pType === 'kiep' || pType === 'draaikiep') {
