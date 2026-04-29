@@ -1595,11 +1595,11 @@ function buildConfigShell() {
         <div class="field-row">
           <div class="field">
             <label class="label">Kleur buiten <span id="color-outside-swatch" class="color-swatch"></span></label>
-            <select class="select" id="color-outside">${COLORS.map(c => `<option value="${c.code}">${c.code} ${c.name}</option>`).join('')}</select>
+            <select class="select" id="color-outside">${COLORS.map(c => `<option value="${c.code}">${/^(RAL|DB)/.test(c.code) ? c.code + ' ' : ''}${c.name}</option>`).join('')}</select>
           </div>
           <div class="field">
             <label class="label">Kleur binnen <span id="color-inside-swatch" class="color-swatch"></span></label>
-            <select class="select" id="color-inside"><option value="same">Zelfde als buiten</option>${COLORS.map(c => `<option value="${c.code}">${c.code} ${c.name}</option>`).join('')}</select>
+            <select class="select" id="color-inside"><option value="same">Zelfde als buiten</option>${COLORS.map(c => `<option value="${c.code}">${/^(RAL|DB)/.test(c.code) ? c.code + ' ' : ''}${c.name}</option>`).join('')}</select>
           </div>
         </div>
         <div class="field-row">
