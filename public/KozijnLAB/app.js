@@ -576,6 +576,7 @@ function drawElement(svg, el, opts = {}) {
       rowGeoms.push({ x: cxPx, y: cyPos, w: cwPx, h: rh, row: r });
       drawPane(svg, cxPx, cyPos, cwPx, rh, r, el, sashPx, {
         isFactory,
+        colorHex: isFactory ? null : (colorObj?.hex || null),
       });
       cyPos += rh + transPx;
     });
@@ -720,7 +721,7 @@ function doorPanelsFor(el, row) {
   }));
 }
 
-function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx) {
+function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx, colorHex) {
   const rail = Math.max(4, Math.min(18, profilePx * 0.34, Math.min(w, h) * 0.16));
   const gap = 0;
   const innerX = x + rail;
@@ -739,8 +740,14 @@ function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx) {
         }
       }
     } else {
-      svg.appendChild(svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-door-panel', rx: 1 }));
-      svg.appendChild(svgEl('rect', { x: innerX + 4, y: cy + 4, width: Math.max(1, innerW - 8), height: Math.max(1, ph - 8), class: 'svg-door-panel-inner', rx: 1 }));
+      const panelFill = colorHex ? shade(colorHex, 14) : null;
+      const panelStroke = colorHex ? shade(colorHex, -22) : null;
+      const pEl = svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-door-panel', rx: 1 });
+      if (panelFill) { pEl.setAttribute('fill', panelFill); pEl.setAttribute('stroke', panelStroke); }
+      svg.appendChild(pEl);
+      const piEl = svgEl('rect', { x: innerX + 4, y: cy + 4, width: Math.max(1, innerW - 8), height: Math.max(1, ph - 8), class: 'svg-door-panel-inner', rx: 1 });
+      if (panelStroke) piEl.setAttribute('stroke', panelStroke);
+      svg.appendChild(piEl);
     }
     cy += ph + gap;
   });
@@ -807,17 +814,22 @@ function drawDoorHandle(svg, edgeX, centerY, side, profilePx) {
 
 function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   const isFactory = !!opts.isFactory;
+  const colorHex = opts.colorHex || null;
   const pType = row.paneType;
   const isDoorPane = isDoorPaneType(pType);
   if (isDoorPane) {
     svg.appendChild(svgEl('rect', {
       x: x + 4, y: y + 4, width: w - 8, height: h - 8,
-      fill: 'var(--surface-1)', stroke: 'var(--draw-glass-edge)', 'stroke-width': 1, rx: 2
+      fill: colorHex || 'var(--surface-1)',
+      stroke: colorHex ? shade(colorHex, -30) : 'var(--draw-glass-edge)',
+      'stroke-width': 1, rx: 2
     }));
   } else if (row.fill === 'panel') {
     svg.appendChild(svgEl('rect', {
       x: x + 4, y: y + 4, width: w - 8, height: h - 8,
-      fill: 'var(--surface-3)', stroke: 'var(--draw-mull)', 'stroke-width': 1, rx: 2
+      fill: colorHex ? shade(colorHex, 12) : 'var(--surface-3)',
+      stroke: colorHex ? shade(colorHex, -22) : 'var(--draw-mull)',
+      'stroke-width': 1, rx: 2
     }));
   } else {
     svg.appendChild(svgEl('rect', {
@@ -835,10 +847,15 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   const inset = Math.max(4, Math.min(isDoorPane ? doorPaneProfilePx : sashPx, Math.min(w, h) * (isDoorPane ? 0.16 : 0.12)));
   const isOpenable = ['draai', 'kiep', 'draaikiep', 'deur', 'schuif'].includes(pType);
   if (isOpenable) {
-    svg.appendChild(svgEl('rect', {
+    const sashEl = svgEl('rect', {
       x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset,
       class: 'svg-sash', rx: 1
-    }));
+    });
+    if (colorHex) {
+      sashEl.setAttribute('fill', shade(colorHex, -8));
+      sashEl.setAttribute('stroke', shade(colorHex, -32));
+    }
+    svg.appendChild(sashEl);
   }
 
   const sx = x + inset, sy = y + inset, sw = w - 2 * inset, sh = h - 2 * inset;
@@ -853,7 +870,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   if (pType === 'deur') {
     const hx = hinge === 'left' ? x : x + w;
     const handleX = hinge === 'left' ? x + w : x;
-    drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx);
+    drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx, colorHex);
     svg.appendChild(svgEl('path', { d: `M ${hx} ${y} L ${handleX} ${y + h / 2} L ${hx} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, hinge === 'left' ? sx + sw : sx, sy + sh * 0.5, hinge === 'left' ? 'right' : 'left', doorPaneProfilePx);
     if (shouldDrawDoorHinges(el)) {
@@ -899,12 +916,16 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     const rox = sx + sw / 2 + gap / 2;
     const rw = sw - lw - gap;
     const seamX = x + w / 2;
-    svg.appendChild(svgEl('rect', { x: sx,  y: sy, width: lw, height: sh, class: 'svg-sash', rx: 1 }));
-    svg.appendChild(svgEl('rect', { x: rox, y: sy, width: rw, height: sh, class: 'svg-sash', rx: 1 }));
+    const d2SashAttrs = colorHex ? { fill: shade(colorHex, -8), stroke: shade(colorHex, -32) } : {};
+    const d2L = svgEl('rect', { x: sx,  y: sy, width: lw, height: sh, class: 'svg-sash', rx: 1 });
+    const d2R = svgEl('rect', { x: rox, y: sy, width: rw, height: sh, class: 'svg-sash', rx: 1 });
+    Object.entries(d2SashAttrs).forEach(([k, v]) => { d2L.setAttribute(k, v); d2R.setAttribute(k, v); });
+    svg.appendChild(d2L);
+    svg.appendChild(d2R);
     svg.appendChild(svgEl('line', { x1: seamX, y1: y, x2: seamX, y2: y + h, class: 'svg-sash' }));
     const panels = doorPanelsFor(el, row);
-    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, doorPaneProfilePx);
-    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx);
+    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, doorPaneProfilePx, colorHex);
+    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx, colorHex);
     svg.appendChild(svgEl('path', { d: `M ${x} ${y} L ${seamX} ${y + h / 2} L ${x} ${y + h}`, class: 'svg-op' }));
     svg.appendChild(svgEl('path', { d: `M ${x + w} ${y} L ${seamX} ${y + h / 2} L ${x + w} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, seamX - gap / 2, sy + sh * 0.5, 'right', doorPaneProfilePx);
