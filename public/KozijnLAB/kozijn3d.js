@@ -274,40 +274,41 @@
     return 2;
   }
 
-  // Glass unit — insulating glass with spacer bars and sky reflection
+  // Glass unit — single outdoor pane face to avoid z-fighting with frame depth faces.
+  // Inner panes represented by edge spacer-bar lines only.
   function addGlassUnit(scene, x1, y1, x2, y2, zCenter, row) {
     var layers  = glassLayerCount(row.glassPack);
-    var spacing = layers === 3 ? 14 : 18;   // mm between pane faces
+    var spacing = layers === 3 ? 14 : 18;
     var isSatin = row.glassFinish === "satinato";
-    var glassBase = isSatin ? "#cfdce6" : "#8fcce8";
+    var glassBase = isSatin ? "#cfdce6" : "#92cceb";
 
-    // Outdoor pane (highest z in the unit = closest to viewer)
+    // Only the OUTDOOR (highest z) pane face is drawn as a filled polygon.
+    // This avoids painter's-algo z-fighting between inner glass panes and frame
+    // depth faces which share similar average-z values.
     var zOuter = zCenter + spacing * (layers - 1) * 0.5;
-    var zInner = zCenter - spacing * (layers - 1) * 0.5;
+    var zEdge  = zCenter - spacing * (layers - 1) * 0.5;  // inner edge for spacer lines
 
-    for (var i = 0; i < layers; i++) {
-      var z = zInner + i * spacing;
-      // outdoor pane more solid, inner panes slightly visible for depth cue
-      var a = (i === layers - 1) ? .76 : .52;
-      addFace(scene, rectPoints(x1,y1,x2,y2,z), glassBase, a, "rgba(96,165,250,.22)");
-      addLine(scene,[{x:x1,y:y2,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(255,255,255,.48)",0.9,.76);
-      addLine(scene,[{x:x2,y:y1,z:z+.2},{x:x2,y:y2,z:z+.2}],"rgba(15,23,42,.14)",0.7,.50);
-    }
+    // Main glass face — outdoor pane
+    addFace(scene, rectPoints(x1,y1,x2,y2,zOuter), glassBase, .82, "rgba(96,165,250,.24)");
 
-    // Aluminium spacer bar lines visible on the right and top edges (IGU edge)
-    var spacerColor = "rgba(30,41,59,.36)";
+    // Edge highlights on outdoor face
+    addLine(scene,[{x:x1,y:y2,z:zOuter+.2},{x:x2,y:y2,z:zOuter+.2}],"rgba(255,255,255,.55)",1.0,.80);
+    addLine(scene,[{x:x2,y:y1,z:zOuter+.2},{x:x2,y:y2,z:zOuter+.2}],"rgba(15,23,42,.14)",0.7,.52);
+
+    // Aluminium spacer bar lines at right and top edges (shows IGU thickness)
     if (layers >= 2) {
-      addLine(scene,[{x:x2+4,y:y1,z:zInner},{x:x2+4,y:y1,z:zOuter},{x:x2+4,y:y2,z:zOuter},{x:x2+4,y:y2,z:zInner}], spacerColor, 1.2, .65);
-      addLine(scene,[{x:x1,y:y2+4,z:zInner},{x:x1,y:y2+4,z:zOuter},{x:x2,y:y2+4,z:zOuter},{x:x2,y:y2+4,z:zInner}], spacerColor, 1.2, .58);
+      var sc = "rgba(30,41,59,.38)";
+      addLine(scene,[{x:x2+4,y:y1,z:zEdge},{x:x2+4,y:y1,z:zOuter},{x:x2+4,y:y2,z:zOuter},{x:x2+4,y:y2,z:zEdge}], sc, 1.4, .68);
+      addLine(scene,[{x:x1,y:y2+4,z:zEdge},{x:x1,y:y2+4,z:zOuter},{x:x2,y:y2+4,z:zOuter},{x:x2,y:y2+4,z:zEdge}], sc, 1.4, .60);
     }
 
-    // Sky reflection diagonal stripe on the outdoor pane
+    // Sky-reflection diagonal stripe — subtle, on outdoor face
     addFace(scene, [
       {x:x1+Math.max(10,(x2-x1)*.07), y:y2-Math.max(10,(y2-y1)*.07), z:zOuter+1},
       {x:x1+Math.max(28,(x2-x1)*.20), y:y2-Math.max(10,(y2-y1)*.07), z:zOuter+1},
       {x:x1+Math.max(12,(x2-x1)*.09), y:y2-Math.max(50,(y2-y1)*.52), z:zOuter+1},
       {x:x1+Math.max(2,  (x2-x1)*.01), y:y2-Math.max(50,(y2-y1)*.52), z:zOuter+1}
-    ], "#e0f0ff", .22, "transparent");
+    ], "#e0f0ff", .20, "transparent");
   }
 
   // Tilt-turn / handle (suppressed in house mode)

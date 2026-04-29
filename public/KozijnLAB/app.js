@@ -201,7 +201,7 @@ function normalizeDoorPanels(el) {
   if (!el || el.type !== 'deur') return;
   let panels = Array.isArray(el.doorPanels) ? el.doorPanels : null;
   if (!panels || panels.length === 0) {
-    const rows = (el.columns || []).flatMap(col => col.rows || []);
+    const rows = (el.columns || []).filter(col => !col._isSidelight).flatMap(col => col.rows || []);
     const source = rows.length > 1 ? rows : [rows[0] || {}];
     panels = source.map((r, i) => ({
       heightPct: r.heightPct || (100 / source.length),
@@ -236,7 +236,7 @@ function setDoorPanelCount(el, count) {
 }
 
 function tuindeurRowFrom(el) {
-  const rows = (el.columns || []).flatMap(col => col.rows || []);
+  const rows = (el.columns || []).filter(col => !col._isSidelight).flatMap(col => col.rows || []);
   const src = rows.find(r => isDoorPaneType(r.paneType)) || rows[0] || {};
   return {
     paneType: doorPaneTypeFor(el),
@@ -249,6 +249,14 @@ function tuindeurRowFrom(el) {
   };
 }
 
+function doorColIndex(el) {
+  const idx = (el?.columns || []).findIndex(col => !col._isSidelight);
+  return idx >= 0 ? idx : 0;
+}
+function doorMainRow(el) {
+  return el?.columns?.[doorColIndex(el)]?.rows?.[0];
+}
+
 function applyDoorSubtypeLayout(el) {
   if (!el || el.type !== 'deur') return;
   normalizeDoorPanels(el);
@@ -256,8 +264,28 @@ function applyDoorSubtypeLayout(el) {
   row.paneType = doorPaneTypeFor(el);
   row.heightPct = 100;
   row.fill = el.doorPanels?.some(p => p.fill === 'glass') ? 'glass' : 'panel';
-  el.columns = [{ widthPct: 100, rows: [row] }];
-  el._activeColIdx = 0;
+
+  const opts = el.doorOptions || {};
+  const zijlichtKant = opts.zijlichtKant || (opts.zijlicht ? 'rechts' : null);
+  const sidelightCol = (pct) => ({
+    widthPct: pct,
+    _isSidelight: true,
+    rows: [{ paneType: 'vast', fill: 'glass', heightPct: 100, glassPack: 'HR++', glassFinish: 'clear' }],
+  });
+
+  if (zijlichtKant === 'beide') {
+    el.columns = [sidelightCol(20), { widthPct: 60, rows: [row] }, sidelightCol(20)];
+    el._activeColIdx = 1;
+  } else if (zijlichtKant === 'links') {
+    el.columns = [sidelightCol(25), { widthPct: 75, rows: [row] }];
+    el._activeColIdx = 1;
+  } else if (zijlichtKant === 'rechts') {
+    el.columns = [{ widthPct: 75, rows: [row] }, sidelightCol(25)];
+    el._activeColIdx = 0;
+  } else {
+    el.columns = [{ widthPct: 100, rows: [row] }];
+    el._activeColIdx = 0;
+  }
   el._activeRowIdx = 0;
 }
 
@@ -323,18 +351,21 @@ function priceElement(el) {
   } else if (el.type === 'deur') {
     const sub = el.doorSubtype || 'voordeur';
     const opts = el.doorOptions || {};
+    const zijlichtKant = opts.zijlichtKant || (opts.zijlicht ? 'rechts' : null);
     if (sub === 'voordeur') {
       base = opts.epkSchuin ? 4892.5 : 4738;
       if (opts.briefklep)        base += 257.5;
       if (opts.briefbak)         base += 154.5;
       if (opts.draadlozeBel)     base += 103;
-      if (opts.zijlicht)         base += 257.5;
+      if (zijlichtKant === 'beide') base += 515;
+      else if (zijlichtKant)    base += 257.5;
       if (opts.bovenlicht)       base += 257.5;
       if (opts.dddPaneel)        base += 1545;
       if (opts.paneelSierrooster) base += 2575;
     } else if (sub === 'achterdeur') {
       base = 3811;
-      if (opts.zijlicht)   base += 257.5;
+      if (zijlichtKant === 'beide') base += 515;
+      else if (zijlichtKant)   base += 257.5;
       if (opts.bovenlicht) base += 257.5;
       if (opts.dddPaneel)  base += 1545;
     } else if (sub === 'tuindeur') {
@@ -1132,12 +1163,52 @@ function renderConfig() {
     };
     const opts = el.doorOptions || {};
     const optsList = root.querySelector('#door-opts-list');
-    optsList.innerHTML = (DOOR_OPTS[sub] || []).map(o => `
-      <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;">
+    optsList.innerHTML = (DOOR_OPTS[sub] || []).map(o => {
+      if (o.key === 'zijlicht') {
+        const kant = opts.zijlichtKant || (opts.zijlicht ? 'rechts' : '');
+        const active = !!kant;
+        return `<div>
+          <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="zijlicht-toggle" ${active ? 'checked' : ''}/>
+            <span style="flex:1">${o.label}</span>
+            <span style="color:var(--text-muted);font-size:12px;">+${fmtEuro(o.price)}–${fmtEuro(o.price * 2)}</span>
+          </label>
+          <div id="zijlicht-sub" style="display:${active ? 'flex' : 'none'};padding-left:24px;gap:14px;flex-wrap:wrap;font-size:12px;padding-bottom:6px;">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="rechts" ${kant==='rechts'?'checked':''}/> Rechts</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="links" ${kant==='links'?'checked':''}/> Links</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="beide" ${kant==='beide'?'checked':''}/> Beide kanten</label>
+          </div>
+        </div>`;
+      }
+      return `<label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;">
         <input type="checkbox" data-door-opt="${o.key}" ${opts[o.key] ? 'checked' : ''}/>
         <span style="flex:1">${o.label}</span>
         <span style="color:var(--text-muted);font-size:12px;">+${fmtEuro(o.price)}</span>
-      </label>`).join('');
+      </label>`;
+    }).join('');
+
+    const zijlichtToggle = optsList.querySelector('#zijlicht-toggle');
+    if (zijlichtToggle) {
+      zijlichtToggle.onchange = () => {
+        if (!el.doorOptions) el.doorOptions = {};
+        if (zijlichtToggle.checked) {
+          el.doorOptions.zijlichtKant = el.doorOptions.zijlichtKant || 'rechts';
+          delete el.doorOptions.zijlicht;
+        } else {
+          delete el.doorOptions.zijlichtKant;
+          delete el.doorOptions.zijlicht;
+        }
+        render();
+      };
+    }
+    optsList.querySelectorAll('[name="zijlichtKant"]').forEach(radio => {
+      radio.onchange = () => {
+        if (!el.doorOptions) el.doorOptions = {};
+        el.doorOptions.zijlichtKant = radio.value;
+        delete el.doorOptions.zijlicht;
+        render();
+      };
+    });
     optsList.querySelectorAll('[data-door-opt]').forEach(cb => {
       cb.onchange = () => {
         if (!el.doorOptions) el.doorOptions = {};
@@ -1298,7 +1369,7 @@ function renderDoorPanelControls(root, el) {
   const activeIdx = Math.min(el._activeDoorPanelIdx || 0, panels.length - 1);
   el._activeDoorPanelIdx = activeIdx;
   const activePanel = panels[activeIdx];
-  const mainRow = el.columns?.[0]?.rows?.[0] || {};
+  const mainRow = doorMainRow(el) || {};
 
   const hingeField = root.querySelector('#door-hinge-field');
   hingeField.style.display = (el.doorSubtype || 'voordeur') === 'tuindeur' ? 'none' : '';
@@ -1497,12 +1568,12 @@ function bindConfigShell() {
     if (t.id === 'height-mm') { el.heightMM = Math.max(400, +t.value || 1400); render(); return; }
     if (t.id === 'door-panels-count') { setDoorPanelCount(el, t.value); render(); return; }
     if (t.id === 'door-hinge') {
-      const row = el.columns?.[0]?.rows?.[0];
+      const row = doorMainRow(el);
       if (row) row.hinge = t.value;
       render(); return;
     }
     if (t.id === 'door-hinge-style') {
-      const row = el.columns?.[0]?.rows?.[0];
+      const row = doorMainRow(el);
       if (row) row.hingeStyle = t.value;
       render(); return;
     }
@@ -1560,12 +1631,12 @@ function bindConfigShell() {
   root.addEventListener('change', e => {
     const el = activeElement();
     if (e.target.id === 'door-hinge') {
-      const row = el.columns?.[0]?.rows?.[0];
+      const row = doorMainRow(el);
       if (row) row.hinge = e.target.value;
       render(); return;
     }
     if (e.target.id === 'door-hinge-style') {
-      const row = el.columns?.[0]?.rows?.[0];
+      const row = doorMainRow(el);
       if (row) row.hingeStyle = e.target.value;
       render(); return;
     }
