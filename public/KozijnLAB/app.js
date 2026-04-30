@@ -628,6 +628,8 @@ function drawElement(svg, el, opts = {}) {
   const colorObj = COLORS.find(c => c.code === el.colorOutside);
   const sashCode = (el.colorSash && el.colorSash !== 'same') ? el.colorSash : el.colorOutside;
   const sashColorObj = COLORS.find(c => c.code === sashCode);
+  const panelCode = (el.colorPanel && el.colorPanel !== 'same') ? el.colorPanel : null;
+  const panelColorObj = panelCode ? COLORS.find(c => c.code === panelCode) : null;
   if (!isFactory && colorObj) {
     svg.querySelectorAll('.svg-frame').forEach(r => {
       r.style.fill = colorObj.hex;
@@ -675,6 +677,7 @@ function drawElement(svg, el, opts = {}) {
         isFactory,
         colorHex: isFactory ? null : (colorObj?.hex || null),
         sashColorHex: isFactory ? null : (sashColorObj?.hex || colorObj?.hex || null),
+        panelColorHex: isFactory ? null : (panelColorObj?.hex || colorObj?.hex || null),
       });
       cyPos += rh + transPx;
     });
@@ -1080,6 +1083,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   const isFactory = !!opts.isFactory;
   const colorHex = opts.colorHex || null;
   const sashColorHex = opts.sashColorHex || colorHex;
+  const panelColorHex = opts.panelColorHex || colorHex;
   const pType = row.paneType;
   const isDoorPane = isDoorPaneType(pType);
   const isOpenable = ['draai', 'kiep', 'draaikiep', 'deur', 'schuif'].includes(pType);
@@ -1100,8 +1104,8 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     svg.appendChild(profBg);
     if (row.fill === 'panel') {
       const panEl = svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, rx: 1 });
-      panEl.style.fill = shade(sashColorHex, 12);
-      panEl.style.stroke = shade(sashColorHex, -22);
+      panEl.style.fill = shade(panelColorHex, 12);
+      panEl.style.stroke = shade(panelColorHex, -22);
       svg.appendChild(panEl);
     } else {
       const glEl = svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, class: 'svg-glass', rx: 1 });
@@ -1116,8 +1120,8 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   } else if (row.fill === 'panel') {
     svg.appendChild(svgEl('rect', {
       x: x + 4, y: y + 4, width: w - 8, height: h - 8,
-      fill: colorHex ? shade(colorHex, 12) : 'var(--surface-3)',
-      stroke: colorHex ? shade(colorHex, -22) : 'var(--draw-mull)',
+      fill: panelColorHex ? shade(panelColorHex, 12) : 'var(--surface-3)',
+      stroke: panelColorHex ? shade(panelColorHex, -22) : 'var(--draw-mull)',
       'stroke-width': 1, rx: 2
     }));
   } else {
