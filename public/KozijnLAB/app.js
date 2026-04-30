@@ -892,6 +892,15 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
       sashEl.style.stroke = shade(sashColorHex, -32);
     }
     svg.appendChild(sashEl);
+    // Redraw glass inside the profile so only the rim shows the profile color
+    if (sashColorHex && !isDoorPane && row.fill === 'glass') {
+      const gi = svgEl('rect', {
+        x: x + inset + 2, y: y + inset + 2,
+        width: Math.max(1, w - 2 * inset - 4), height: Math.max(1, h - 2 * inset - 4),
+        class: 'svg-glass', rx: 1
+      });
+      svg.appendChild(gi);
+    }
   }
 
   const sx = x + inset, sy = y + inset, sw = w - 2 * inset, sh = h - 2 * inset;
@@ -906,7 +915,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   if (pType === 'deur') {
     const hx = hinge === 'left' ? x : x + w;
     const handleX = hinge === 'left' ? x + w : x;
-    drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx, colorHex);
+    drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx, sashColorHex);
     svg.appendChild(svgEl('path', { d: `M ${hx} ${y} L ${handleX} ${y + h / 2} L ${hx} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, hinge === 'left' ? sx + sw : sx, sy + sh * 0.5, hinge === 'left' ? 'right' : 'left', doorPaneProfilePx);
     if (shouldDrawDoorHinges(el)) {
@@ -961,8 +970,8 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     svg.appendChild(d2R);
     svg.appendChild(svgEl('line', { x1: seamX, y1: y, x2: seamX, y2: y + h, class: 'svg-sash' }));
     const panels = doorPanelsFor(el, row);
-    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, doorPaneProfilePx, colorHex);
-    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx, colorHex);
+    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, doorPaneProfilePx, sashColorHex);
+    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx, sashColorHex);
     svg.appendChild(svgEl('path', { d: `M ${x} ${y} L ${seamX} ${y + h / 2} L ${x} ${y + h}`, class: 'svg-op' }));
     svg.appendChild(svgEl('path', { d: `M ${x + w} ${y} L ${seamX} ${y + h / 2} L ${x + w} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, seamX - gap / 2, sy + sh * 0.5, 'right', doorPaneProfilePx);
