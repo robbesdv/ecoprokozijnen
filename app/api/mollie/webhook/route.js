@@ -79,29 +79,69 @@ export async function POST(request) {
 
     const { data: order } = await supabase
       .from('orders')
-      .select('id, customer_name, customer_address, total_amount, payment_split, crm_reference')
+      .select('id, customer_name, customer_email, customer_address, total_amount, payment_split, crm_reference, portal_token, phase_id')
       .eq('id', orderId)
       .single()
 
+    if (!order) return new Response('OK', { status: 200 })
+
     const updates = {}
+    let notifyType = null
+    let notifyExtra = {}
+
     if (paymentType === 'deposit') {
       updates.deposit_confirmed = true
       updates.deposit_notified = true
       updates.phase_id = 2
+      notifyType = 'aanbetaling_bevestigd'
     } else if (paymentType === 'main') {
       updates.main_payment_confirmed = true
       updates.main_payment_notified = true
+      // full_80 is financially complete → advance to phase 7
+      if (order.payment_split === 'full_80') {
+        updates.phase_id = 7
+        updates.completed_at = new Date().toISOString()
+      }
+      notifyType = 'betaling_bevestigd'
+      notifyExtra = {
+        amount: Number(payment.amount?.value || 0),
+        final: false,
+      }
     } else if (paymentType === 'final') {
       updates.final_payment_confirmed = true
       updates.phase_id = 7
+      updates.completed_at = new Date().toISOString()
+      notifyType = 'betaling_bevestigd'
+      notifyExtra = {
+        amount: Number(payment.amount?.value || 0),
+        final: true,
+      }
     }
 
+    const prevPhase = order.phase_id
     await supabase.from('orders').update(updates).eq('id', orderId)
 
-    if (order) {
-      const amount = payment.amount?.value || 0
-      await sendAdminEmail(order, paymentType, amount)
+    // Log phase change
+    if (updates.phase_id && updates.phase_id !== prevPhase) {
+      await supabase.from('status_history').insert({
+        order_id: orderId,
+        from_phase: prevPhase,
+        to_phase: updates.phase_id,
+        changed_by: 'mollie_webhook',
+      }).catch(() => {})
     }
+
+    // Send customer notification
+    if (notifyType && order.customer_email) {
+      await fetch(`${BASE_URL}/api/notify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order, type: notifyType, extra: notifyExtra }),
+      }).catch(() => {})
+    }
+
+    const amount = payment.amount?.value || 0
+    await sendAdminEmail(order, paymentType, amount)
 
     return new Response('OK', { status: 200 })
   } catch (err) {
