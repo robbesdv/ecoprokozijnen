@@ -489,6 +489,7 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
 /* Fields */
 .field { display: grid; gap: 5px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.check-label { display: flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; user-select: none; }
 .label {
   font-size: 12px;
   color: var(--text-muted);

@@ -458,7 +458,7 @@ function priceElement(el) {
       const pack = r.glassPack || el.glassPack || 'HR++';
       if (pack === 'HR+++') glassUpgrade += am2 * 105;
       if (pack === 'Triple') glassUpgrade += am2 * 105;
-      if (pack === 'Gelaagd') glassUpgrade += am2 * 48.40;
+      if (r.gelaagd) glassUpgrade += am2 * 48.40;
       if (r.glassFinish === 'satinato') glassUpgrade += am2 * 20;
       if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
     }));
@@ -1714,6 +1714,7 @@ function renderConfig() {
   if (showGlass) {
     glassFields.querySelector('#glass-pack').value = activeRow.glassPack || 'HR++';
     glassFields.querySelector('#glass-finish').value = activeRow.glassFinish || 'clear';
+    glassFields.querySelector('#glass-gelaagd').checked = !!activeRow.gelaagd;
   }
   if (isDoor) {
     hingeField.style.display = 'none';
@@ -1806,6 +1807,7 @@ function renderDoorPanelControls(root, el) {
   if (activePanel.fill === 'glass') {
     root.querySelector('#door-panel-glass-pack').value = activePanel.glassPack || 'HR++';
     root.querySelector('#door-panel-glass-finish').value = activePanel.glassFinish || 'clear';
+    root.querySelector('#door-panel-glass-gelaagd').checked = !!activePanel.gelaagd;
   }
 }
 
@@ -1891,12 +1893,13 @@ function buildConfigShell() {
         <div id="glass-fields" style="display:none">
           <div class="field-row">
             <div class="field"><label class="label">Beglazing</label>
-              <select class="select" id="glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option><option value="Gelaagd">Gelaagd (+€40/m²)</option></select>
+              <select class="select" id="glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option></select>
             </div>
             <div class="field"><label class="label">Afwerking</label>
               <select class="select" id="glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
             </div>
           </div>
+          <div class="field"><label class="check-label"><input type="checkbox" id="glass-gelaagd"/> Gelaagd glas <span class="label-hint">(+€40/m²)</span></label></div>
         </div>
         <div id="door-vakken-fields" style="display:none">
           <div class="field">
@@ -1914,12 +1917,13 @@ function buildConfigShell() {
           <div id="door-glass-fields" style="display:none">
             <div class="field-row">
               <div class="field"><label class="label">Beglazing</label>
-                <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option><option value="Gelaagd">Gelaagd (+€40/m²)</option></select>
+                <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option></select>
               </div>
               <div class="field"><label class="label">Afwerking</label>
                 <select class="select" id="door-panel-glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
               </div>
             </div>
+            <div class="field"><label class="check-label"><input type="checkbox" id="door-panel-glass-gelaagd"/> Gelaagd glas <span class="label-hint">(+€40/m²)</span></label></div>
           </div>
         </div>
       </div>
@@ -2038,6 +2042,7 @@ function bindConfigShell() {
     if (t.id === 'finish-inside') { el.finishInside = t.value; render(); return; }
     if (t.id === 'glass-pack') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassPack = t.value; render(); return; }
     if (t.id === 'glass-finish') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassFinish = t.value; render(); return; }
+    if (t.id === 'glass-gelaagd') { el.columns[el._activeColIdx].rows[el._activeRowIdx].gelaagd = t.checked; render(); return; }
     if (t.id === 'montage') { state.montageEuro = +t.value || 0; render(); return; }
     if (t.id === 'discount') { state.discountPct = +t.value || 0; render(); return; }
     if (t.id === 'project-notes') { state.notes = t.value; saveState(); return; }
@@ -2072,6 +2077,11 @@ function bindConfigShell() {
     if (e.target.id === 'door-panel-glass-finish') {
       normalizeDoorPanels(el);
       el.doorPanels[el._activeDoorPanelIdx || 0].glassFinish = e.target.value;
+      render(); return;
+    }
+    if (e.target.id === 'door-panel-glass-gelaagd') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].gelaagd = e.target.checked;
       render(); return;
     }
     if (e.target.closest('#hinge-style-field')) {
