@@ -456,8 +456,7 @@ function priceElement(el) {
       const rowH = el.heightMM * (r.heightPct / 100);
       const am2 = (colW * rowH) / 1e6;
       const pack = r.glassPack || el.glassPack || 'HR++';
-      if (pack === 'HR+++') glassUpgrade += am2 * 105;
-      if (pack === 'Triple') glassUpgrade += am2 * 105;
+      if (pack === 'HR+++' || pack === 'Triple') glassUpgrade += am2 * 105;
       if (r.gelaagd) glassUpgrade += am2 * 48.40;
       if (r.glassFinish === 'satinato') glassUpgrade += am2 * 20;
       if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
@@ -1893,7 +1892,7 @@ function buildConfigShell() {
         <div id="glass-fields" style="display:none">
           <div class="field-row">
             <div class="field"><label class="label">Beglazing</label>
-              <select class="select" id="glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option></select>
+              <select class="select" id="glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ / Triple (Ug 0.5)</option></select>
             </div>
             <div class="field"><label class="label">Afwerking</label>
               <select class="select" id="glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
@@ -1917,7 +1916,7 @@ function buildConfigShell() {
           <div id="door-glass-fields" style="display:none">
             <div class="field-row">
               <div class="field"><label class="label">Beglazing</label>
-                <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option></select>
+                <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ / Triple (Ug 0.5)</option></select>
               </div>
               <div class="field"><label class="label">Afwerking</label>
                 <select class="select" id="door-panel-glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
