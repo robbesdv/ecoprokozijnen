@@ -652,6 +652,7 @@ function Phase0({ order, onRefresh, showToast }) {
   const [showSign, setShowSign] = useState(false)
   const [signName, setSignName] = useState('')
   const [signError, setSignError] = useState('')
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   const items = (order.order_items || []).sort((a, b) => a.sort_order - b.sort_order)
   const expired = order.quote_expires_at && new Date(order.quote_expires_at) < new Date()
@@ -1063,6 +1064,11 @@ function Phase0({ order, onRefresh, showToast }) {
       return
     }
 
+    if (!termsAccepted) {
+      setSignError('Ga akkoord met de algemene voorwaarden om door te gaan')
+      return
+    }
+
     setAccepting(true)
 
     await supabase
@@ -1082,9 +1088,11 @@ function Phase0({ order, onRefresh, showToast }) {
       changed_by: 'klant',
     })
 
-    showToast('Akkoord bevestigd! Wij nemen spoedig contact op.')
+    showToast('Akkoord bevestigd! U wordt doorgestuurd naar de betalingspagina.')
     setAccepting(false)
     setShowSign(false)
+    setSignName('')
+    setTermsAccepted(false)
     onRefresh()
   }
 
@@ -1300,11 +1308,45 @@ function Phase0({ order, onRefresh, showToast }) {
                   borderRadius: 10,
                   padding: '12px 14px',
                   fontSize: 14,
-                  marginBottom: 10,
+                  marginBottom: 14,
                   outline: 'none',
                   background: 'white',
                 }}
               />
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  fontSize: 13,
+                  color: 'var(--text)',
+                  lineHeight: 1.5,
+                  marginBottom: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => {
+                    setTermsAccepted(e.target.checked)
+                    if (signError) setSignError('')
+                  }}
+                  style={{ marginTop: 2, flexShrink: 0, accentColor: 'var(--brand)' }}
+                />
+                <span>
+                  Ik ga akkoord met de{' '}
+                  <a
+                    href="/algemene-voorwaarden"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--brand)', textDecoration: 'underline' }}
+                  >
+                    algemene voorwaarden
+                  </a>
+                </span>
+              </label>
 
               {signError && (
                 <div className="notice notice-danger" style={{ marginBottom: 10 }}>
@@ -1329,6 +1371,7 @@ function Phase0({ order, onRefresh, showToast }) {
                     setShowSign(false)
                     setSignName('')
                     setSignError('')
+                    setTermsAccepted(false)
                   }}
                 >
                   Annuleren
