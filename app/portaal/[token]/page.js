@@ -1482,7 +1482,7 @@ function Phase1({ order, onRefresh, showToast }) {
         reference={`Aanbetaling ${order.id.slice(0, 8).toUpperCase()}`}
       />
 
-      <iDEALButton order={order} paymentType="deposit" label={`Betaal ${formatEuro(deposit)} via iDEAL`} />
+      <IDealButton order={order} paymentType="deposit" label={`Betaal ${formatEuro(deposit)} via iDEAL`} />
 
       <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
 
@@ -1748,7 +1748,7 @@ function Phase6({ order, onRefresh, showToast }) {
             reference={`Restbetaling ${order.id.slice(0, 8).toUpperCase()}`}
           />
 
-          <iDEALButton order={order} paymentType="main" label={`Betaal ${formatEuro(calcMain(order.total_amount, order.payment_split))} via iDEAL`} />
+          <IDealButton order={order} paymentType="main" label={`Betaal ${formatEuro(calcMain(order.total_amount, order.payment_split))} via iDEAL`} />
 
           <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
 
@@ -1818,7 +1818,7 @@ function Phase6({ order, onRefresh, showToast }) {
                   reference={`Slotbetaling ${order.id.slice(0, 8).toUpperCase()}`}
                 />
 
-                <iDEALButton order={order} paymentType="final" label={`Betaal ${formatEuro(calcFinal(order.total_amount))} via iDEAL`} />
+                <IDealButton order={order} paymentType="final" label={`Betaal ${formatEuro(calcFinal(order.total_amount))} via iDEAL`} />
 
                 <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
 
@@ -2190,7 +2190,7 @@ function Phase7({ order, showToast }) {
   )
 }
 
-function iDEALButton({ order, paymentType, label }) {
+function IDealButton({ order, paymentType, label }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
