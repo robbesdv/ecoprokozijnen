@@ -771,7 +771,11 @@ function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx, colorHex) {
   panels.forEach((panel, i) => {
     const ph = innerH * (panel.heightPct / 100);
     if (panel.fill === 'glass') {
-      svg.appendChild(svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-glass svg-door-panel-fill', rx: 1 }));
+      const glEl = svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-glass svg-door-panel-fill', rx: 1 });
+      // When door has a profile color, the glass composites over a dark background.
+      // Override opacity so the glass shows at its CSS fill color without the dark overlay.
+      if (colorHex) glEl.style.opacity = '1';
+      svg.appendChild(glEl);
       if (panel.glassFinish === 'satinato') {
         for (let ly = cy + 4; ly < cy + ph - 2; ly += 6) {
           svg.appendChild(svgEl('line', { x1: innerX + 4, y1: ly, x2: innerX + innerW - 4, y2: ly, stroke: 'rgba(255,255,255,.62)', 'stroke-width': .5 }));
@@ -856,10 +860,35 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   const sashColorHex = opts.sashColorHex || colorHex;
   const pType = row.paneType;
   const isDoorPane = isDoorPaneType(pType);
+  const isOpenable = ['draai', 'kiep', 'draaikiep', 'deur', 'schuif'].includes(pType);
+  const doorPaneProfilePx = isDoorPane && el.type !== 'deur' ? sashPx * 2 : sashPx;
+  const inset = Math.max(4, Math.min(isDoorPane ? doorPaneProfilePx : sashPx, Math.min(w, h) * (isDoorPane ? 0.16 : 0.12)));
+
   if (isDoorPane) {
+    // Door: sash-color background rect covers the full pane interior
     const doorBg = svgEl('rect', { x: x + 4, y: y + 4, width: w - 8, height: h - 8, 'stroke-width': 1, rx: 2, class: 'svg-frame' });
     if (sashColorHex) { doorBg.style.fill = sashColorHex; doorBg.style.stroke = shade(sashColorHex, -30); }
     svg.appendChild(doorBg);
+  } else if (isOpenable && sashColorHex) {
+    // Openable kozijn pane with a sash color: draw the sash profile as background at x+4,
+    // then draw glass/panel INSIDE at x+inset — the visible rim (inset-4 px) shows the profile color.
+    const profBg = svgEl('rect', { x: x + 4, y: y + 4, width: w - 8, height: h - 8, rx: 2 });
+    profBg.style.fill = shade(sashColorHex, -8);
+    profBg.style.stroke = shade(sashColorHex, -30);
+    svg.appendChild(profBg);
+    if (row.fill === 'panel') {
+      const panEl = svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, rx: 1 });
+      panEl.style.fill = shade(sashColorHex, 12);
+      panEl.style.stroke = shade(sashColorHex, -22);
+      svg.appendChild(panEl);
+    } else {
+      svg.appendChild(svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, class: 'svg-glass', rx: 1 }));
+      if (row.glassFinish === 'satinato') {
+        for (let i = 0; i < h - 2 * inset; i += 6) {
+          svg.appendChild(svgEl('line', { x1: x + inset + 2, y1: y + inset + i, x2: x + w - inset - 2, y2: y + inset + i, stroke: 'rgba(255,255,255,.6)', 'stroke-width': .5 }));
+        }
+      }
+    }
   } else if (row.fill === 'panel') {
     svg.appendChild(svgEl('rect', {
       x: x + 4, y: y + 4, width: w - 8, height: h - 8,
@@ -868,10 +897,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
       'stroke-width': 1, rx: 2
     }));
   } else {
-    svg.appendChild(svgEl('rect', {
-      x: x + 4, y: y + 4, width: w - 8, height: h - 8,
-      class: 'svg-glass', rx: 2
-    }));
+    svg.appendChild(svgEl('rect', { x: x + 4, y: y + 4, width: w - 8, height: h - 8, class: 'svg-glass', rx: 2 }));
     if (row.glassFinish === 'satinato') {
       for (let i = 0; i < h; i += 6) {
         svg.appendChild(svgEl('line', { x1: x + 6, y1: y + 4 + i, x2: x + w - 6, y2: y + 4 + i, stroke: 'rgba(255,255,255,.6)', 'stroke-width': .5 }));
@@ -879,28 +905,13 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     }
   }
 
-  const doorPaneProfilePx = isDoorPane && el.type !== 'deur' ? sashPx * 2 : sashPx;
-  const inset = Math.max(4, Math.min(isDoorPane ? doorPaneProfilePx : sashPx, Math.min(w, h) * (isDoorPane ? 0.16 : 0.12)));
-  const isOpenable = ['draai', 'kiep', 'draaikiep', 'deur', 'schuif'].includes(pType);
+  // Sash rect: stroke-only (CSS svg-sash has fill:none). When colored, tint the stroke.
+  // For openable+sashColorHex kozijn panes, the profBg already provides the fill.
+  // For door panes, doorBg already provides the fill — keep sash stroke-only so door leaf glass isn't darkened.
   if (isOpenable) {
-    const sashEl = svgEl('rect', {
-      x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset,
-      class: 'svg-sash', rx: 1
-    });
-    if (sashColorHex) {
-      sashEl.style.fill = shade(sashColorHex, -8);
-      sashEl.style.stroke = shade(sashColorHex, -32);
-    }
+    const sashEl = svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, class: 'svg-sash', rx: 1 });
+    if (sashColorHex) sashEl.style.stroke = shade(sashColorHex, -40);
     svg.appendChild(sashEl);
-    // Redraw glass inside the profile so only the rim shows the profile color
-    if (sashColorHex && !isDoorPane && row.fill === 'glass') {
-      const gi = svgEl('rect', {
-        x: x + inset + 2, y: y + inset + 2,
-        width: Math.max(1, w - 2 * inset - 4), height: Math.max(1, h - 2 * inset - 4),
-        class: 'svg-glass', rx: 1
-      });
-      svg.appendChild(gi);
-    }
   }
 
   const sx = x + inset, sy = y + inset, sw = w - 2 * inset, sh = h - 2 * inset;
@@ -964,7 +975,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     const d2L = svgEl('rect', { x: sx,  y: sy, width: lw, height: sh, class: 'svg-sash', rx: 1 });
     const d2R = svgEl('rect', { x: rox, y: sy, width: rw, height: sh, class: 'svg-sash', rx: 1 });
     if (sashColorHex) {
-      [d2L, d2R].forEach(el => { el.style.fill = shade(sashColorHex, -8); el.style.stroke = shade(sashColorHex, -32); });
+      [d2L, d2R].forEach(el => { el.style.stroke = shade(sashColorHex, -40); });
     }
     svg.appendChild(d2L);
     svg.appendChild(d2R);
@@ -1369,25 +1380,28 @@ function renderConfig() {
 
   // Column widths (with drag-sync)
   const colDims = root.querySelector('#col-dims');
-  colDims.innerHTML = el.columns.map((c, i) => `
-    <div class="dim-row">
-      <span class="dim-tag">K${i + 1}</span>
-      <div class="input-wrap">
-        <input class="input mono col-w" data-i="${i}" type="number" value="${Math.round(el.widthMM * c.widthPct / 100)}" step="1"/>
-        <span class="input-suffix">mm</span>
-      </div>
-      <button class="btn btn-sm btn-ghost" data-eq="${i}" title="Verdeel gelijk">⇋</button>
-    </div>`).join('');
+  if (!colDims.querySelector('.col-w:focus')) {
+    colDims.innerHTML = el.columns.map((c, i) => `
+      <div class="dim-row">
+        <span class="dim-tag">K${i + 1}</span>
+        <div class="input-wrap">
+          <input class="input mono col-w" data-i="${i}" type="number" value="${Math.round(el.widthMM * c.widthPct / 100)}" step="1"/>
+          <span class="input-suffix">mm</span>
+        </div>
+        <button class="btn btn-sm btn-ghost" data-eq="${i}" title="Verdeel gelijk">⇋</button>
+      </div>`).join('');
+  }
   colDims.querySelectorAll('.col-w').forEach(inp => {
-    inp.oninput = () => {
+    inp.onchange = () => {
       const i = +inp.dataset.i;
-      const v = Math.max(150, +inp.value || 0);
+      const v = Math.max(150, +inp.value || 150);
+      inp.value = v;
       const others = el.columns.filter((_, j) => j !== i);
       const remPct = 100 - (v / el.widthMM) * 100;
       const otherSum = others.reduce((a, c) => a + c.widthPct, 0);
       el.columns[i].widthPct = (v / el.widthMM) * 100;
       others.forEach(c => c.widthPct = otherSum > 0 ? (c.widthPct / otherSum) * remPct : remPct / others.length);
-      render();
+      saveState(); render();
     };
   });
   colDims.querySelectorAll('[data-eq]').forEach(b => {
@@ -1405,25 +1419,28 @@ function renderConfig() {
 
   // Row heights
   const rowDims = root.querySelector('#row-dims');
-  rowDims.innerHTML = activeCol.rows.map((r, i) => `
-    <div class="dim-row">
-      <span class="dim-tag">V${i + 1}</span>
-      <div class="input-wrap">
-        <input class="input mono row-h" data-i="${i}" type="number" value="${Math.round(el.heightMM * r.heightPct / 100)}" step="1"/>
-        <span class="input-suffix">mm</span>
-      </div>
-      <button class="btn btn-sm btn-ghost" data-eq="${i}">⇋</button>
-    </div>`).join('');
+  if (!rowDims.querySelector('.row-h:focus')) {
+    rowDims.innerHTML = activeCol.rows.map((r, i) => `
+      <div class="dim-row">
+        <span class="dim-tag">V${i + 1}</span>
+        <div class="input-wrap">
+          <input class="input mono row-h" data-i="${i}" type="number" value="${Math.round(el.heightMM * r.heightPct / 100)}" step="1"/>
+          <span class="input-suffix">mm</span>
+        </div>
+        <button class="btn btn-sm btn-ghost" data-eq="${i}">⇋</button>
+      </div>`).join('');
+  }
   rowDims.querySelectorAll('.row-h').forEach(inp => {
-    inp.oninput = () => {
+    inp.onchange = () => {
       const i = +inp.dataset.i;
-      const v = Math.max(150, +inp.value || 0);
+      const v = Math.max(150, +inp.value || 150);
+      inp.value = v;
       const others = activeCol.rows.filter((_, j) => j !== i);
       const remPct = 100 - (v / el.heightMM) * 100;
       const otherSum = others.reduce((a, r) => a + r.heightPct, 0);
       activeCol.rows[i].heightPct = (v / el.heightMM) * 100;
       others.forEach(r => r.heightPct = otherSum > 0 ? (r.heightPct / otherSum) * remPct : remPct / others.length);
-      render();
+      saveState(); render();
     };
   });
   rowDims.querySelectorAll('[data-eq]').forEach(b => {
