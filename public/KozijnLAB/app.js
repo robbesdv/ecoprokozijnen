@@ -46,10 +46,11 @@ const COLORS = [
 ];
 
 const ELEMENT_TYPES = [
-  { id: 'kozijn', label: 'Kozijn', icon: 'kozijn' },
-  { id: 'deur', label: 'Deur', icon: 'deur' },
-  { id: 'schuifpui', label: 'Schuifpui', icon: 'schuif' },
-  { id: 'dakraam', label: 'Dakraam', icon: 'dak' },
+  { id: 'kozijn',    label: 'Kozijn',        icon: 'kozijn' },
+  { id: 'deur',     label: 'Deur',           icon: 'deur'   },
+  { id: 'schuifpui',label: 'Schuifpui',      icon: 'schuif' },
+  { id: 'hefschuif',label: 'Hef-schuifpui',  icon: 'schuif' },
+  { id: 'dakraam',  label: 'Dakraam',        icon: 'dak'    },
 ];
 
 const PANE_TYPES = {
@@ -197,8 +198,17 @@ function newElement(type = 'kozijn', name = '') {
     base.doorPanels = [defaultDoorPanel('panel')];
     base.columns = [{ widthPct: 100, rows: [{ paneType: 'deur', hinge: 'left', hingeStyle: 'flag', fill: 'panel', heightPct: 100 }] }];
   }
-  if (type === 'schuifpui' || type === 'hefschuif') {
+  if (type === 'schuifpui') {
     base.widthMM = 3000; base.heightMM = 2300;
+    base.slideSystem = 'psk';
+    base.columns = [
+      { widthPct: 50, rows: [{ paneType: 'schuif', heightPct: 100, fill: 'glass', glassPack: 'HR++' }] },
+      { widthPct: 50, rows: [{ paneType: 'vast', heightPct: 100, fill: 'glass', glassPack: 'HR++' }] },
+    ];
+  }
+  if (type === 'hefschuif') {
+    base.widthMM = 3000; base.heightMM = 2300;
+    base.slideSystem = 'hst';
     base.columns = [
       { widthPct: 50, rows: [{ paneType: 'schuif', heightPct: 100, fill: 'glass', glassPack: 'HR++' }] },
       { widthPct: 50, rows: [{ paneType: 'vast', heightPct: 100, fill: 'glass', glassPack: 'HR++' }] },
@@ -212,7 +222,7 @@ function newElement(type = 'kozijn', name = '') {
 }
 
 function autoName(type) {
-  const labels = { kozijn: 'Kozijn', deur: 'Deur', schuifpui: 'Schuifpui', hefschuif: 'Hefschuif', dakraam: 'Dakraam' };
+  const labels = { kozijn: 'Kozijn', deur: 'Deur', schuifpui: 'Schuifpui', hefschuif: 'Hef-schuifpui', dakraam: 'Dakraam' };
   return labels[type] + ' ' + (state?.elements?.length ? state.elements.length + 1 : 1);
 }
 
@@ -231,7 +241,7 @@ function newProject() {
   };
 }
 
-let state = loadState() || newProject();
+let state = newProject();
 
 function loadState() {
   try {
@@ -258,10 +268,8 @@ function activeElement() {
 
 function normalizeElementType(el) {
   if (!el) return el;
-  if (el.type === 'hefschuif') {
-    el.type = 'schuifpui';
-    el.slideSystem = 'hst';
-  }
+  if (el.type === 'hefschuif' && !el.slideSystem) el.slideSystem = 'hst';
+  if (el.type === 'schuifpui' && !el.slideSystem) el.slideSystem = 'psk';
   return el;
 }
 
@@ -492,10 +500,10 @@ function priceElement(el) {
       if (opts.bovenlicht)    base += 515;
     }
 
+  } else if (el.type === 'hefschuif') {
+    base = 3502 + m2 * 1133;
   } else if (el.type === 'schuifpui') {
-    base = (el.slideSystem || 'hst') === 'hst'
-      ? 3502 + m2 * 1133
-      : 2266 + m2 * 876;
+    base = 2266 + m2 * 876;
   }
   else if (el.type === 'dakraam') base = 597 + m2 * 227;
 
@@ -572,7 +580,7 @@ function drawElement(svg, el, opts = {}) {
   const thresholdSourcePx = (baseProfile.mullionMM || 60) * scale;
   const isSchuif = el.type === 'schuifpui' || el.type === 'hefschuif';
   const cols = el.columns;
-  const hasDoorThreshold = cols.some(col => {
+  const hasDoorThreshold = el.type === 'hefschuif' || cols.some(col => {
     const rows = col.rows || [];
     const lastRow = rows[rows.length - 1];
     return lastRow && isDoorPaneType(lastRow.paneType);
@@ -1487,11 +1495,7 @@ function renderConfig() {
     };
   });
 
-  const slideField = root.querySelector('#slide-system-field');
-  slideField.style.display = el.type === 'schuifpui' ? '' : 'none';
-  slideField.querySelectorAll('#slide-seg button').forEach(b => {
-    b.classList.toggle('is-active', b.dataset.v === (el.slideSystem || 'hst'));
-  });
+  root.querySelector('#slide-system-field').style.display = 'none';
 
   const doorTypeField = root.querySelector('#door-type-field');
   const doorOptsField = root.querySelector('#door-options-field');
