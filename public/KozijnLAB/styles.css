@@ -546,7 +546,7 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
 /* Type grid */
 .type-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 6px;
 }
 .type-card {

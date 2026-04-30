@@ -49,7 +49,7 @@ const ELEMENT_TYPES = [
   { id: 'kozijn',    label: 'Kozijn',        icon: 'kozijn' },
   { id: 'deur',     label: 'Deur',           icon: 'deur'   },
   { id: 'schuifpui',label: 'Schuifpui',      icon: 'schuif' },
-  { id: 'hefschuif',label: 'Hef-schuifpui',  icon: 'schuif' },
+  { id: 'hefschuif',label: 'Hef-schuif',     icon: 'schuif' },
   { id: 'dakraam',  label: 'Dakraam',        icon: 'dak'    },
 ];
 
@@ -502,8 +502,24 @@ function priceElement(el) {
 
   } else if (el.type === 'hefschuif') {
     base = 3502 + m2 * 1133;
+    let sgUpgrade = 0;
+    el.columns.forEach(col => col.rows.forEach(r => {
+      if (r.fill !== 'glass' || !r.gelaagd) return;
+      const colW = el.widthMM * (col.widthPct / 100);
+      const rowH = el.heightMM * (r.heightPct / 100);
+      sgUpgrade += (colW * rowH / 1e6) * 48.40;
+    }));
+    base += sgUpgrade;
   } else if (el.type === 'schuifpui') {
     base = 2266 + m2 * 876;
+    let sgUpgrade = 0;
+    el.columns.forEach(col => col.rows.forEach(r => {
+      if (r.fill !== 'glass' || !r.gelaagd) return;
+      const colW = el.widthMM * (col.widthPct / 100);
+      const rowH = el.heightMM * (r.heightPct / 100);
+      sgUpgrade += (colW * rowH / 1e6) * 48.40;
+    }));
+    base += sgUpgrade;
   }
   else if (el.type === 'dakraam') base = 597 + m2 * 227;
 
@@ -2045,7 +2061,6 @@ function bindConfigShell() {
     if (t.id === 'finish-inside') { el.finishInside = t.value; render(); return; }
     if (t.id === 'glass-pack') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassPack = t.value; render(); return; }
     if (t.id === 'glass-finish') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassFinish = t.value; render(); return; }
-    if (t.id === 'glass-gelaagd') { el.columns[el._activeColIdx].rows[el._activeRowIdx].gelaagd = t.checked; render(); return; }
     if (t.id === 'montage') { state.montageEuro = +t.value || 0; render(); return; }
     if (t.id === 'discount') { state.discountPct = +t.value || 0; render(); return; }
     if (t.id === 'project-notes') { state.notes = t.value; saveState(); return; }
@@ -2080,6 +2095,10 @@ function bindConfigShell() {
     if (e.target.id === 'door-panel-glass-finish') {
       normalizeDoorPanels(el);
       el.doorPanels[el._activeDoorPanelIdx || 0].glassFinish = e.target.value;
+      render(); return;
+    }
+    if (e.target.id === 'glass-gelaagd') {
+      el.columns[el._activeColIdx].rows[el._activeRowIdx].gelaagd = e.target.checked;
       render(); return;
     }
     if (e.target.id === 'door-panel-glass-gelaagd') {
