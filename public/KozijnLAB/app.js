@@ -8,6 +8,7 @@ const STORAGE_KEY = 'KL_V2_STATE';
 
 const COLORS = [
   // Wit / crème
+  { code: 'RAL9010', name: 'Puur wit',        hex: '#f4f4f0' },
   { code: 'RAL9016', name: 'Verkeerswit',     hex: '#f6f6f3' },
   { code: 'RAL9001', name: 'Crèmewit',        hex: '#f0ead6' },
   { code: 'RAL1013', name: 'Parelwit',        hex: '#ebe2c8' },
@@ -32,6 +33,7 @@ const COLORS = [
   { code: 'RAL6005', name: 'Mosgroen',        hex: '#114232' },
   // Blauw
   { code: 'RAL5010', name: 'Gentiaanblauw',   hex: '#0e518d' },
+  { code: 'RAL5011', name: 'Staalblauw',      hex: '#232d3f' },
   // Rood
   { code: 'RAL3009', name: 'Oxidrood',        hex: '#6c3028' },
   // Schüco speciaal / folie
@@ -150,6 +152,7 @@ function newElement(type = 'kozijn', name = '') {
     profile: defaultProfile(),
     colorOutside: 'RAL7016',
     colorInside: 'same',
+    colorSash: 'same',
     finishOutside: 'smooth',
     finishInside: 'smooth',
     glassPack: 'HR++',
@@ -427,7 +430,6 @@ function priceElement(el) {
     base += glassUpgrade;
 
     if (el.colorInside !== 'same' && el.colorInside !== el.colorOutside) base += 191;
-    if (el.finishOutside === 'woodgrain' || el.finishInside === 'woodgrain') base += 101;
 
   } else if (el.type === 'deur') {
     const sub = el.doorSubtype || 'voordeur';
@@ -564,10 +566,12 @@ function drawElement(svg, el, opts = {}) {
   }));
 
   const colorObj = COLORS.find(c => c.code === el.colorOutside);
+  const sashCode = (el.colorSash && el.colorSash !== 'same') ? el.colorSash : el.colorOutside;
+  const sashColorObj = COLORS.find(c => c.code === sashCode);
   if (!isFactory && colorObj) {
     svg.querySelectorAll('.svg-frame').forEach(r => {
-      r.setAttribute('fill', colorObj.hex);
-      r.setAttribute('stroke', shade(colorObj.hex, -25));
+      r.style.fill = colorObj.hex;
+      r.style.stroke = shade(colorObj.hex, -25);
     });
   }
 
@@ -577,8 +581,8 @@ function drawElement(svg, el, opts = {}) {
     const mx = colXPx[i] - mullPx;
     const r = svgEl('rect', { x: mx, y: iy, width: mullPx, height: ih, class: 'svg-mull' });
     if (!isFactory && colorObj) {
-      r.setAttribute('fill', colorObj.hex);
-      r.setAttribute('stroke', shade(colorObj.hex, -25));
+      r.style.fill = colorObj.hex;
+      r.style.stroke = shade(colorObj.hex, -25);
     }
     svg.appendChild(r);
     mullionLines.push({ idx: i - 1, cxPx: mx + mullPx / 2 });
@@ -600,8 +604,8 @@ function drawElement(svg, el, opts = {}) {
       if (ri > 0) {
         const t = svgEl('rect', { x: cxPx, y: cyPos - transPx, width: cwPx, height: transPx, class: 'svg-mull' });
         if (!isFactory && colorObj) {
-          t.setAttribute('fill', colorObj.hex);
-          t.setAttribute('stroke', shade(colorObj.hex, -25));
+          t.style.fill = colorObj.hex;
+          t.style.stroke = shade(colorObj.hex, -25);
         }
         svg.appendChild(t);
         transomLines.push({ colIdx: ci, rowIdx: ri - 1, cyPx: cyPos - transPx / 2, cxPx, cwPx });
@@ -610,6 +614,7 @@ function drawElement(svg, el, opts = {}) {
       drawPane(svg, cxPx, cyPos, cwPx, rh, r, el, sashPx, {
         isFactory,
         colorHex: isFactory ? null : (colorObj?.hex || null),
+        sashColorHex: isFactory ? null : (sashColorObj?.hex || colorObj?.hex || null),
       });
       cyPos += rh + transPx;
     });
@@ -776,10 +781,10 @@ function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx, colorHex) {
       const panelFill = colorHex ? shade(colorHex, 14) : null;
       const panelStroke = colorHex ? shade(colorHex, -22) : null;
       const pEl = svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-door-panel', rx: 1 });
-      if (panelFill) { pEl.setAttribute('fill', panelFill); pEl.setAttribute('stroke', panelStroke); }
+      if (panelFill) { pEl.style.fill = panelFill; pEl.style.stroke = panelStroke; }
       svg.appendChild(pEl);
       const piEl = svgEl('rect', { x: innerX + 4, y: cy + 4, width: Math.max(1, innerW - 8), height: Math.max(1, ph - 8), class: 'svg-door-panel-inner', rx: 1 });
-      if (panelStroke) piEl.setAttribute('stroke', panelStroke);
+      if (panelStroke) piEl.style.stroke = panelStroke;
       svg.appendChild(piEl);
     }
     cy += ph + gap;
@@ -848,15 +853,13 @@ function drawDoorHandle(svg, edgeX, centerY, side, profilePx) {
 function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   const isFactory = !!opts.isFactory;
   const colorHex = opts.colorHex || null;
+  const sashColorHex = opts.sashColorHex || colorHex;
   const pType = row.paneType;
   const isDoorPane = isDoorPaneType(pType);
   if (isDoorPane) {
-    svg.appendChild(svgEl('rect', {
-      x: x + 4, y: y + 4, width: w - 8, height: h - 8,
-      fill: colorHex || 'var(--surface-1)',
-      stroke: colorHex ? shade(colorHex, -30) : 'var(--draw-glass-edge)',
-      'stroke-width': 1, rx: 2
-    }));
+    const doorBg = svgEl('rect', { x: x + 4, y: y + 4, width: w - 8, height: h - 8, 'stroke-width': 1, rx: 2, class: 'svg-frame' });
+    if (sashColorHex) { doorBg.style.fill = sashColorHex; doorBg.style.stroke = shade(sashColorHex, -30); }
+    svg.appendChild(doorBg);
   } else if (row.fill === 'panel') {
     svg.appendChild(svgEl('rect', {
       x: x + 4, y: y + 4, width: w - 8, height: h - 8,
@@ -884,9 +887,9 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
       x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset,
       class: 'svg-sash', rx: 1
     });
-    if (colorHex) {
-      sashEl.setAttribute('fill', shade(colorHex, -8));
-      sashEl.setAttribute('stroke', shade(colorHex, -32));
+    if (sashColorHex) {
+      sashEl.style.fill = shade(sashColorHex, -8);
+      sashEl.style.stroke = shade(sashColorHex, -32);
     }
     svg.appendChild(sashEl);
   }
@@ -949,10 +952,11 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     const rox = sx + sw / 2 + gap / 2;
     const rw = sw - lw - gap;
     const seamX = x + w / 2;
-    const d2SashAttrs = colorHex ? { fill: shade(colorHex, -8), stroke: shade(colorHex, -32) } : {};
     const d2L = svgEl('rect', { x: sx,  y: sy, width: lw, height: sh, class: 'svg-sash', rx: 1 });
     const d2R = svgEl('rect', { x: rox, y: sy, width: rw, height: sh, class: 'svg-sash', rx: 1 });
-    Object.entries(d2SashAttrs).forEach(([k, v]) => { d2L.setAttribute(k, v); d2R.setAttribute(k, v); });
+    if (sashColorHex) {
+      [d2L, d2R].forEach(el => { el.style.fill = shade(sashColorHex, -8); el.style.stroke = shade(sashColorHex, -32); });
+    }
     svg.appendChild(d2L);
     svg.appendChild(d2R);
     svg.appendChild(svgEl('line', { x1: seamX, y1: y, x2: seamX, y2: y + h, class: 'svg-sash' }));
@@ -1462,16 +1466,21 @@ function renderConfig() {
 
   root.querySelector('#color-outside').value = el.colorOutside;
   root.querySelector('#color-inside').value = el.colorInside;
+  root.querySelector('#color-sash').value = el.colorSash || 'same';
   root.querySelector('#finish-outside').value = el.finishOutside;
   root.querySelector('#finish-inside').value = el.finishInside;
 
   const swatchOut = root.querySelector('#color-outside-swatch');
   const swatchIn = root.querySelector('#color-inside-swatch');
+  const swatchSash = root.querySelector('#color-sash-swatch');
   const co = COLORS.find(c => c.code === el.colorOutside);
   if (co) swatchOut.style.background = co.hex;
   const ciCode = el.colorInside === 'same' ? el.colorOutside : el.colorInside;
   const ciObj = COLORS.find(c => c.code === ciCode);
   if (ciObj) swatchIn.style.background = ciObj.hex;
+  const csCode = (el.colorSash && el.colorSash !== 'same') ? el.colorSash : el.colorOutside;
+  const csObj = COLORS.find(c => c.code === csCode);
+  if (csObj) swatchSash.style.background = csObj.hex;
 
   if (document.activeElement?.id !== 'montage') root.querySelector('#montage').value = state.montageEuro;
   if (document.activeElement?.id !== 'discount') root.querySelector('#discount').value = state.discountPct;
@@ -1666,6 +1675,10 @@ function buildConfigShell() {
             <select class="select" id="color-inside"><option value="same">Zelfde als buiten</option>${COLORS.map(c => `<option value="${c.code}">${/^(RAL|DB)/.test(c.code) ? c.code + ' ' : ''}${c.name}</option>`).join('')}</select>
           </div>
         </div>
+        <div class="field">
+          <label class="label">Kleur draai-/kiepdelen <span id="color-sash-swatch" class="color-swatch"></span></label>
+          <select class="select" id="color-sash"><option value="same">Zelfde als kozijn</option>${COLORS.map(c => `<option value="${c.code}">${/^(RAL|DB)/.test(c.code) ? c.code + ' ' : ''}${c.name}</option>`).join('')}</select>
+        </div>
         <div class="field-row">
           <div class="field"><label class="label">Afwerking buiten</label><select class="select" id="finish-outside"><option value="smooth">Glad</option><option value="woodgrain">Houtnerf</option></select></div>
           <div class="field"><label class="label">Afwerking binnen</label><select class="select" id="finish-inside"><option value="smooth">Glad</option><option value="woodgrain">Houtnerf</option></select></div>
@@ -1747,6 +1760,7 @@ function bindConfigShell() {
     }
     if (t.id === 'color-outside') { el.colorOutside = t.value; render(); return; }
     if (t.id === 'color-inside') { el.colorInside = t.value; render(); return; }
+    if (t.id === 'color-sash') { el.colorSash = t.value; render(); return; }
     if (t.id === 'finish-outside') { el.finishOutside = t.value; render(); return; }
     if (t.id === 'finish-inside') { el.finishInside = t.value; render(); return; }
     if (t.id === 'glass-pack') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassPack = t.value; render(); return; }
@@ -1789,7 +1803,7 @@ function bindConfigShell() {
       el.columns[el._activeColIdx].rows[el._activeRowIdx].hingeStyle = e.target.value;
       render(); return;
     }
-    if (['pane-type', 'color-outside', 'color-inside'].includes(e.target.id)) render();
+    if (['pane-type', 'color-outside', 'color-inside', 'color-sash'].includes(e.target.id)) render();
   });
   root.addEventListener('click', e => {
     const presetBtn = e.target.closest('[data-preset]');
