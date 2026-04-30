@@ -346,6 +346,8 @@ function applyDoorSubtypeLayout(el) {
 
   const sidelightCol = (pct) => ({ widthPct: pct, _isSidelight: true, rows: sidelightRows() });
 
+  const prevColIdx = el._activeColIdx; // preserve user's column selection across renders
+
   // Tuindeur sidelight (zijlichtKlein / zijlichtGroot) — always to the right
   if (sub === 'tuindeur') {
     const sidePct = opts.zijlichtGroot ? 30 : opts.zijlichtKlein ? 20 : 0;
@@ -369,8 +371,16 @@ function applyDoorSubtypeLayout(el) {
     el.columns = [{ widthPct: 100, rows: colRows(row) }];
     el._activeColIdx = 0;
   }
+
+  // Restore user's column selection if it's still a valid index
+  if (typeof prevColIdx === 'number' && prevColIdx < el.columns.length) {
+    el._activeColIdx = prevColIdx;
+  }
+
   // Point activeRowIdx to the door row (index 1 when bovenlicht is present, else 0)
-  el._activeRowIdx = hasBovenlicht ? 1 : 0;
+  if (!el.columns[el._activeColIdx]?._isSidelight) {
+    el._activeRowIdx = hasBovenlicht ? 1 : 0;
+  }
 }
 
 // ============================================================
@@ -479,15 +489,17 @@ function countVakken(el) {
 function projectTotals() {
   let material = 0;
   state.elements.forEach(el => material += priceElement(el));
-  let extrasTotal = 0;
-  (state.extras || []).forEach(ex => extrasTotal += (ex.qty || 1) * (ex.unitPrice || 0));
   const montage = Number(state.montageEuro) || 0;
-  const sub = material + extrasTotal + montage;
+  const sub = material + montage;
   const discount = sub * ((Number(state.discountPct) || 0) / 100);
   const net = Math.max(0, sub - discount);
   const vat = net * (Number(state.vatRate) || 0);
-  const gross = net + vat;
-  return { material, extrasTotal, montage, sub, discount, net, vat, gross };
+  const materialGross = net + vat;
+  // Extra's zijn bruto bedragen (incl. BTW) — worden NA de BTW-berekening opgeteld
+  let extrasTotal = 0;
+  (state.extras || []).forEach(ex => extrasTotal += (ex.qty || 1) * (ex.unitPrice || 0));
+  const gross = materialGross + extrasTotal;
+  return { material, montage, sub, discount, net, vat, materialGross, extrasTotal, gross };
 }
 
 const fmtEuro = n => '€ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
@@ -2035,8 +2047,8 @@ function renderExtras() {
     <div class="extra-row" style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);">
       <input class="input extra-name" data-i="${i}" placeholder="Omschrijving" value="${escapeHtml(ex.name)}" style="flex:1;min-width:0;font-size:12px;padding:4px 6px;"/>
       <input class="input mono extra-qty" data-i="${i}" type="number" min="1" step="1" value="${ex.qty}" style="width:46px;font-size:12px;padding:4px 6px;" title="Aantal"/>
-      <input class="input mono extra-price" data-i="${i}" type="number" min="0" step="1" value="${ex.unitPrice}" style="width:70px;font-size:12px;padding:4px 6px;" title="Stukprijs €"/>
-      <span class="extra-total mono" style="font-size:11px;color:var(--text-muted);min-width:60px;text-align:right;">${fmtEuro(ex.qty * ex.unitPrice)}</span>
+      <input class="input mono extra-price" data-i="${i}" type="number" min="0" step="0.01" value="${ex.unitPrice}" style="width:80px;font-size:12px;padding:4px 6px;" title="Bruto prijs per stuk (incl. BTW)"/>
+      <span class="extra-total mono" style="font-size:11px;color:var(--text-muted);min-width:64px;text-align:right;">${fmtEuro(ex.qty * ex.unitPrice)}</span>
       <button class="btn btn-sm btn-danger extra-del" data-i="${i}" style="padding:2px 6px;">✕</button>
     </div>`).join('');
 
@@ -2066,18 +2078,21 @@ function renderExtras() {
 
 function renderTotals() {
   const t = projectTotals();
-  const extraRows = (state.extras || []).map(ex =>
-    `<div class="row muted"><span>${escapeHtml(ex.name || 'Extra')} (${ex.qty}×)</span><span class="v">${fmtEuro(ex.qty * ex.unitPrice)}</span></div>`
-  ).join('');
+  const extraRows = (state.extras || []).map(ex => {
+    const amt = (ex.qty || 1) * (ex.unitPrice || 0);
+    const lbl = ex.qty > 1 ? `${escapeHtml(ex.name || 'Extra')} (${ex.qty}×)` : escapeHtml(ex.name || 'Extra');
+    return `<div class="row muted"><span>${lbl} <span style="font-size:10px;color:var(--text-muted)">bruto</span></span><span class="v">${fmtEuro(amt)}</span></div>`;
+  }).join('');
   document.getElementById('totals-table').innerHTML = `
     <div class="row muted"><span>Materiaal (${state.elements.length} el.)</span><span class="v">${fmtEuro(t.material)}</span></div>
-    ${extraRows}
     <div class="row muted"><span>Montage</span><span class="v">${fmtEuro(t.montage)}</span></div>
     <div class="row divider"><span>Subtotaal</span><span class="v">${fmtEuro(t.sub)}</span></div>
     ${t.discount > 0 ? `<div class="row muted"><span>Korting (${state.discountPct}%)</span><span class="v">−${fmtEuro(t.discount)}</span></div>` : ''}
     <div class="row muted"><span>Netto</span><span class="v">${fmtEuro(t.net)}</span></div>
     <div class="row muted"><span>BTW (21%)</span><span class="v">${fmtEuro(t.vat)}</span></div>
-    <div class="row total"><span>Totaal incl.</span><span class="v">${fmtEuro(t.gross)}</span></div>`;
+    <div class="row divider"><span>Materiaal incl. BTW</span><span class="v">${fmtEuro(t.materialGross)}</span></div>
+    ${extraRows}
+    <div class="row total"><span>Totaal</span><span class="v">${fmtEuro(t.gross)}</span></div>`;
 }
 
 // ============================================================
