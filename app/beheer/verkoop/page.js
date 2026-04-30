@@ -383,6 +383,12 @@ export default function VerkoopPage() {
   const leads    = orders.filter(o => o.phase === 0)
   const offertes = orders.filter(o => o.phase <= 1)
   const openValue = offertes.reduce((s, o) => s + (o.total_amount || 0), 0)
+  // Orders where iDEAL payment came in — phase 2 = deposit just confirmed, phase 6 main_payment_confirmed
+  const recentPayments = orders.filter(o =>
+    (o.phase === 2 && o.deposit_confirmed) ||
+    (o.phase === 6 && o.main_payment_confirmed) ||
+    (o.phase === 7 && o.final_payment_confirmed && o.final_payment_confirmed !== o._final_ack)
+  ).slice(0, 10)
 
   const confirmAdjustedTotal = (() => {
     if (!confirmData) return 0
@@ -414,6 +420,7 @@ export default function VerkoopPage() {
                 style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: `1px solid ${tab === item.key ? 'var(--brand)' : 'var(--border)'}`, background: tab === item.key ? 'var(--brand)' : 'white', color: tab === item.key ? 'white' : 'var(--text-muted)', fontWeight: tab === item.key ? 600 : 400, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.1s' }}>
                 <span>{item.icon}</span> {item.label}
                 {item.key === 'leads' && leads.length > 0 && <span style={{ background: 'var(--warn)', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 10, padding: '1px 5px' }}>{leads.length}</span>}
+                {item.key === 'dashboard' && recentPayments.length > 0 && <span style={{ background: '#22c55e', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 10, padding: '1px 5px' }}>{recentPayments.length}</span>}
               </button>
             ))}
           </div>
@@ -450,6 +457,30 @@ export default function VerkoopPage() {
                   </div>
                 ))}
               </div>
+
+              {recentPayments.length > 0 && (
+                <div style={{ background: 'white', border: '2px solid #22c55e', borderRadius: 12, overflow: 'hidden', marginBottom: 22 }}>
+                  <div style={{ background: '#f0fdf4', padding: '12px 20px', borderBottom: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>💳</span>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>Betalingen ontvangen via iDEAL</div>
+                    <span style={{ marginLeft: 'auto', background: '#22c55e', color: 'white', fontSize: 11, fontWeight: 700, borderRadius: 10, padding: '2px 8px' }}>{recentPayments.length}</span>
+                  </div>
+                  {recentPayments.map((o, i) => {
+                    const isDeposit = o.phase === 2
+                    const isFinal = o.final_payment_confirmed && o.phase === 7
+                    const label = isDeposit ? `Aanbetaling 20% — ${formatEuro(o.total_amount * 0.2)}` : isFinal ? `Slotbetaling 10% — ${formatEuro(o.total_amount * 0.1)}` : `Restbetaling — ${formatEuro(o.payment_split === 'split_70_10' ? o.total_amount * 0.7 : o.total_amount * 0.8)}`
+                    return (
+                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: i < recentPayments.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{o.customer_name}</div>
+                          <div style={{ color: '#15803d', fontSize: 12, marginTop: 2, fontWeight: 500 }}>✓ {label}</div>
+                        </div>
+                        <Link href="/beheer" style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600, textDecoration: 'none' }}>Beheer →</Link>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', marginBottom: 22 }}>
                 <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 14 }}>Snelle acties</div>

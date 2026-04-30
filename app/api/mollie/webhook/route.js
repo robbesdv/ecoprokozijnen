@@ -1,5 +1,61 @@
 import { createClient } from '@supabase/supabase-js'
 import createMollieClient from '@mollie/api-client'
+import { Resend } from 'resend'
+
+const FROM = 'EcoPro Kozijnen <onboarding@resend.dev>'
+const ADMIN_EMAIL = 'robbesdv@gmail.com'
+const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app').replace(/^http:/, 'https:')
+
+const PAYMENT_LABELS = {
+  deposit: 'Aanbetaling (20%)',
+  main:    'Restbetaling (70% of 80%)',
+  final:   'Slotbetaling (10%)',
+}
+
+async function sendAdminEmail(order, paymentType, amount) {
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    const label = PAYMENT_LABELS[paymentType] || paymentType
+    const adminUrl = `${BASE_URL}/beheer/verkoop`
+    await resend.emails.send({
+      from: FROM,
+      to: ADMIN_EMAIL,
+      subject: `💳 iDEAL betaling ontvangen — ${order.customer_name}`,
+      html: `
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
+          <div style="background:#1A3A2A;border-radius:12px;padding:24px 28px;color:white;margin-bottom:24px">
+            <div style="font-size:13px;opacity:0.7;margin-bottom:6px">iDEAL betaling bevestigd</div>
+            <div style="font-size:24px;font-weight:700">${order.customer_name}</div>
+            <div style="font-size:15px;opacity:0.85;margin-top:4px">${order.customer_address || ''}</div>
+          </div>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:24px">
+            <tr style="background:#f9fafb">
+              <td style="padding:12px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb">Type</td>
+              <td style="padding:12px 16px;font-size:13px;font-weight:600;border-bottom:1px solid #e5e7eb;text-align:right">${label}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #e5e7eb">Bedrag</td>
+              <td style="padding:12px 16px;font-size:16px;font-weight:700;color:#1A3A2A;border-bottom:1px solid #e5e7eb;text-align:right">€ ${Number(amount).toLocaleString('nl-NL', { minimumFractionDigits: 2 })}</td>
+            </tr>
+            <tr style="background:#f9fafb">
+              <td style="padding:12px 16px;font-size:13px;color:#6b7280">Referentie</td>
+              <td style="padding:12px 16px;font-size:13px;font-weight:600;text-align:right">${order.crm_reference || order.id.slice(0, 8).toUpperCase()}</td>
+            </tr>
+          </table>
+
+          <div style="text-align:center">
+            <a href="${adminUrl}" style="display:inline-block;background:#1A3A2A;color:white;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px">
+              Bekijk in dashboard →
+            </a>
+          </div>
+        </div>
+      `,
+    })
+  } catch (e) {
+    console.error('Admin email failed:', e)
+  }
+}
 
 export async function POST(request) {
   try {
@@ -21,6 +77,12 @@ export async function POST(request) {
       process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     )
 
+    const { data: order } = await supabase
+      .from('orders')
+      .select('id, customer_name, customer_address, total_amount, payment_split, crm_reference')
+      .eq('id', orderId)
+      .single()
+
     const updates = {}
     if (paymentType === 'deposit') {
       updates.deposit_confirmed = true
@@ -35,6 +97,11 @@ export async function POST(request) {
     }
 
     await supabase.from('orders').update(updates).eq('id', orderId)
+
+    if (order) {
+      const amount = payment.amount?.value || 0
+      await sendAdminEmail(order, paymentType, amount)
+    }
 
     return new Response('OK', { status: 200 })
   } catch (err) {
