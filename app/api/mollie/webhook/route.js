@@ -67,7 +67,7 @@ export async function POST(request) {
     const mollie = createMollieClient({ apiKey: process.env.MOLLIE_API_KEY })
     const payment = await mollie.payments.get(paymentId)
 
-    if (!payment.isPaid()) return new Response('OK', { status: 200 })
+    if (payment.status !== 'paid') return new Response('OK', { status: 200 })
 
     const { orderId, paymentType } = payment.metadata || {}
     if (!orderId || !paymentType) return new Response('OK', { status: 200 })
