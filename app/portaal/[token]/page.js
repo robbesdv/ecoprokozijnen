@@ -46,6 +46,7 @@ export default function PortaalPage({ params: paramsPromise }) {
   }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function withComputedTotal(orderData) {
+    if (orderData.total_amount != null) return orderData
     const exclSum = (orderData.order_items || []).reduce(
       (s, i) => s + (i.unit_price || 0) * (i.quantity || 1), 0
     )
@@ -697,7 +698,11 @@ function Phase0({ order, onRefresh, showToast }) {
       })
 
     const offerteNr = '2026-' + order.id.slice(0, 4).toUpperCase()
+    const itemsSumExcl = items.reduce((s, i) => s + (i.unit_price || 0) * (i.quantity || 1), 0)
+    const itemsSumIncl = Math.round(itemsSumExcl * 1.21 * 100) / 100
     const inclBTW = order.total_amount
+    const kortingIncl = Math.round((itemsSumIncl - inclBTW) * 100) / 100
+    const hasKorting = kortingIncl > 0.01
     const exclBTW = Math.round((inclBTW / 1.21) * 100) / 100
     const btwBedrag = Math.round((inclBTW - exclBTW) * 100) / 100
 
@@ -780,17 +785,14 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.autoTable({
       startY: y,
       head: [['Hoeveelheid', 'Omschrijving', 'Prijs excl. btw', 'Btw', 'Totaal incl. btw']],
-      body: items.map((i) => {
-        const excl = i.unit_price * i.quantity
-        const incl = excl * 1.21
-        return [
-          String(i.quantity),
-          i.description,
-          eur(excl),
-          '21%',
-          eur(incl),
-        ]
-      }),
+      body: [
+        ...items.map((i) => {
+          const excl = i.unit_price * i.quantity
+          const incl = excl * 1.21
+          return [String(i.quantity), i.description, eur(excl), '21%', eur(incl)]
+        }),
+        ...(hasKorting ? [['', 'Korting', eur(-(kortingIncl / 1.21)), '', eur(-kortingIncl)]] : []),
+      ],
       headStyles: {
         fillColor: brand,
         textColor: [255, 255, 255],
