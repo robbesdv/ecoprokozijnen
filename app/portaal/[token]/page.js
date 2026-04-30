@@ -993,8 +993,8 @@ function Phase0({ order, onRefresh, showToast }) {
         || (el.doorPanels?.some(p => p.fill === 'panel'))
         || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
       const pdfGlasPacks = [...new Set([
-        ...cols.flatMap(col => col.rows?.map(r => r.glassPack).filter(Boolean) || []),
-        ...(el.doorPanels?.map(p => p.glassPack).filter(Boolean) || []),
+        ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack).filter(Boolean) || []),
+        ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack).filter(Boolean) || []),
       ])]
       const specsBody = [
         ['Type', el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—'],
@@ -1377,8 +1377,8 @@ function KozijnElementenSection({ items }) {
           || (el.doorPanels?.some(p => p.fill === 'panel'))
           || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
         const glassPacks = [...new Set([
-          ...cols.flatMap(col => col.rows?.map(r => r.glassPack).filter(Boolean) || []),
-          ...(el.doorPanels?.map(p => p.glassPack).filter(Boolean) || []),
+          ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack).filter(Boolean) || []),
+          ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack).filter(Boolean) || []),
         ])]
         const specRows = [
           { label: 'Type', value: el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—' },

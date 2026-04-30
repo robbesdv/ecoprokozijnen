@@ -26,7 +26,7 @@ function buildItemDescription(el) {
     const label = PANE_LABEL[r.paneType] || r.paneType
     if (!seenTypes.includes(label)) seenTypes.push(label)
   })
-  const glassRows = [...allRows, ...doorPanels].filter(r => r.glassPack)
+  const glassRows = [...allRows.filter(r => r.fill !== 'panel'), ...doorPanels.filter(r => r.fill === 'glass')]
   const glassPacks = [...new Set(glassRows.map(r => r.glassPack).filter(Boolean))]
   const glassStr = glassPacks.length > 0 ? glassPacks.join('/') : 'HR++'
   const w = el.dimensions?.widthMM
