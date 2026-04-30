@@ -1221,7 +1221,29 @@ function _render() {
   renderExtras();
   renderTotals();
   renderPreview();
+  renderPrintNotes();
   document.getElementById('offer-code').textContent = state.offerCode;
+}
+
+function renderPrintNotes() {
+  const div = document.getElementById('print-notes');
+  if (!div) return;
+  const sections = [];
+  if (state.notes?.trim()) {
+    sections.push(`<div class="pn-section"><div class="pn-label">Projectopmerkingen</div><div class="pn-text">${state.notes.trim().replace(/</g,'&lt;')}</div></div>`);
+  }
+  state.elements.forEach(el => {
+    if (el.notes?.trim()) {
+      sections.push(`<div class="pn-section"><div class="pn-label">${(el.name || el.type).replace(/</g,'&lt;')}</div><div class="pn-text">${el.notes.trim().replace(/</g,'&lt;')}</div></div>`);
+    }
+  });
+  if (sections.length) {
+    div.hidden = false;
+    div.innerHTML = `<h3>Opmerkingen</h3>${sections.join('')}`;
+  } else {
+    div.hidden = true;
+    div.innerHTML = '';
+  }
 }
 
 function renderDrawingOnly() {
@@ -1363,16 +1385,28 @@ function renderConfig() {
     });
   }
 
+  // Compute activeCol early for visibility decisions
+  if (typeof el._activeColIdx !== 'number' || el._activeColIdx >= el.columns.length) el._activeColIdx = 0;
+  const activeColForVis = el.columns[el._activeColIdx];
   const isDoor = el.type === 'deur';
-  ['#cols-count', '#col-dims', '#col-tabs', '#rows-count', '#row-dims', '#vak-tabs', '#pane-type'].forEach(sel => {
-    const node = root.querySelector(sel);
-    const field = node?.closest('.field');
-    if (field) field.style.display = isDoor ? 'none' : '';
+  const isSidelightActive = isDoor && !!activeColForVis?._isSidelight;
+  const showDoorUI = isDoor && !isSidelightActive;
+  const showRowUI = !isDoor || isSidelightActive;
+
+  // cols-count: hide for door (door column structure managed via door options)
+  { const f = root.querySelector('#cols-count')?.closest('.field'); if (f) f.style.display = isDoor ? 'none' : ''; }
+  // col-dims: hide only for main door column; show for sidelight & kozijn
+  { const f = root.querySelector('#col-dims')?.closest('.field'); if (f) f.style.display = showDoorUI ? 'none' : ''; }
+  // col-tabs: always visible so user can switch between main door and sidelights
+  { const f = root.querySelector('#col-tabs')?.closest('.field'); if (f) f.style.display = ''; }
+  // row config: visible for kozijn elements and sidelight columns
+  ['#rows-count', '#row-dims', '#vak-tabs', '#pane-type'].forEach(sel => {
+    const f = root.querySelector(sel)?.closest('.field'); if (f) f.style.display = showRowUI ? '' : 'none';
   });
   const normalVakDivider = root.querySelector('#vak-tabs')?.closest('.field')?.previousElementSibling;
-  if (normalVakDivider?.classList?.contains('divider')) normalVakDivider.style.display = isDoor ? 'none' : '';
-  root.querySelector('#door-vakken-fields').style.display = isDoor ? '' : 'none';
-  if (isDoor) renderDoorPanelControls(root, el);
+  if (normalVakDivider?.classList?.contains('divider')) normalVakDivider.style.display = showRowUI ? '' : 'none';
+  root.querySelector('#door-vakken-fields').style.display = showDoorUI ? '' : 'none';
+  if (showDoorUI) renderDoorPanelControls(root, el);
 
   if (document.activeElement?.id !== 'elem-name') root.querySelector('#elem-name').value = el.name;
   if (document.activeElement?.id !== 'elem-qty') root.querySelector('#elem-qty').value = el.qty;
@@ -1411,7 +1445,6 @@ function renderConfig() {
   });
 
   // Active column tabs
-  if (typeof el._activeColIdx !== 'number' || el._activeColIdx >= el.columns.length) el._activeColIdx = 0;
   const colTabs = root.querySelector('#col-tabs');
   colTabs.innerHTML = el.columns.map((c, i) => `<button class="vak-tab ${i === el._activeColIdx ? 'is-active' : ''}" data-col="${i}">K${i + 1}</button>`).join('');
   colTabs.querySelectorAll('.vak-tab').forEach(b => { b.onclick = () => { el._activeColIdx = +b.dataset.col; render(); }; });
@@ -1512,6 +1545,8 @@ function renderConfig() {
 
   if (document.activeElement?.id !== 'montage') root.querySelector('#montage').value = state.montageEuro;
   if (document.activeElement?.id !== 'discount') root.querySelector('#discount').value = state.discountPct;
+  if (document.activeElement?.id !== 'project-notes') root.querySelector('#project-notes').value = state.notes || '';
+  if (document.activeElement?.id !== 'elem-notes') root.querySelector('#elem-notes').value = el.notes || '';
 
   ['name', 'projectName', 'address', 'postcode', 'city', 'phone', 'email', 'date', 'deliveryDate'].forEach(k => {
     const i = root.querySelector(`#cust-${k}`);
@@ -1626,6 +1661,10 @@ function buildConfigShell() {
         <div id="door-options-field" style="display:none">
           <div class="field"><label class="label">Opties</label><div id="door-opts-list"></div></div>
         </div>
+        <div class="field">
+          <label class="label">Opmerking element</label>
+          <textarea class="input" id="elem-notes" rows="2" placeholder="Interne opmerking bij dit element…" style="resize:vertical;min-height:52px;font-size:12px;"></textarea>
+        </div>
       </div>
     </div>
 
@@ -1722,6 +1761,16 @@ function buildConfigShell() {
           <div class="field"><label class="label">Korting</label><div class="input-wrap"><input class="input mono with-suffix" id="discount" type="number" step="0.5" value="0"/><span class="input-suffix">%</span></div></div>
         </div>
       </div>
+    </div>
+
+    <div class="section is-open" data-sec="notes">
+      <div class="section-head"><span class="section-title"><span class="step-num">7</span>Opmerkingen</span><span class="section-chev">▾</span></div>
+      <div class="section-body">
+        <div class="field">
+          <label class="label">Projectopmerkingen <span class="label-hint">· verschijnen op de offerte</span></label>
+          <textarea class="input" id="project-notes" rows="4" placeholder="Bijzonderheden, installatieafspraken, kleurmerk, …" style="resize:vertical;min-height:72px;font-size:12px;"></textarea>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -1795,6 +1844,8 @@ function bindConfigShell() {
     if (t.id === 'glass-finish') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassFinish = t.value; render(); return; }
     if (t.id === 'montage') { state.montageEuro = +t.value || 0; render(); return; }
     if (t.id === 'discount') { state.discountPct = +t.value || 0; render(); return; }
+    if (t.id === 'project-notes') { state.notes = t.value; saveState(); return; }
+    if (t.id === 'elem-notes') { el.notes = t.value; saveState(); return; }
     if (t.id?.startsWith('cust-')) { state.customer[t.id.replace('cust-', '')] = t.value; render(); return; }
     if (t.closest('#hinge-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].hinge = t.value; render(); return; }
     if (t.closest('#hinge-style-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].hingeStyle = t.value; render(); return; }
@@ -2115,7 +2166,7 @@ function buildExportPayload() {
       doorPanels: el.type === 'deur' ? exportDoorPanels(el.doorPanels, 'panel') : undefined,
       dimensions: { widthMM: el.widthMM, heightMM: el.heightMM, areaM2: +(el.widthMM * el.heightMM / 1e6).toFixed(3) },
       profile: el.profile,
-      finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, finishOutside: el.finishOutside, finishInside: el.finishInside },
+      finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, colorSash: el.colorSash || 'same', finishOutside: el.finishOutside, finishInside: el.finishInside },
       hardware: el.hardware,
       slideSystem: el.type === 'schuifpui' ? (el.slideSystem || 'hst') : undefined,
       columns: el.columns.map((col, ci) => ({
