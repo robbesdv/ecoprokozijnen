@@ -82,22 +82,30 @@ const PANE_TYPES = {
 };
 
 const DOOR_PRESETS = [
-  { id: 'vol-paneel',      label: 'Volpaneel',    panels: [{fill:'panel', heightPct:100}] },
-  { id: 'smal-glas',       label: 'Smal glas',    panels: [{fill:'glass', heightPct:12, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:88}] },
-  { id: 'klein-glas',      label: 'Klein glas',   panels: [{fill:'glass', heightPct:22, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:78}] },
-  { id: 'glas-boven',      label: 'Glas boven',   panels: [{fill:'glass', heightPct:38, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:62}] },
-  { id: 'half-glas',       label: 'Half glas',    panels: [{fill:'glass', heightPct:50, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:50}] },
-  { id: 'groot-glas',      label: 'Groot glas',   panels: [{fill:'glass', heightPct:65, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:35}] },
-  { id: 'vol-glas',        label: 'Vol glas',     panels: [{fill:'glass', heightPct:100, glassPack:'HR++', glassFinish:'clear'}] },
-  { id: 'glas-midden',     label: 'Glas midden',  panels: [{fill:'panel', heightPct:25},{fill:'glass', heightPct:50, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:25}] },
-  { id: 'breed-glas',      label: 'Breed glas',   panels: [{fill:'panel', heightPct:20},{fill:'glass', heightPct:60, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:20}] },
-  { id: 'smal-glas-m',     label: 'Smal m.',      panels: [{fill:'panel', heightPct:35},{fill:'glass', heightPct:30, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:35}] },
-  { id: 'klassiek',        label: 'Klassiek',     panels: [{fill:'panel', heightPct:30},{fill:'glass', heightPct:40, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:30}] },
-  { id: 'gpg',             label: 'Glas-P-Glas',  panels: [{fill:'glass', heightPct:30, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:40},{fill:'glass', heightPct:30, glassPack:'HR++', glassFinish:'clear'}] },
-  { id: 'glas-onder',      label: 'Glas onder',   panels: [{fill:'panel', heightPct:60},{fill:'glass', heightPct:40, glassPack:'HR++', glassFinish:'clear'}] },
-  { id: 'twin-glas',       label: 'Twin glas',    panels: [{fill:'glass', heightPct:28, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:16},{fill:'glass', heightPct:40, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:16}] },
-  { id: 'vier-vakken',     label: '4 vakken',     panels: [{fill:'glass', heightPct:25, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:25},{fill:'glass', heightPct:25, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:25}] },
-  { id: 'dubbel-glas',     label: 'Dubbel glas',  panels: [{fill:'glass', heightPct:20, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:22},{fill:'glass', heightPct:38, glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:20}] },
+  { id: 'ecopro-1',        label: 'EcoPro-01',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro01'}]}] },
+  { id: 'ecopro-2',        label: 'EcoPro-02',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro02'}]}] },
+  { id: 'ecopro-3',        label: 'EcoPro-03',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro03'}]}] },
+  { id: 'ecopro-4',        label: 'EcoPro-04',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro04'}]}] },
+  { id: 'ecopro-5',        label: 'EcoPro-05',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro05'}]}] },
+  { id: 'ecopro-6',        label: 'EcoPro-06',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro06'}]}] },
+  { id: 'ecopro-7',        label: 'EcoPro-07',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro07'}]}] },
+  { id: 'ecopro-8',        label: 'EcoPro-08',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro08'}]}] },
+  { id: 'ecopro-9',        label: 'EcoPro-09',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro09'}]}] },
+  { id: 'ecopro-10',       label: 'EcoPro-10',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'ecopro10'}]}] },
+  { id: 'ecopro-11',       label: 'EcoPro-11',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'rect', x:20, y:30, w:60, h:26}]}] },
+  { id: 'ecopro-12',       label: 'EcoPro-12',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'rect', x:8, y:6, w:84, h:88}]}] },
+  { id: 'ecopro-13',       label: 'EcoPro-13',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'vpair', y:55, h:32}]}] },
+  { id: 'ecopro-14',       label: 'EcoPro-14',    panels: [{fill:'panel', heightPct:100}] },
+  { id: 'ecopro-15',       label: 'EcoPro-15',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'rect', x:43, y:34, w:14, h:12},{type:'rect', x:43, y:53, w:14, h:12}]}] },
+  { id: 'ecopro-16',       label: 'EcoPro-16',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'rect', x:58, y:32, w:18, h:10}]}] },
+  { id: 'ecopro-17',       label: 'EcoPro-17',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'rect', x:34, y:26, w:32, h:36}]}] },
+  { id: 'ecopro-18',       label: 'EcoPro-18',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'slash'}]}] },
+  { id: 'ecopro-19',       label: 'EcoPro-19',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'rect', x:20, y:31, w:26, h:10},{type:'rect', x:54, y:31, w:26, h:10}]}] },
+  { id: 'ecopro-20',       label: 'EcoPro-20',    panels: [{fill:'glass', heightPct:70, widthPct:42, align:'center', glassPack:'HR++', glassFinish:'clear', grooves:[{type:'vsplit'}]},{fill:'panel', heightPct:30}] },
+  { id: 'ecopro-21',       label: 'EcoPro-21',    panels: [{fill:'glass', heightPct:88, widthPct:42, align:'left', glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:12}] },
+  { id: 'ecopro-22',       label: 'EcoPro-22',    panels: [{fill:'panel', heightPct:18},{fill:'glass', heightPct:38, widthPct:22, align:'center', glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:44, grooves:[{type:'line', y:8}]}] },
+  { id: 'ecopro-23',       label: 'EcoPro-23',    panels: [{fill:'panel', heightPct:24},{fill:'glass', heightPct:44, widthPct:28, align:'center', glassPack:'HR++', glassFinish:'clear'},{fill:'panel', heightPct:32, grooves:[{type:'rect', x:20, y:18, w:60, h:18}]}] },
+  { id: 'ecopro-24',       label: 'EcoPro-24',    panels: [{fill:'panel', heightPct:100, grooves:[{type:'vpair', y:12, h:62},{type:'rect', x:42, y:32, w:16, h:8}]}] },
 ];
 
 function presetThumbSvg(panels) {
@@ -106,8 +114,16 @@ function presetThumbSvg(panels) {
   let y = fr;
   const rects = panels.map(p => {
     const ph = Math.max(1, Math.round(innerH * (p.heightPct / 100)));
+    const specialType = doorSpecialDesignType(p);
+    if (specialType) {
+      const x = fr, top = y, iw = W - 2 * fr, ih = ph;
+      y += ph;
+      return doorSpecialThumbSvg(specialType, x, top, iw, ih);
+    }
+    const pw = Math.max(2, (W - 2 * fr) * ((Number(p.widthPct) || 100) / 100));
+    const px = p.align === 'left' ? fr : p.align === 'right' ? W - fr - pw : fr + ((W - 2 * fr) - pw) / 2;
     const fill = p.fill === 'glass' ? '#bfdbfe' : '#cbd5e1';
-    const r = `<rect x="${fr}" y="${y}" width="${W - 2 * fr}" height="${ph}" fill="${fill}"/>`;
+    const r = `<rect x="${px}" y="${y}" width="${pw}" height="${ph}" fill="${fill}"/>`;
     y += ph;
     return r;
   }).join('');
@@ -136,6 +152,19 @@ function defaultDoorPanel(fill = 'panel') {
     glassPack: 'HR++',
     glassFinish: 'clear',
   };
+}
+
+function cloneDoorPanelDetail(p = {}, fallbackGlassPack = 'HR++') {
+  const panel = {
+    heightPct: Math.max(1, Number(p.heightPct) || 0),
+    fill: p.fill === 'glass' ? 'glass' : 'panel',
+    glassPack: p.glassPack || fallbackGlassPack,
+    glassFinish: p.glassFinish || 'clear',
+  };
+  if (p.widthPct) panel.widthPct = Math.max(8, Math.min(100, Number(p.widthPct) || 100));
+  if (['left', 'center', 'right'].includes(p.align)) panel.align = p.align;
+  if (Array.isArray(p.grooves)) panel.grooves = p.grooves.map(g => ({ ...g }));
+  return panel;
 }
 
 function newElement(type = 'kozijn', name = '') {
@@ -275,12 +304,7 @@ function normalizeDoorPanels(el) {
     }));
   }
 
-  panels = panels.slice(0, 6).map((p) => ({
-    heightPct: Math.max(1, Number(p.heightPct) || 0),
-    fill: p.fill === 'glass' ? 'glass' : 'panel',
-    glassPack: p.glassPack || el.glassPack || 'HR++',
-    glassFinish: p.glassFinish || 'clear',
-  }));
+  panels = panels.slice(0, 8).map((p) => cloneDoorPanelDetail(p, el.glassPack || 'HR++'));
   const sum = panels.reduce((a, p) => a + p.heightPct, 0);
   if (!sum) panels = [defaultDoorPanel('panel')];
   else panels.forEach(p => { p.heightPct = (p.heightPct / sum) * 100; });
@@ -291,7 +315,7 @@ function normalizeDoorPanels(el) {
 
 function setDoorPanelCount(el, count) {
   normalizeDoorPanels(el);
-  const n = Math.max(1, Math.min(6, Number(count) || 1));
+  const n = Math.max(1, Math.min(8, Number(count) || 1));
   while (el.doorPanels.length < n) el.doorPanels.push(defaultDoorPanel('glass'));
   while (el.doorPanels.length > n) el.doorPanels.pop();
   el.doorPanels.forEach(p => { p.heightPct = 100 / n; });
@@ -763,12 +787,171 @@ function doorPanelsFor(el, row) {
     ? el.doorPanels
     : [defaultDoorPanel(row.fill === 'glass' ? 'glass' : 'panel')];
   const sum = panels.reduce((a, p) => a + (Number(p.heightPct) || 0), 0) || 100;
-  return panels.map(p => ({
-    heightPct: ((Number(p.heightPct) || 0) / sum) * 100,
-    fill: p.fill === 'glass' ? 'glass' : 'panel',
-    glassPack: p.glassPack || 'HR++',
-    glassFinish: p.glassFinish || 'clear',
+  return panels.map(p => {
+    const panel = cloneDoorPanelDetail(p);
+    panel.heightPct = ((Number(p.heightPct) || 0) / sum) * 100;
+    return panel;
+  });
+}
+
+function doorPanelInnerRect(innerX, innerW, y, h, panel) {
+  const widthPct = Math.max(8, Math.min(100, Number(panel.widthPct) || 100));
+  const w = innerW * (widthPct / 100);
+  const align = panel.align || 'center';
+  const x = align === 'left' ? innerX : align === 'right' ? innerX + innerW - w : innerX + (innerW - w) / 2;
+  return { x, y, w, h };
+}
+
+function doorSpecialDesignType(panel) {
+  const g = Array.isArray(panel?.grooves) ? panel.grooves.find(item => /^ecopro\d{2}$/.test(item.type || '')) : null;
+  return g?.type || null;
+}
+
+function doorSpecialThumbSvg(type, x, y, w, h) {
+  const rect = (rx, ry, rw, rh, fill = '#34413d') => `<rect x="${x + w * rx}" y="${y + h * ry}" width="${w * rw}" height="${h * rh}" fill="${fill}"/>`;
+  const glass = (rx, ry, rw, rh) => rect(rx, ry, rw, rh, '#bfdbfe');
+  const rail = '#475569';
+  const panel = '#cbd5e1';
+  if (type === 'ecopro01') {
+    return `${rect(0,0,1,1,panel)}<path d="M ${x} ${y} H ${x + w} L ${x} ${y + h * .58} Z" fill="#bfdbfe"/>${glass(0,.58,.32,.42)}<path d="M ${x + w * .2} ${y + h * .58} L ${x + w * .86} ${y + h * .16} L ${x + w * .94} ${y + h * .2} L ${x + w * .3} ${y + h * .66} Z" fill="${rail}"/>${rect(.38,.48,.2,.5,rail)}`;
+  }
+  if (type === 'ecopro02') return `${rect(0,0,1,1)}${glass(.73,.02,.2,.23)}${glass(.73,.36,.2,.25)}${glass(.73,.72,.2,.26)}${rect(.72,.25,.23,.11,rail)}${rect(.72,.61,.23,.11,rail)}${rect(.34,0,.04,1,rail)}`;
+  if (type === 'ecopro03') return `${glass(0,0,1,.31)}${rect(0,.31,1,.1,rail)}${glass(0,.41,1,.3)}${rect(0,.71,1,.1,rail)}${glass(0,.81,1,.19)}`;
+  if (type === 'ecopro04') return `${rect(0,0,1,1)}${glass(.45,.15,.18,.55)}${rect(.45,.03,.18,.12,rail)}${rect(.45,.7,.18,.12,rail)}${rect(.18,.03,.18,.94,rail)}${rect(.72,.03,.18,.94,rail)}`;
+  if (type === 'ecopro05') return `${rect(0,0,1,1)}${glass(.43,.02,.18,.45)}${glass(.43,.58,.18,.4)}${rect(.06,.47,.88,.11,rail)}${rect(.16,.02,.18,.96,rail)}${rect(.66,.02,.18,.96,rail)}`;
+  if (type === 'ecopro06') return `${rect(0,0,1,1)}${glass(.76,.02,.18,.96)}${rect(.08,.5,.48,.02,rail)}${rect(.08,.57,.48,.02,rail)}`;
+  if (type === 'ecopro07') return `${rect(0,0,1,1)}${glass(.43,.22,.18,.17)}${glass(.43,.48,.18,.17)}${glass(.43,.74,.18,.17)}${rect(.22,.04,.12,.92,rail)}${rect(.66,.04,.12,.92,rail)}`;
+  if (type === 'ecopro08') return `${rect(0,0,1,1)}${glass(.43,.02,.18,.55)}${rect(.43,.7,.2,.26,rail)}${rect(.16,.02,.18,.94,rail)}${rect(.66,.02,.18,.94,rail)}`;
+  if (type === 'ecopro09') return `${rect(0,0,1,1)}${glass(.43,.02,.18,.31)}${glass(.43,.41,.18,.3)}${glass(.43,.79,.18,.19)}${rect(.16,.02,.18,.96,rail)}${rect(.66,.02,.18,.96,rail)}`;
+  if (type === 'ecopro10') return `${glass(.04,.02,.4,.55)}${glass(.56,.02,.4,.55)}${rect(.45,.02,.1,.55,rail)}${rect(.04,.57,.92,.41)}`;
+  return rect(0,0,1,1,panel);
+}
+
+function appendDoorRect(svg, x, y, w, h, fill, stroke, opacity) {
+  const r = svgEl('rect', { x, y, width: w, height: h, fill, stroke: stroke || 'none', 'stroke-width': .8, rx: 1 });
+  if (opacity !== undefined) r.style.opacity = String(opacity);
+  svg.appendChild(r);
+  return r;
+}
+
+function appendDoorGlass(svg, x, y, w, h) {
+  const r = svgEl('rect', { x, y, width: w, height: h, class: 'svg-glass svg-door-panel-fill', rx: 1 });
+  r.style.opacity = '1';
+  svg.appendChild(r);
+  return r;
+}
+
+function drawEcoProDesign(svg, type, x, y, w, h, stroke) {
+  const line = stroke || 'var(--draw-mull)';
+  const panel = '#34413d';
+  const panelDark = '#24302c';
+  const rail = '#3f4d49';
+  const r = (rx, ry, rw, rh, fill = panel, edge = line, opacity) => appendDoorRect(svg, x + w * rx, y + h * ry, w * rw, h * rh, fill, edge, opacity);
+  const g = (rx, ry, rw, rh) => appendDoorGlass(svg, x + w * rx, y + h * ry, w * rw, h * rh);
+  r(0, 0, 1, 1, panel, line);
+
+  if (type === 'ecopro01') {
+  const glassA = svgEl('path', {
+    d: `M ${x} ${y} H ${x + w} L ${x} ${y + h * .58} Z`,
+    class: 'svg-glass svg-door-panel-fill',
+  });
+  const glassB = svgEl('path', {
+    d: `M ${x} ${y + h * .58} H ${x + w * .32} V ${y + h} H ${x} Z`,
+    class: 'svg-glass svg-door-panel-fill',
+  });
+  [glassA, glassB].forEach(el => { el.style.opacity = '1'; svg.appendChild(el); });
+
+  svg.appendChild(svgEl('path', {
+    d: `M ${x + w * .32} ${y + h} V ${y + h * .55} L ${x + w} ${y + h * .09} V ${y + h} Z`,
+    fill: panel, stroke: line, 'stroke-width': .8,
   }));
+  svg.appendChild(svgEl('path', {
+    d: `M ${x} ${y + h * .58} L ${x + w * .82} ${y + h * .16} L ${x + w * .92} ${y + h * .2} L ${x + w * .08} ${y + h * .67} Z`,
+    fill: rail, stroke: panelDark, 'stroke-width': 1,
+  }));
+  svg.appendChild(svgEl('path', {
+    d: `M ${x + w * .08} ${y + h * .67} L ${x + w * .33} ${y + h * .79} L ${x + w * .41} ${y + h * .86} L ${x + w * .23} ${y + h * .9} L ${x} ${y + h * .72} Z`,
+    fill: rail, stroke: panelDark, 'stroke-width': 1,
+  }));
+  svg.appendChild(svgEl('rect', {
+    x: x + w * .39, y: y + h * .49, width: w * .2, height: h * .49,
+    fill: rail, stroke: line, 'stroke-width': .8,
+  }));
+  svg.appendChild(svgEl('line', { x1: x + w * .58, y1: y + h * .2, x2: x + w * .58, y2: y + h * .98, stroke: line, 'stroke-width': .7, opacity: .55 }));
+    return;
+  }
+
+  if (type === 'ecopro02') {
+    r(.05, .04, .3, .92, panelDark, line, .35);
+    r(.35, 0, .05, 1, rail, line);
+    g(.73, .01, .2, .22); g(.73, .36, .2, .25); g(.73, .72, .2, .25);
+    r(.72, .25, .23, .11, rail, panelDark); r(.72, .61, .23, .11, rail, panelDark);
+    r(0, .95, .93, .05, rail, line); r(0, 0, .93, .05, rail, line);
+  } else if (type === 'ecopro03') {
+    g(.04, .02, .92, .3); r(.04, .32, .92, .09, rail, panelDark);
+    g(.04, .41, .92, .29); r(.04, .7, .92, .09, rail, panelDark); g(.04, .79, .92, .19);
+  } else if (type === 'ecopro04') {
+    r(.08, .03, .17, .94, panelDark, line, .35); r(.72, .03, .17, .94, panelDark, line, .35);
+    r(.45, .03, .17, .12, rail, line); g(.45, .15, .17, .56); r(.45, .71, .17, .1, rail, line);
+    r(.32, .03, .12, .94, panelDark, line, .18); r(.63, .03, .12, .94, panelDark, line, .18);
+  } else if (type === 'ecopro05') {
+    r(.1, .03, .18, .94, panelDark, line, .35); r(.66, .03, .18, .94, panelDark, line, .35);
+    g(.43, .03, .17, .43); r(.04, .46, .9, .11, rail, line); g(.43, .57, .17, .4);
+  } else if (type === 'ecopro06') {
+    r(.08, .04, .56, .92, panelDark, line, .22); g(.77, .02, .18, .94);
+    r(.08, .5, .48, .012, rail, line); r(.08, .57, .48, .012, rail, line);
+  } else if (type === 'ecopro07') {
+    r(.13, .03, .13, .94, panelDark, line, .28); r(.31, .03, .13, .2, panelDark, line, .28); r(.62, .03, .13, .94, panelDark, line, .28);
+    g(.43, .22, .18, .17); g(.43, .48, .18, .17); g(.43, .74, .18, .17);
+    r(.43, .65, .18, .09, rail, line); r(.43, .91, .18, .06, rail, line);
+  } else if (type === 'ecopro08') {
+    r(.12, .03, .18, .94, panelDark, line, .25); r(.66, .03, .18, .94, panelDark, line, .25);
+    g(.43, .02, .17, .55); r(.43, .7, .2, .27, panelDark, line, .35);
+  } else if (type === 'ecopro09') {
+    r(.1, .03, .18, .94, panelDark, line, .25); r(.66, .03, .18, .94, panelDark, line, .25);
+    g(.43, .02, .17, .31); r(.43, .33, .17, .08, rail, line);
+    g(.43, .41, .17, .3); r(.43, .71, .17, .08, rail, line); g(.43, .79, .17, .19);
+  } else if (type === 'ecopro10') {
+    g(.04, .02, .4, .54); g(.56, .02, .4, .54); r(.45, .02, .1, .54, rail, line);
+    r(.04, .56, .92, .4, panelDark, line, .25);
+  }
+}
+
+function drawDoorPanelGrooves(svg, x, y, w, h, grooves, stroke) {
+  if (!Array.isArray(grooves) || !grooves.length) return;
+  const sx = stroke || 'var(--draw-mull)';
+  grooves.forEach(g => {
+    if (/^ecopro\d{2}$/.test(g.type || '')) {
+      drawEcoProDesign(svg, g.type, x, y, w, h, sx);
+    } else if (g.type === 'rect') {
+      svg.appendChild(svgEl('rect', {
+        x: x + w * ((Number(g.x) || 0) / 100),
+        y: y + h * ((Number(g.y) || 0) / 100),
+        width: w * ((Number(g.w) || 0) / 100),
+        height: h * ((Number(g.h) || 0) / 100),
+        fill: 'none', stroke: sx, 'stroke-width': .8, rx: 1,
+      }));
+    } else if (g.type === 'line') {
+      const ly = y + h * ((Number(g.y) || 50) / 100);
+      svg.appendChild(svgEl('line', { x1: x + w * .08, y1: ly, x2: x + w * .92, y2: ly, stroke: sx, 'stroke-width': .8 }));
+    } else if (g.type === 'lines') {
+      (g.y || []).forEach(gy => {
+        const ly = y + h * ((Number(gy) || 0) / 100);
+        svg.appendChild(svgEl('line', { x1: x + w * .08, y1: ly, x2: x + w * .92, y2: ly, stroke: sx, 'stroke-width': .8 }));
+      });
+    } else if (g.type === 'vpair') {
+      const top = y + h * ((Number(g.y) || 15) / 100);
+      const gh = h * ((Number(g.h) || 70) / 100);
+      const gw = w * .14;
+      svg.appendChild(svgEl('rect', { x: x + w * .38 - gw, y: top, width: gw, height: gh, fill: 'none', stroke: sx, 'stroke-width': .8, rx: 1 }));
+      svg.appendChild(svgEl('rect', { x: x + w * .62, y: top, width: gw, height: gh, fill: 'none', stroke: sx, 'stroke-width': .8, rx: 1 }));
+    } else if (g.type === 'vsplit') {
+      svg.appendChild(svgEl('line', { x1: x + w / 2, y1: y + 2, x2: x + w / 2, y2: y + h - 2, stroke: sx, 'stroke-width': .8 }));
+    } else if (g.type === 'slash') {
+      svg.appendChild(svgEl('line', { x1: x + w * .16, y1: y + h * .44, x2: x + w * .74, y2: y + h * .18, stroke: sx, 'stroke-width': 1.2 }));
+      svg.appendChild(svgEl('line', { x1: x + w * .72, y1: y + h * .18, x2: x + w * .84, y2: y + h * .12, stroke: sx, 'stroke-width': 1.2 }));
+    }
+  });
 }
 
 function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx, colorHex) {
@@ -782,15 +965,17 @@ function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx, colorHex) {
 
   panels.forEach((panel, i) => {
     const ph = innerH * (panel.heightPct / 100);
+    const panelRect = doorPanelInnerRect(innerX, innerW, cy, ph, panel);
     if (panel.fill === 'glass') {
-      const glEl = svgEl('rect', { x: innerX, y: cy, width: innerW, height: ph, class: 'svg-glass svg-door-panel-fill', rx: 1 });
+      const glEl = svgEl('rect', { x: panelRect.x, y: panelRect.y, width: panelRect.w, height: panelRect.h, class: 'svg-glass svg-door-panel-fill', rx: 1 });
       // When door has a profile color, the glass composites over a dark background.
       // Override opacity so the glass shows at its CSS fill color without the dark overlay.
       if (colorHex) glEl.style.opacity = '1';
       svg.appendChild(glEl);
+      drawDoorPanelGrooves(svg, panelRect.x, panelRect.y, panelRect.w, panelRect.h, panel.grooves, colorHex ? shade(colorHex, -22) : null);
       if (panel.glassFinish === 'satinato') {
         for (let ly = cy + 4; ly < cy + ph - 2; ly += 6) {
-          svg.appendChild(svgEl('line', { x1: innerX + 4, y1: ly, x2: innerX + innerW - 4, y2: ly, stroke: 'rgba(255,255,255,.62)', 'stroke-width': .5 }));
+          svg.appendChild(svgEl('line', { x1: panelRect.x + 4, y1: ly, x2: panelRect.x + panelRect.w - 4, y2: ly, stroke: 'rgba(255,255,255,.62)', 'stroke-width': .5 }));
         }
       }
     } else {
@@ -802,6 +987,7 @@ function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx, colorHex) {
       const piEl = svgEl('rect', { x: innerX + 4, y: cy + 4, width: Math.max(1, innerW - 8), height: Math.max(1, ph - 8), class: 'svg-door-panel-inner', rx: 1 });
       if (panelStroke) piEl.style.stroke = panelStroke;
       svg.appendChild(piEl);
+      drawDoorPanelGrooves(svg, innerX + 4, cy + 4, Math.max(1, innerW - 8), Math.max(1, ph - 8), panel.grooves, panelStroke);
     }
     cy += ph + gap;
   });
@@ -1722,7 +1908,7 @@ function buildConfigShell() {
           <div class="divider"></div>
           <div class="field" id="door-hinge-field"><label class="label">Scharnierzijde</label><select class="select" id="door-hinge"><option value="left">Links</option><option value="right">Rechts</option></select></div>
           <div class="field"><label class="label">Scharnier type</label><select class="select" id="door-hinge-style"><option value="flag">Vlagscharnier</option><option value="roller">Rollerbandscharnier</option></select></div>
-          <div class="field"><label class="label">Aantal deurvakken</label><input class="input mono" id="door-panels-count" type="number" min="1" max="6" step="1"/></div>
+          <div class="field"><label class="label">Aantal deurvakken</label><input class="input mono" id="door-panels-count" type="number" min="1" max="8" step="1"/></div>
           <div class="field"><label class="label">Deurvak hoogtes</label><div class="dim-list" id="door-panel-dims"></div></div>
           <div class="divider"></div>
           <div class="field"><label class="label">Selecteer deurvak</label><div class="vak-tabs" id="door-panel-tabs"></div></div>
@@ -2149,12 +2335,11 @@ function toast(msg) {
 function exportDoorPanels(panels, fallbackFill = 'panel') {
   const src = (Array.isArray(panels) && panels.length) ? panels : [defaultDoorPanel(fallbackFill)];
   const sum = src.reduce((a, p) => a + (Number(p.heightPct) || 0), 0) || 100;
-  return src.map(p => ({
-    heightPct: +(((Number(p.heightPct) || 0) / sum) * 100).toFixed(2),
-    fill: p.fill === 'glass' ? 'glass' : 'panel',
-    glassPack: p.glassPack || 'HR++',
-    glassFinish: p.glassFinish || 'clear',
-  }));
+  return src.map(p => {
+    const panel = cloneDoorPanelDetail(p);
+    panel.heightPct = +(((Number(p.heightPct) || 0) / sum) * 100).toFixed(2);
+    return panel;
+  });
 }
 
 function exportDoorPanelsForRow(el, row) {
@@ -2240,12 +2425,7 @@ function importFromJSON(data) {
       slideSystem: e.type === 'hefschuif' ? 'hst' : (e.slideSystem || 'hst'),
       doorSubtype: e.doorSubtype || 'voordeur',
       doorOptions: e.doorOptions || {},
-      doorPanels: Array.isArray(e.doorPanels) ? e.doorPanels.map(p => ({
-        heightPct: p.heightPct || 100,
-        fill: p.fill === 'glass' ? 'glass' : 'panel',
-        glassPack: p.glassPack || 'HR++',
-        glassFinish: p.glassFinish || 'clear',
-      })) : undefined,
+      doorPanels: Array.isArray(e.doorPanels) ? e.doorPanels.map(p => cloneDoorPanelDetail({ ...p, heightPct: p.heightPct || 100 })) : undefined,
       columns: (e.columns || []).map(col => ({
         widthPct: col.widthPct || 50,
         rows: (col.rows || []).map(r => ({
@@ -2256,12 +2436,7 @@ function importFromJSON(data) {
           hingeStyle: r.hingeStyle || 'flag',
           glassPack: r.glassPack || 'HR++',
           glassFinish: r.glassFinish || 'clear',
-          doorPanels: Array.isArray(r.doorPanels) ? r.doorPanels.map(p => ({
-            heightPct: p.heightPct || 100,
-            fill: p.fill === 'glass' ? 'glass' : 'panel',
-            glassPack: p.glassPack || 'HR++',
-            glassFinish: p.glassFinish || 'clear',
-          })) : undefined,
+          doorPanels: Array.isArray(r.doorPanels) ? r.doorPanels.map(p => cloneDoorPanelDetail({ ...p, heightPct: p.heightPct || 100 })) : undefined,
         })),
       })),
       notes: e.notes || '',
