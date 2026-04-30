@@ -161,6 +161,7 @@ function cloneDoorPanelDetail(p = {}, fallbackGlassPack = 'HR++') {
     fill: p.fill === 'glass' ? 'glass' : 'panel',
     glassPack: p.glassPack || fallbackGlassPack,
     glassFinish: p.glassFinish || 'clear',
+    gelaagd: !!p.gelaagd,
   };
   if (p.widthPct) panel.widthPct = Math.max(8, Math.min(100, Number(p.widthPct) || 100));
   if (['left', 'center', 'right'].includes(p.align)) panel.align = p.align;
@@ -183,6 +184,7 @@ function newElement(type = 'kozijn', name = '') {
     colorOutside: 'RAL7016',
     colorInside: 'same',
     colorSash: 'same',
+    colorPanel: 'same',
     finishOutside: 'smooth',
     finishInside: 'smooth',
     glassPack: 'HR++',
@@ -1148,7 +1150,9 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   if (pType === 'deur') {
     const hx = hinge === 'left' ? x : x + w;
     const handleX = hinge === 'left' ? x + w : x;
-    drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx, sashColorHex);
+    const panelCode = (el.colorPanel && el.colorPanel !== 'same') ? el.colorPanel : null;
+    const panelColorHex = (panelCode ? (COLORS.find(c => c.code === panelCode)?.hex) : null) || sashColorHex;
+    drawDoorLeafPanels(svg, sx, sy, sw, sh, doorPanelsFor(el, row), doorPaneProfilePx, panelColorHex);
     svg.appendChild(svgEl('path', { d: `M ${hx} ${y} L ${handleX} ${y + h / 2} L ${hx} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, hinge === 'left' ? sx + sw : sx, sy + sh * 0.5, hinge === 'left' ? 'right' : 'left', doorPaneProfilePx);
     if (shouldDrawDoorHinges(el)) {
@@ -1203,8 +1207,10 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     svg.appendChild(d2R);
     svg.appendChild(svgEl('line', { x1: seamX, y1: y, x2: seamX, y2: y + h, class: 'svg-sash' }));
     const panels = doorPanelsFor(el, row);
-    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, doorPaneProfilePx, sashColorHex);
-    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx, sashColorHex);
+    const panelCode2 = (el.colorPanel && el.colorPanel !== 'same') ? el.colorPanel : null;
+    const panelColorHex2 = (panelCode2 ? (COLORS.find(c => c.code === panelCode2)?.hex) : null) || sashColorHex;
+    drawDoorLeafPanels(svg, sx, sy, lw, sh, panels, doorPaneProfilePx, panelColorHex2);
+    drawDoorLeafPanels(svg, rox, sy, rw, sh, panels, doorPaneProfilePx, panelColorHex2);
     svg.appendChild(svgEl('path', { d: `M ${x} ${y} L ${seamX} ${y + h / 2} L ${x} ${y + h}`, class: 'svg-op' }));
     svg.appendChild(svgEl('path', { d: `M ${x + w} ${y} L ${seamX} ${y + h / 2} L ${x + w} ${y + h}`, class: 'svg-op' }));
     drawDoorHandle(svg, seamX - gap / 2, sy + sh * 0.5, 'right', doorPaneProfilePx);
@@ -1745,12 +1751,17 @@ function renderConfig() {
   root.querySelector('#color-outside').value = el.colorOutside;
   root.querySelector('#color-inside').value = el.colorInside;
   root.querySelector('#color-sash').value = el.colorSash || 'same';
+  root.querySelector('#color-panel').value = el.colorPanel || 'same';
   root.querySelector('#finish-outside').value = el.finishOutside;
   root.querySelector('#finish-inside').value = el.finishInside;
+
+  const hasDoorPanels = el.type === 'deur' || (el.doorPanels?.some(p => p.fill === 'panel'));
+  root.querySelector('#color-panel-field').style.display = hasDoorPanels ? '' : 'none';
 
   const swatchOut = root.querySelector('#color-outside-swatch');
   const swatchIn = root.querySelector('#color-inside-swatch');
   const swatchSash = root.querySelector('#color-sash-swatch');
+  const swatchPanel = root.querySelector('#color-panel-swatch');
   const co = COLORS.find(c => c.code === el.colorOutside);
   if (co) swatchOut.style.background = co.hex;
   const ciCode = el.colorInside === 'same' ? el.colorOutside : el.colorInside;
@@ -1759,6 +1770,9 @@ function renderConfig() {
   const csCode = (el.colorSash && el.colorSash !== 'same') ? el.colorSash : el.colorOutside;
   const csObj = COLORS.find(c => c.code === csCode);
   if (csObj) swatchSash.style.background = csObj.hex;
+  const cpCode = (el.colorPanel && el.colorPanel !== 'same') ? el.colorPanel : el.colorOutside;
+  const cpObj = COLORS.find(c => c.code === cpCode);
+  if (cpObj) swatchPanel.style.background = cpObj.hex;
 
   if (document.activeElement?.id !== 'montage') root.querySelector('#montage').value = state.montageEuro;
   if (document.activeElement?.id !== 'discount') root.querySelector('#discount').value = state.discountPct;
@@ -1965,6 +1979,10 @@ function buildConfigShell() {
           <label class="label">Kleur draai-/kiepdelen <span id="color-sash-swatch" class="color-swatch"></span></label>
           <select class="select" id="color-sash"><option value="same">Zelfde als kozijn</option>${COLORS.map(c => `<option value="${c.code}">${/^(RAL|DB)/.test(c.code) ? c.code + ' ' : ''}${c.name}</option>`).join('')}</select>
         </div>
+        <div class="field" id="color-panel-field">
+          <label class="label">Kleur panelen <span id="color-panel-swatch" class="color-swatch"></span></label>
+          <select class="select" id="color-panel"><option value="same">Zelfde als kozijn</option>${COLORS.map(c => `<option value="${c.code}">${/^(RAL|DB)/.test(c.code) ? c.code + ' ' : ''}${c.name}</option>`).join('')}</select>
+        </div>
         <div class="field-row">
           <div class="field"><label class="label">Afwerking buiten</label><select class="select" id="finish-outside"><option value="smooth">Glad</option><option value="woodgrain">Houtnerf</option></select></div>
           <div class="field"><label class="label">Afwerking binnen</label><select class="select" id="finish-inside"><option value="smooth">Glad</option><option value="woodgrain">Houtnerf</option></select></div>
@@ -2057,6 +2075,7 @@ function bindConfigShell() {
     if (t.id === 'color-outside') { el.colorOutside = t.value; render(); return; }
     if (t.id === 'color-inside') { el.colorInside = t.value; render(); return; }
     if (t.id === 'color-sash') { el.colorSash = t.value; render(); return; }
+    if (t.id === 'color-panel') { el.colorPanel = t.value; render(); return; }
     if (t.id === 'finish-outside') { el.finishOutside = t.value; render(); return; }
     if (t.id === 'finish-inside') { el.finishInside = t.value; render(); return; }
     if (t.id === 'glass-pack') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassPack = t.value; render(); return; }
@@ -2395,7 +2414,7 @@ function buildExportPayload() {
       doorPanels: el.type === 'deur' ? exportDoorPanels(el.doorPanels, 'panel') : undefined,
       dimensions: { widthMM: el.widthMM, heightMM: el.heightMM, areaM2: +(el.widthMM * el.heightMM / 1e6).toFixed(3) },
       profile: el.profile,
-      finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, colorSash: el.colorSash || 'same', finishOutside: el.finishOutside, finishInside: el.finishInside },
+      finish: { colorOutside: el.colorOutside, colorInside: el.colorInside, colorSash: el.colorSash || 'same', colorPanel: el.colorPanel || 'same', finishOutside: el.finishOutside, finishInside: el.finishInside },
       hardware: el.hardware,
       slideSystem: el.type === 'schuifpui' ? (el.slideSystem || 'hst') : undefined,
       columns: el.columns.map((col, ci) => ({
@@ -2409,7 +2428,7 @@ function buildExportPayload() {
             heightPct: +r.heightPct.toFixed(2),
             paneType: r.paneType, fill: r.fill, hinge: r.hinge,
             hingeStyle: r.hingeStyle || 'flag',
-            glassPack: r.glassPack, glassFinish: r.glassFinish,
+            glassPack: r.glassPack, glassFinish: r.glassFinish, gelaagd: r.gelaagd || false,
           };
           const doorPanels = exportDoorPanelsForRow(el, r);
           if (doorPanels) row.doorPanels = doorPanels;
@@ -2448,6 +2467,8 @@ function importFromJSON(data) {
       profile: e.profile || defaultProfile(),
       colorOutside: finish.colorOutside || e.colorOutside || 'RAL7016',
       colorInside: finish.colorInside || e.colorInside || 'same',
+      colorSash: finish.colorSash || e.colorSash || 'same',
+      colorPanel: finish.colorPanel || e.colorPanel || 'same',
       finishOutside: finish.finishOutside || e.finishOutside || 'smooth',
       finishInside: finish.finishInside || e.finishInside || 'smooth',
       hardware: e.hardware || 'siegenia',
@@ -2465,6 +2486,7 @@ function importFromJSON(data) {
           hingeStyle: r.hingeStyle || 'flag',
           glassPack: r.glassPack || 'HR++',
           glassFinish: r.glassFinish || 'clear',
+          gelaagd: !!r.gelaagd,
           doorPanels: Array.isArray(r.doorPanels) ? r.doorPanels.map(p => cloneDoorPanelDetail({ ...p, heightPct: p.heightPct || 100 })) : undefined,
         })),
       })),

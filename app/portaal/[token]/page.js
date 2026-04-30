@@ -917,6 +917,13 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.text(COMPANY.contactRole, M, y)
     doc.text(`${COMPANY.phone}  ·  ${COMPANY.email}`, M, y + 4)
 
+    const disclaimerText = 'Aan deze offerte kunnen geen rechten worden ontleend. Afbeeldingen en tekeningen zijn indicatief en fictief van aard. Na het inmeten worden de definitieve productietekeningen vrijgegeven; maatvoering kan hiervan afwijken.'
+    const disclaimerLines = doc.splitTextToSize(disclaimerText, W - 2 * M)
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'italic')
+    doc.setTextColor(160, 160, 160)
+    doc.text(disclaimerLines, M, 272)
+
     doc.setFillColor(...brand)
     doc.rect(0, 282, W, 15, 'F')
     doc.setFillColor(...gold)
@@ -977,13 +984,21 @@ function Phase0({ order, onRefresh, showToast }) {
       // Specs tabel
       const cols = el.columns || []
       const pdfSashCode = el.colorSash && el.colorSash !== 'same' ? el.colorSash : null
-      const pdfHasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd))
+      const pdfPanelCode = el.colorPanel && el.colorPanel !== 'same' ? el.colorPanel : null
+      const pdfHasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd)) || (el.doorPanels?.some(p => p.gelaagd))
+      const pdfHasDoorPanels = el.type === 'deur' || (el.doorPanels?.some(p => p.fill === 'panel'))
+      const pdfGlasPacks = [...new Set([
+        ...cols.flatMap(col => col.rows?.map(r => r.glassPack).filter(Boolean) || []),
+        ...(el.doorPanels?.map(p => p.glassPack).filter(Boolean) || []),
+      ])]
       const specsBody = [
         ['Type', el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—'],
         ['Breedte × Hoogte', `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm`],
         ['Kleur buiten', `${el.colorOutside} — ${ralName(el.colorOutside)}`],
         ['Kleur binnen', el.colorInside === 'same' ? `Zelfde als buiten` : `${el.colorInside} — ${ralName(el.colorInside)}`],
         ['Kleur draaidelen', pdfSashCode ? `${pdfSashCode} — ${ralName(pdfSashCode)}` : 'Zelfde als kozijn'],
+        ...(pdfHasDoorPanels ? [['Kleur panelen', pdfPanelCode ? `${pdfPanelCode} — ${ralName(pdfPanelCode)}` : 'Zelfde als kozijn']] : []),
+        ['Glasspakket', pdfGlasPacks.length > 0 ? pdfGlasPacks.join(', ') : '—'],
         ['Gelaagd glas', pdfHasGelaagd ? 'Ja' : 'Nee'],
         ['Afwerking', `Buiten: ${el.finishOutside === 'woodgrain' ? 'Houtnerf' : 'Glad'}  /  Binnen: ${el.finishInside === 'woodgrain' ? 'Houtnerf' : 'Glad'}`],
         ['Aantal kolommen', String(cols.length)],
@@ -1350,13 +1365,22 @@ function KozijnElementenSection({ items }) {
         const colorInside = el.colorInside === 'same' ? el.colorOutside : el.colorInside
         const sashCode = el.colorSash && el.colorSash !== 'same' ? el.colorSash : null
         const sashLabel = sashCode ? `${sashCode} ${ralName(sashCode)}` : `Zelfde als kozijn`
-        const hasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd))
+        const panelCode = el.colorPanel && el.colorPanel !== 'same' ? el.colorPanel : null
+        const panelLabel = panelCode ? `${panelCode} ${ralName(panelCode)}` : `Zelfde als kozijn`
+        const hasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd)) || (el.doorPanels?.some(p => p.gelaagd))
+        const hasDoorPanels = el.type === 'deur' || (el.doorPanels?.some(p => p.fill === 'panel'))
+        const glassPacks = [...new Set([
+          ...cols.flatMap(col => col.rows?.map(r => r.glassPack).filter(Boolean) || []),
+          ...(el.doorPanels?.map(p => p.glassPack).filter(Boolean) || []),
+        ])]
         const specRows = [
           { label: 'Type', value: el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—' },
           { label: 'Breedte × Hoogte', value: `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm` },
           { label: 'Kleur buiten', value: `${el.colorOutside} ${ralName(el.colorOutside)}` },
           { label: 'Kleur binnen', value: el.colorInside === 'same' ? `Zelfde (${ralName(el.colorOutside)})` : `${colorInside} ${ralName(colorInside)}` },
           { label: 'Kleur draaidelen', value: sashLabel },
+          ...(hasDoorPanels ? [{ label: 'Kleur panelen', value: panelLabel }] : []),
+          { label: 'Glasspakket', value: glassPacks.length > 0 ? glassPacks.join(', ') : '—' },
           { label: 'Gelaagd glas', value: hasGelaagd ? 'Ja' : 'Nee' },
           { label: 'Kolommen', value: String(cols.length) },
           { label: 'Vakken', value: panesSummary || '—' },
