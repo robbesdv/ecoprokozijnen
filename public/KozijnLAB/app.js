@@ -2273,7 +2273,7 @@ function renderTotals() {
     ${extraRows}
     <div class="row divider"><span>Subtotaal</span><span class="v">${fmtEuro(t.sub)}</span></div>
     ${t.discount > 0 ? `<div class="row muted"><span>Korting (${state.discountPct}%)</span><span class="v">−${fmtEuro(t.discount)}</span></div>` : ''}
-    <div class="row muted"><span>Netto</span><span class="v">${fmtEuro(t.net)}</span></div>
+    <div class="row muted"><span>Bruto</span><span class="v">${fmtEuro(t.net)}</span></div>
     <div class="row muted"><span>BTW (21%)</span><span class="v">${fmtEuro(t.vat)}</span></div>
     <div class="row total"><span>Totaal incl. BTW</span><span class="v">${fmtEuro(t.gross)}</span></div>`;
 }
