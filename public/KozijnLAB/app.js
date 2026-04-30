@@ -882,7 +882,9 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
       panEl.style.stroke = shade(sashColorHex, -22);
       svg.appendChild(panEl);
     } else {
-      svg.appendChild(svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, class: 'svg-glass', rx: 1 }));
+      const glEl = svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, class: 'svg-glass', rx: 1 });
+      glEl.style.opacity = '1';
+      svg.appendChild(glEl);
       if (row.glassFinish === 'satinato') {
         for (let i = 0; i < h - 2 * inset; i += 6) {
           svg.appendChild(svgEl('line', { x1: x + inset + 2, y1: y + inset + i, x2: x + w - inset - 2, y2: y + inset + i, stroke: 'rgba(255,255,255,.6)', 'stroke-width': .5 }));
