@@ -976,11 +976,15 @@ function Phase0({ order, onRefresh, showToast }) {
 
       // Specs tabel
       const cols = el.columns || []
+      const pdfSashCode = el.colorSash && el.colorSash !== 'same' ? el.colorSash : null
+      const pdfHasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd))
       const specsBody = [
         ['Type', el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—'],
         ['Breedte × Hoogte', `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm`],
         ['Kleur buiten', `${el.colorOutside} — ${ralName(el.colorOutside)}`],
         ['Kleur binnen', el.colorInside === 'same' ? `Zelfde als buiten` : `${el.colorInside} — ${ralName(el.colorInside)}`],
+        ['Kleur draaidelen', pdfSashCode ? `${pdfSashCode} — ${ralName(pdfSashCode)}` : 'Zelfde als kozijn'],
+        ['Gelaagd glas', pdfHasGelaagd ? 'Ja' : 'Nee'],
         ['Afwerking', `Buiten: ${el.finishOutside === 'woodgrain' ? 'Houtnerf' : 'Glad'}  /  Binnen: ${el.finishInside === 'woodgrain' ? 'Houtnerf' : 'Glad'}`],
         ['Aantal kolommen', String(cols.length)],
         ...cols.map((col, ci) => {
@@ -988,6 +992,7 @@ function Phase0({ order, onRefresh, showToast }) {
           const colW = col.widthMM ?? (el.widthMM && col.widthPct ? Math.round(el.widthMM * col.widthPct / 100) : '—')
           return [`Kolom ${ci + 1} (${colW} mm)`, vakken]
         }),
+        ...(el.notes ? [['Opmerkingen', el.notes]] : []),
       ]
 
       doc.autoTable({
@@ -1309,6 +1314,13 @@ function Phase0({ order, onRefresh, showToast }) {
 
       <OrderFiles order={order} />
 
+      {order.montage_notes && (
+        <div className="card-elevated" style={{ padding: '14px 20px' }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>Opmerkingen project</div>
+          <div style={{ fontSize: 13, color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{order.montage_notes}</div>
+        </div>
+      )}
+
       <KozijnElementenSection items={items} />
     </div>
   )
@@ -1336,6 +1348,20 @@ function KozijnElementenSection({ items }) {
           col.rows.map((r, ri) => `K${ci + 1}-V${ri + 1}: ${PANE_NAMES[r.paneType] || r.paneType}`).join(', ')
         ).join(' · ')
         const colorInside = el.colorInside === 'same' ? el.colorOutside : el.colorInside
+        const sashCode = el.colorSash && el.colorSash !== 'same' ? el.colorSash : null
+        const sashLabel = sashCode ? `${sashCode} ${ralName(sashCode)}` : `Zelfde als kozijn`
+        const hasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd))
+        const specRows = [
+          { label: 'Type', value: el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—' },
+          { label: 'Breedte × Hoogte', value: `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm` },
+          { label: 'Kleur buiten', value: `${el.colorOutside} ${ralName(el.colorOutside)}` },
+          { label: 'Kleur binnen', value: el.colorInside === 'same' ? `Zelfde (${ralName(el.colorOutside)})` : `${colorInside} ${ralName(colorInside)}` },
+          { label: 'Kleur draaidelen', value: sashLabel },
+          { label: 'Gelaagd glas', value: hasGelaagd ? 'Ja' : 'Nee' },
+          { label: 'Kolommen', value: String(cols.length) },
+          { label: 'Vakken', value: panesSummary || '—' },
+          ...(el.notes ? [{ label: 'Opmerkingen', value: el.notes, full: true }] : []),
+        ]
 
         return (
           <div key={item.id || idx} className="card-elevated" style={{ overflow: 'hidden', pageBreakInside: 'avoid' }}>
@@ -1358,26 +1384,13 @@ function KozijnElementenSection({ items }) {
             </div>
 
             <div style={{ padding: '14px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 13 }}>
-              {[
-                { label: 'Type', value: el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—' },
-                { label: 'Breedte × Hoogte', value: `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm` },
-                { label: 'Kleur buiten', value: `${el.colorOutside} ${ralName(el.colorOutside)}` },
-                { label: 'Kleur binnen', value: el.colorInside === 'same' ? `Zelfde (${ralName(el.colorOutside)})` : `${colorInside} ${ralName(colorInside)}` },
-                { label: 'Kolommen', value: String(cols.length) },
-                { label: 'Vakken', value: panesSummary || '—' },
-              ].map(row => (
-                <div key={row.label} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', background: '#F8FAFC', borderRadius: 8 }}>
+              {specRows.map(row => (
+                <div key={row.label} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 10px', background: '#F8FAFC', borderRadius: 8, gridColumn: row.full ? '1 / -1' : undefined }}>
                   <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', fontWeight: 600 }}>{row.label}</div>
                   <div style={{ fontWeight: 500, color: 'var(--text)' }}>{row.value}</div>
                 </div>
               ))}
             </div>
-
-            {el.notes && (
-              <div style={{ padding: '0 20px 14px', fontSize: 13, color: 'var(--text-muted)' }}>
-                <span style={{ fontWeight: 600 }}>Notities: </span>{el.notes}
-              </div>
-            )}
           </div>
         )
       })}
