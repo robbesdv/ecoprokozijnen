@@ -74,6 +74,11 @@ export default function VerkoopPage() {
   const [offerteItems, setOfferteItems] = useState([])
   const [editPrices, setEditPrices] = useState({})
   const [savingOfferte, setSavingOfferte] = useState(false)
+  const [statusEvents, setStatusEvents] = useState([])
+  const [dismissedEvents, setDismissedEvents] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('dismissedEvents') || '[]')) }
+    catch { return new Set() }
+  })
   const iframeRef = useRef(null)
   const pendingKozijnPayloadRef = useRef(null)
 
@@ -82,8 +87,20 @@ export default function VerkoopPage() {
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false })
-    setOrders(data || [])
+    const orders = data || []
+    setOrders(orders)
     setLoading(false)
+
+    const { data: hist } = await supabase
+      .from('status_history')
+      .select('id, created_at, order_id, from_phase, to_phase, changed_by, note')
+      .in('changed_by', ['klant', 'mollie_webhook'])
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (hist) {
+      const orderMap = Object.fromEntries(orders.map(o => [o.id, o]))
+      setStatusEvents(hist.map(e => ({ ...e, order: orderMap[e.order_id] })))
+    }
   }, [])
 
   useEffect(() => { loadOrders() }, [loadOrders])
@@ -380,6 +397,40 @@ export default function VerkoopPage() {
     setTimeout(() => { window.location.href = '/beheer' }, 2000)
   }
 
+  function eventKey(e) { return e.id || `${e.order_id}_${e.created_at}` }
+
+  function eventLabel(e) {
+    if (e.changed_by === 'klant' && e.from_phase === 0 && e.to_phase === 1)
+      return { icon: '🖊', text: 'Offerte geaccordeerd door klant', color: '#1A3A2A' }
+    if (e.changed_by === 'mollie_webhook' && e.to_phase === 2)
+      return { icon: '💳', text: 'Aanbetaling (20%) ontvangen via iDEAL', color: '#15803d' }
+    if (e.changed_by === 'mollie_webhook' && e.to_phase === 7)
+      return { icon: '💳', text: 'Betaling ontvangen via iDEAL', color: '#15803d' }
+    const ph = getPhase(e.to_phase)
+    return { icon: '🔄', text: `Status gewijzigd naar: ${ph?.adminLabel || `fase ${e.to_phase}`}`, color: 'var(--text-muted)' }
+  }
+
+  function relTime(dateStr) {
+    const mins = Math.floor((Date.now() - new Date(dateStr)) / 60000)
+    if (mins < 1) return 'zojuist'
+    if (mins < 60) return `${mins} min geleden`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs} uur geleden`
+    const days = Math.floor(hrs / 24)
+    return `${days} dag${days !== 1 ? 'en' : ''} geleden`
+  }
+
+  function dismissEvent(key) {
+    setDismissedEvents(prev => {
+      const next = new Set(prev)
+      next.add(key)
+      localStorage.setItem('dismissedEvents', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  const visibleEvents = statusEvents.filter(e => !dismissedEvents.has(eventKey(e)))
+
   const leads    = orders.filter(o => o.phase === 0)
   const offertes = orders.filter(o => o.phase <= 1)
   const openValue = offertes.reduce((s, o) => s + (o.total_amount || 0), 0)
@@ -420,7 +471,7 @@ export default function VerkoopPage() {
                 style={{ padding: '6px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer', border: `1px solid ${tab === item.key ? 'var(--brand)' : 'var(--border)'}`, background: tab === item.key ? 'var(--brand)' : 'white', color: tab === item.key ? 'white' : 'var(--text-muted)', fontWeight: tab === item.key ? 600 : 400, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.1s' }}>
                 <span>{item.icon}</span> {item.label}
                 {item.key === 'leads' && leads.length > 0 && <span style={{ background: 'var(--warn)', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 10, padding: '1px 5px' }}>{leads.length}</span>}
-                {item.key === 'dashboard' && recentPayments.length > 0 && <span style={{ background: '#22c55e', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 10, padding: '1px 5px' }}>{recentPayments.length}</span>}
+                {item.key === 'dashboard' && visibleEvents.length > 0 && <span style={{ background: '#ef4444', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 10, padding: '1px 5px' }}>{visibleEvents.length}</span>}
               </button>
             ))}
           </div>
@@ -458,24 +509,31 @@ export default function VerkoopPage() {
                 ))}
               </div>
 
-              {recentPayments.length > 0 && (
-                <div style={{ background: 'white', border: '2px solid #22c55e', borderRadius: 12, overflow: 'hidden', marginBottom: 22 }}>
-                  <div style={{ background: '#f0fdf4', padding: '12px 20px', borderBottom: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>💳</span>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d' }}>Betalingen ontvangen via iDEAL</div>
-                    <span style={{ marginLeft: 'auto', background: '#22c55e', color: 'white', fontSize: 11, fontWeight: 700, borderRadius: 10, padding: '2px 8px' }}>{recentPayments.length}</span>
+              {visibleEvents.length > 0 && (
+                <div style={{ background: 'white', border: '2px solid #ef4444', borderRadius: 12, overflow: 'hidden', marginBottom: 22 }}>
+                  <div style={{ background: '#fef2f2', padding: '12px 20px', borderBottom: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>🔔</span>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#b91c1c' }}>Actie vereist</div>
+                    <span style={{ marginLeft: 'auto', background: '#ef4444', color: 'white', fontSize: 11, fontWeight: 700, borderRadius: 10, padding: '2px 8px' }}>{visibleEvents.length}</span>
                   </div>
-                  {recentPayments.map((o, i) => {
-                    const isDeposit = o.phase === 2
-                    const isFinal = o.final_payment_confirmed && o.phase === 7
-                    const label = isDeposit ? `Aanbetaling 20% — ${formatEuro(o.total_amount * 0.2)}` : isFinal ? `Slotbetaling 10% — ${formatEuro(o.total_amount * 0.1)}` : `Restbetaling — ${formatEuro(o.payment_split === 'split_70_10' ? o.total_amount * 0.7 : o.total_amount * 0.8)}`
+                  {visibleEvents.map((e, i) => {
+                    const key = eventKey(e)
+                    const { icon, text, color } = eventLabel(e)
                     return (
-                      <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: i < recentPayments.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
-                        <div>
-                          <div style={{ fontWeight: 600 }}>{o.customer_name}</div>
-                          <div style={{ color: '#15803d', fontSize: 12, marginTop: 2, fontWeight: 500 }}>✓ {label}</div>
+                      <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', borderBottom: i < visibleEvents.length - 1 ? '1px solid var(--border)' : 'none', fontSize: 13 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600 }}>{e.order?.customer_name || 'Onbekende klant'}</div>
+                          <div style={{ color, fontSize: 12, marginTop: 2, fontWeight: 500 }}>{icon} {text}</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>{relTime(e.created_at)}</div>
                         </div>
-                        <Link href="/beheer" style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600, textDecoration: 'none' }}>Beheer →</Link>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                          <Link href="/beheer" style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600, textDecoration: 'none' }}>Beheer →</Link>
+                          <button
+                            onClick={() => dismissEvent(key)}
+                            title="Markeer als gezien"
+                            style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: 'var(--text-muted)', padding: '2px 8px', lineHeight: 1.4 }}
+                          >✕</button>
+                        </div>
                       </div>
                     )
                   })}
