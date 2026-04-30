@@ -1338,7 +1338,7 @@ function Phase0({ order, onRefresh, showToast }) {
                 <span>
                   Ik ga akkoord met de{' '}
                   <a
-                    href="/algemene-voorwaarden"
+                    href="https://ecoprokozijnen.nl/algemene-voorwaarden/"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: 'var(--brand)', textDecoration: 'underline' }}
