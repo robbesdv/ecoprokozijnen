@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@mollie/api-client": "^4.5.0",
     "@supabase/supabase-js": "^2.48.0",
     "next": "^15.1.0",
     "react": "^19.0.0",

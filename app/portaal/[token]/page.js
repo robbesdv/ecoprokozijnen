@@ -43,6 +43,13 @@ export default function PortaalPage({ params: paramsPromise }) {
 
   useEffect(() => {
     loadOrder()
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('payment') === 'return') {
+        setToast({ msg: 'Betaling verwerkt. De status wordt bijgewerkt zodra de betaling is bevestigd.', type: 'success' })
+        window.history.replaceState(null, '', window.location.pathname)
+      }
+    }
   }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function withComputedTotal(orderData) {
@@ -1475,6 +1482,10 @@ function Phase1({ order, onRefresh, showToast }) {
         reference={`Aanbetaling ${order.id.slice(0, 8).toUpperCase()}`}
       />
 
+      <iDEALButton order={order} paymentType="deposit" label={`Betaal ${formatEuro(deposit)} via iDEAL`} />
+
+      <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
+
       {!order.deposit_notified ? (
         <button className="btn btn-secondary btn-full" onClick={notifyPayment} disabled={notifying}>
           {notifying ? (
@@ -1737,6 +1748,10 @@ function Phase6({ order, onRefresh, showToast }) {
             reference={`Restbetaling ${order.id.slice(0, 8).toUpperCase()}`}
           />
 
+          <iDEALButton order={order} paymentType="main" label={`Betaal ${formatEuro(calcMain(order.total_amount, order.payment_split))} via iDEAL`} />
+
+          <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
+
           {!order.main_payment_notified ? (
             <button
               className="btn btn-secondary btn-full"
@@ -1802,6 +1817,10 @@ function Phase6({ order, onRefresh, showToast }) {
                   description="Deze betaling wordt vrijgegeven zodra alle open punten zijn opgelost."
                   reference={`Slotbetaling ${order.id.slice(0, 8).toUpperCase()}`}
                 />
+
+                <iDEALButton order={order} paymentType="final" label={`Betaal ${formatEuro(calcFinal(order.total_amount))} via iDEAL`} />
+
+                <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
 
                 {!order.final_payment_notified ? (
                   <button
@@ -2167,6 +2186,64 @@ function Phase7({ order, showToast }) {
 
       <ContactCard />
       <OrderFiles order={order} />
+    </div>
+  )
+}
+
+function iDEALButton({ order, paymentType, label }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function startPayment() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/mollie/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, paymentType, token: order.portal_token }),
+      })
+      const data = await res.json()
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl
+      } else {
+        setError(data.error || 'Er is een fout opgetreden. Probeer het later opnieuw.')
+        setLoading(false)
+      }
+    } catch {
+      setError('Kon verbinding maken met betaaldienst. Probeer het later opnieuw.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <button
+        onClick={startPayment}
+        disabled={loading}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          background: loading ? '#e0e0e0' : '#CC0066', color: 'white',
+          border: 'none', borderRadius: 12, padding: '14px 20px',
+          fontSize: 15, fontWeight: 700, cursor: loading ? 'default' : 'pointer',
+          width: '100%',
+        }}
+      >
+        {loading ? (
+          <><Spinner /> Doorverwijzen naar iDEAL…</>
+        ) : (
+          <>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <rect width="24" height="24" rx="4" fill="white" opacity="0.15"/>
+              <text x="12" y="17" textAnchor="middle" fontSize="13" fontWeight="bold" fill="white">iD</text>
+            </svg>
+            {label || 'Betaal via iDEAL'}
+          </>
+        )}
+      </button>
+      {error && (
+        <div className="notice notice-warning" style={{ fontSize: 13 }}>⚠ {error}</div>
+      )}
     </div>
   )
 }
