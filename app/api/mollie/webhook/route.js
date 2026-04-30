@@ -79,7 +79,7 @@ export async function POST(request) {
 
     const { data: order } = await supabase
       .from('orders')
-      .select('id, customer_name, customer_email, customer_address, total_amount, payment_split, crm_reference, portal_token, phase_id')
+      .select('id, customer_name, customer_email, customer_address, total_amount, payment_split, crm_reference, portal_token, phase')
       .eq('id', orderId)
       .single()
 
@@ -92,14 +92,14 @@ export async function POST(request) {
     if (paymentType === 'deposit') {
       updates.deposit_confirmed = true
       updates.deposit_notified = true
-      updates.phase_id = 2
+      updates.phase = 2
       notifyType = 'aanbetaling_bevestigd'
     } else if (paymentType === 'main') {
       updates.main_payment_confirmed = true
       updates.main_payment_notified = true
       // full_80 is financially complete → advance to phase 7
       if (order.payment_split === 'full_80') {
-        updates.phase_id = 7
+        updates.phase = 7
         updates.completed_at = new Date().toISOString()
       }
       notifyType = 'betaling_bevestigd'
@@ -109,7 +109,7 @@ export async function POST(request) {
       }
     } else if (paymentType === 'final') {
       updates.final_payment_confirmed = true
-      updates.phase_id = 7
+      updates.phase = 7
       updates.completed_at = new Date().toISOString()
       notifyType = 'betaling_bevestigd'
       notifyExtra = {
@@ -118,15 +118,15 @@ export async function POST(request) {
       }
     }
 
-    const prevPhase = order.phase_id
+    const prevPhase = order.phase
     await supabase.from('orders').update(updates).eq('id', orderId)
 
     // Log phase change
-    if (updates.phase_id && updates.phase_id !== prevPhase) {
+    if (updates.phase && updates.phase !== prevPhase) {
       await supabase.from('status_history').insert({
         order_id: orderId,
         from_phase: prevPhase,
-        to_phase: updates.phase_id,
+        to_phase: updates.phase,
         changed_by: 'mollie_webhook',
       }).catch(() => {})
     }
