@@ -1755,7 +1755,9 @@ function renderConfig() {
   root.querySelector('#finish-outside').value = el.finishOutside;
   root.querySelector('#finish-inside').value = el.finishInside;
 
-  const hasDoorPanels = el.type === 'deur' || (el.doorPanels?.some(p => p.fill === 'panel'));
+  const hasDoorPanels = el.type === 'deur'
+    || (el.doorPanels?.some(p => p.fill === 'panel'))
+    || (el.columns?.some(col => col.rows?.some(r => r.fill === 'panel')));
   root.querySelector('#color-panel-field').style.display = hasDoorPanels ? '' : 'none';
 
   const swatchOut = root.querySelector('#color-outside-swatch');

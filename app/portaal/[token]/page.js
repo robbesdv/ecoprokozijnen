@@ -987,7 +987,9 @@ function Phase0({ order, onRefresh, showToast }) {
       const pdfSashCode = el.colorSash && el.colorSash !== 'same' ? el.colorSash : null
       const pdfPanelCode = el.colorPanel && el.colorPanel !== 'same' ? el.colorPanel : null
       const pdfHasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd)) || (el.doorPanels?.some(p => p.gelaagd))
-      const pdfHasDoorPanels = el.type === 'deur' || (el.doorPanels?.some(p => p.fill === 'panel'))
+      const pdfHasDoorPanels = el.type === 'deur'
+        || (el.doorPanels?.some(p => p.fill === 'panel'))
+        || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
       const pdfGlasPacks = [...new Set([
         ...cols.flatMap(col => col.rows?.map(r => r.glassPack).filter(Boolean) || []),
         ...(el.doorPanels?.map(p => p.glassPack).filter(Boolean) || []),
@@ -1369,7 +1371,9 @@ function KozijnElementenSection({ items }) {
         const panelCode = el.colorPanel && el.colorPanel !== 'same' ? el.colorPanel : null
         const panelLabel = panelCode ? `${panelCode} ${ralName(panelCode)}` : `Zelfde als kozijn`
         const hasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd)) || (el.doorPanels?.some(p => p.gelaagd))
-        const hasDoorPanels = el.type === 'deur' || (el.doorPanels?.some(p => p.fill === 'panel'))
+        const hasDoorPanels = el.type === 'deur'
+          || (el.doorPanels?.some(p => p.fill === 'panel'))
+          || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
         const glassPacks = [...new Set([
           ...cols.flatMap(col => col.rows?.map(r => r.glassPack).filter(Boolean) || []),
           ...(el.doorPanels?.map(p => p.glassPack).filter(Boolean) || []),
