@@ -26,6 +26,9 @@ function buildItemDescription(el) {
     const label = PANE_LABEL[r.paneType] || r.paneType
     if (!seenTypes.includes(label)) seenTypes.push(label)
   })
+  const glassRows = [...allRows, ...doorPanels].filter(r => r.glassPack)
+  const glassPacks = [...new Set(glassRows.map(r => r.glassPack).filter(Boolean))]
+  const glassStr = glassPacks.length > 0 ? glassPacks.join('/') : 'HR++'
   const w = el.dimensions?.widthMM
   const h = el.dimensions?.heightMM
   const colorCode = el.finish?.colorOutside || ''
@@ -33,7 +36,7 @@ function buildItemDescription(el) {
   const vaksStr = `${nVaks || 1}-vaks`
   const typesStr = seenTypes.join(' / ') || 'vast glas'
   const kleurStr = colorCode + (colorName && colorName !== colorCode ? ` — ${colorName}` : '')
-  return `Premium Schüco Living Variant ${vaksStr}, ${typesStr}, ${w} × ${h}mm bxh, Kleur: ${kleurStr}, HR++`
+  return `Premium Schüco Living Variant ${vaksStr}, ${typesStr}, ${w} × ${h}mm bxh, Kleur: ${kleurStr}, ${glassStr}`
 }
 
 function buildExtraDescription(ex) {

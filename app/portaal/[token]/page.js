@@ -916,13 +916,14 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.setFontSize(8)
     doc.text(COMPANY.contactRole, M, y)
     doc.text(`${COMPANY.phone}  ·  ${COMPANY.email}`, M, y + 4)
+    y += 12
 
     const disclaimerText = 'Aan deze offerte kunnen geen rechten worden ontleend. Afbeeldingen en tekeningen zijn indicatief en fictief van aard. Na het inmeten worden de definitieve productietekeningen vrijgegeven; maatvoering kan hiervan afwijken.'
     const disclaimerLines = doc.splitTextToSize(disclaimerText, W - 2 * M)
     doc.setFontSize(6.5)
     doc.setFont('helvetica', 'italic')
     doc.setTextColor(160, 160, 160)
-    doc.text(disclaimerLines, M, 272)
+    doc.text(disclaimerLines, M, Math.min(y, 273))
 
     doc.setFillColor(...brand)
     doc.rect(0, 282, W, 15, 'F')
