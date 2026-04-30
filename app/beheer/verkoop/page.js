@@ -265,7 +265,7 @@ export default function VerkoopPage() {
         order_id:      orderId,
         description:   buildExtraDescription(ex),
         quantity:      ex.qty || 1,
-        unit_price:    Number(ex.unitPrice) / 1.21 || 0,
+        unit_price:    Number(ex.unitPrice) || 0,
         sort_order:    elementItems.length + idx,
         element_config: null,
       }))
@@ -284,7 +284,7 @@ export default function VerkoopPage() {
     const c = kl.customer || {}
     const totals = kl.totals || {}
     const d = 1 - ((kl.project?.discountPct || 0) / 100)
-    const total_amount = (totals.gross || 0) - (totals.extrasTotal || 0) * d * 0.21
+    const total_amount = totals.gross || 0
     const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
     const updates = {
       customer_name:    c.name || 'Onbekend',
@@ -341,7 +341,7 @@ export default function VerkoopPage() {
     const c = kl.customer || {}
     const totals = kl.totals || {}
     const d = 1 - ((kl.project?.discountPct || 0) / 100)
-    const total_amount = (totals.gross || 0) - (totals.extrasTotal || 0) * d * 0.21
+    const total_amount = totals.gross || 0
     const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
 
     const { data: order, error } = await supabase
@@ -385,7 +385,7 @@ export default function VerkoopPage() {
     if (!confirmData) return 0
     const t = confirmData.totals || {}
     const dd = 1 - ((confirmData.project?.discountPct || 0) / 100)
-    return (t.gross || 0) - (t.extrasTotal || 0) * dd * 0.21
+    return t.gross || 0
   })()
 
   return (

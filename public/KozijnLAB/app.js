@@ -458,6 +458,7 @@ function priceElement(el) {
       const pack = r.glassPack || el.glassPack || 'HR++';
       if (pack === 'HR+++') glassUpgrade += am2 * 105;
       if (pack === 'Triple') glassUpgrade += am2 * 105;
+      if (pack === 'Gelaagd') glassUpgrade += am2 * 48.40;
       if (r.glassFinish === 'satinato') glassUpgrade += am2 * 20;
       if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
     }));
@@ -514,16 +515,14 @@ function projectTotals() {
   let material = 0;
   state.elements.forEach(el => material += priceElement(el));
   const montage = Number(state.montageEuro) || 0;
-  const sub = material + montage;
+  let extrasTotal = 0;
+  (state.extras || []).forEach(ex => extrasTotal += (ex.qty || 1) * (ex.unitPrice || 0));
+  const sub = material + montage + extrasTotal;
   const discount = sub * ((Number(state.discountPct) || 0) / 100);
   const net = Math.max(0, sub - discount);
   const vat = net * (Number(state.vatRate) || 0);
-  const materialGross = net + vat;
-  // Extra's zijn bruto bedragen (incl. BTW) — worden NA de BTW-berekening opgeteld
-  let extrasTotal = 0;
-  (state.extras || []).forEach(ex => extrasTotal += (ex.qty || 1) * (ex.unitPrice || 0));
-  const gross = materialGross + extrasTotal;
-  return { material, montage, sub, discount, net, vat, materialGross, extrasTotal, gross };
+  const gross = net + vat;
+  return { material, montage, extrasTotal, sub, discount, net, vat, gross };
 }
 
 const fmtEuro = n => '€ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
@@ -1844,8 +1843,7 @@ function buildConfigShell() {
         <div class="field" id="slide-system-field" style="display:none">
           <label class="label">Schuifsysteem</label>
           <div class="segmented full" id="slide-seg">
-            <button data-v="hst">HST (hef-schuif)</button>
-            <button data-v="psk">PSK (kiepschuif)</button>
+            <button data-v="hst">Hef-schuif (HST)</button>
           </div>
         </div>
         <div class="field" id="door-type-field" style="display:none">
@@ -1893,7 +1891,7 @@ function buildConfigShell() {
         <div id="glass-fields" style="display:none">
           <div class="field-row">
             <div class="field"><label class="label">Beglazing</label>
-              <select class="select" id="glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option></select>
+              <select class="select" id="glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option><option value="Gelaagd">Gelaagd (+€40/m²)</option></select>
             </div>
             <div class="field"><label class="label">Afwerking</label>
               <select class="select" id="glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
@@ -1916,7 +1914,7 @@ function buildConfigShell() {
           <div id="door-glass-fields" style="display:none">
             <div class="field-row">
               <div class="field"><label class="label">Beglazing</label>
-                <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option></select>
+                <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ (Ug 0.5)</option><option value="Triple">Triple (Ug 0.5)</option><option value="Gelaagd">Gelaagd (+€40/m²)</option></select>
               </div>
               <div class="field"><label class="label">Afwerking</label>
                 <select class="select" id="door-panel-glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
@@ -2233,7 +2231,7 @@ function renderExtras() {
     <div class="extra-row" style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);">
       <input class="input extra-name" data-i="${i}" placeholder="Omschrijving" value="${escapeHtml(ex.name)}" style="flex:1;min-width:0;font-size:12px;padding:4px 6px;"/>
       <input class="input mono extra-qty" data-i="${i}" type="number" min="1" step="1" value="${ex.qty}" style="width:46px;font-size:12px;padding:4px 6px;" title="Aantal"/>
-      <input class="input mono extra-price" data-i="${i}" type="number" min="0" step="0.01" value="${ex.unitPrice}" style="width:80px;font-size:12px;padding:4px 6px;" title="Bruto prijs per stuk (incl. BTW)"/>
+      <input class="input mono extra-price" data-i="${i}" type="number" min="0" step="0.01" value="${ex.unitPrice}" style="width:80px;font-size:12px;padding:4px 6px;" title="Netto prijs per stuk (excl. BTW)"/>
       <span class="extra-total mono" style="font-size:11px;color:var(--text-muted);min-width:64px;text-align:right;">${fmtEuro(ex.qty * ex.unitPrice)}</span>
       <button class="btn btn-sm btn-danger extra-del" data-i="${i}" style="padding:2px 6px;">✕</button>
     </div>`).join('');
@@ -2267,18 +2265,17 @@ function renderTotals() {
   const extraRows = (state.extras || []).map(ex => {
     const amt = (ex.qty || 1) * (ex.unitPrice || 0);
     const lbl = ex.qty > 1 ? `${escapeHtml(ex.name || 'Extra')} (${ex.qty}×)` : escapeHtml(ex.name || 'Extra');
-    return `<div class="row muted"><span>${lbl} <span style="font-size:10px;color:var(--text-muted)">bruto</span></span><span class="v">${fmtEuro(amt)}</span></div>`;
+    return `<div class="row muted"><span>${lbl}</span><span class="v">${fmtEuro(amt)}</span></div>`;
   }).join('');
   document.getElementById('totals-table').innerHTML = `
     <div class="row muted"><span>Materiaal (${state.elements.length} el.)</span><span class="v">${fmtEuro(t.material)}</span></div>
     <div class="row muted"><span>Montage</span><span class="v">${fmtEuro(t.montage)}</span></div>
+    ${extraRows}
     <div class="row divider"><span>Subtotaal</span><span class="v">${fmtEuro(t.sub)}</span></div>
     ${t.discount > 0 ? `<div class="row muted"><span>Korting (${state.discountPct}%)</span><span class="v">−${fmtEuro(t.discount)}</span></div>` : ''}
     <div class="row muted"><span>Netto</span><span class="v">${fmtEuro(t.net)}</span></div>
     <div class="row muted"><span>BTW (21%)</span><span class="v">${fmtEuro(t.vat)}</span></div>
-    <div class="row divider"><span>Materiaal incl. BTW</span><span class="v">${fmtEuro(t.materialGross)}</span></div>
-    ${extraRows}
-    <div class="row total"><span>Totaal</span><span class="v">${fmtEuro(t.gross)}</span></div>`;
+    <div class="row total"><span>Totaal incl. BTW</span><span class="v">${fmtEuro(t.gross)}</span></div>`;
 }
 
 // ============================================================
