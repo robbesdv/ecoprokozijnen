@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+
+const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app').replace(/^http:/, 'https:')
 
 // Y positions (pt from bottom of A4 page = 842pt) for text overlay fallback.
 // Adjust these if the text lands in the wrong place.
@@ -36,7 +36,9 @@ export async function GET(request) {
 
   let templateBytes
   try {
-    templateBytes = readFileSync(join(process.cwd(), 'public', 'warmtefonds-template.pdf'))
+    const res = await fetch(`${BASE_URL}/warmtefonds-template.pdf`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    templateBytes = await res.arrayBuffer()
   } catch {
     return new Response(
       'Template niet gevonden. Sla het ondertekende PDF-bestand op als public/warmtefonds-template.pdf',
