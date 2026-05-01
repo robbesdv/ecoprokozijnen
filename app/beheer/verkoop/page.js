@@ -792,7 +792,7 @@ export default function VerkoopPage() {
                 <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 12 }}>Klantportaal — scan met telefoon</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <div style={{ background: 'white', padding: 8, border: '1px solid var(--border)', borderRadius: 8, flexShrink: 0 }}>
+                    <div style={{ background: 'white', padding: 8, border: '1px solid var(--border)', borderRadius: 8, flexShrink: 0, colorScheme: 'light' }}>
                       <QRCodeSVG
                         value={`https://ecoprokozijnen.vercel.app/portaal/${selectedOfferte.portal_token}`}
                         size={140}
