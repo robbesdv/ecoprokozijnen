@@ -753,6 +753,35 @@ export default function VerkoopPage() {
                   {savingOfferte ? 'Opslaan…' : '💾 Wijzigingen opslaan'}
                 </button>
               </div>
+
+              {/* Facturen */}
+              {selectedOfferte?.portal_token && (
+                <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 12 }}>Facturen</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {[
+                      { label: 'Factuur 1 — Aanbetaling (20%)', type: 'aanbetaling' },
+                      ...(selectedOfferte.payment_split === 'split_70_10'
+                        ? [
+                            { label: 'Factuur 2 — Na montage (70%)', type: 'hoofdfactuur' },
+                            { label: 'Factuur 3 — Slotbetaling (10%)', type: 'slotbetaling' },
+                          ]
+                        : [{ label: 'Factuur 2 — Slotfactuur (80%)', type: 'slotfactuur' }]
+                      ),
+                    ].map(({ label, type }) => (
+                      <a
+                        key={type}
+                        href={`/factuur/${selectedOfferte.portal_token}/${type}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, color: 'var(--text)', textDecoration: 'none', fontWeight: 500 }}
+                      >
+                        📋 {label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

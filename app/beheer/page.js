@@ -759,6 +759,30 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
 
         {tab === 'betaling' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <Section title="Facturen">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { label: 'Factuur 1 — Aanbetaling (20%)', type: 'aanbetaling' },
+                  ...(paymentSplit === 'split_70_10'
+                    ? [
+                        { label: 'Factuur 2 — Betaling na montage (70%)', type: 'hoofdfactuur' },
+                        { label: 'Factuur 3 — Slotbetaling (10%)', type: 'slotbetaling' },
+                      ]
+                    : [{ label: 'Factuur 2 — Slotfactuur (80%)', type: 'slotfactuur' }]
+                  ),
+                ].map(({ label, type }) => (
+                  <a
+                    key={type}
+                    href={`/factuur/${order.portal_token}/${type}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13, color: 'var(--text)', textDecoration: 'none', background: 'var(--bg)', fontWeight: 500 }}
+                  >
+                    📋 {label}
+                  </a>
+                ))}
+              </div>
+            </Section>
             <Section title="Betaalsplitsing na montage">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {[

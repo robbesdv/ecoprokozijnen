@@ -1502,6 +1502,15 @@ function Phase1({ order, onRefresh, showToast }) {
           kozijnen worden nu besteld bij de fabriek.
         </div>
         <StatusTimeline phase={1} order={order} />
+        <a
+          href={`/factuur/${order.portal_token}/aanbetaling`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-ghost btn-full"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+        >
+          📋 Factuur aanbetaling bekijken (20%)
+        </a>
         <ContactCard />
       </div>
     )
@@ -1544,6 +1553,16 @@ function Phase1({ order, onRefresh, showToast }) {
           ✓ &nbsp;Uw betaling is gemeld. Wij bevestigen de ontvangst zo spoedig mogelijk.
         </div>
       )}
+
+      <a
+        href={`/factuur/${order.portal_token}/aanbetaling`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="btn btn-ghost btn-full"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+      >
+        📋 Factuur aanbetaling downloaden (20%)
+      </a>
 
       <ContactCard />
       <OrderFiles order={order} />
@@ -1791,6 +1810,16 @@ function Phase6({ order, onRefresh, showToast }) {
             reference={`Restbetaling ${order.id.slice(0, 8).toUpperCase()}`}
           />
 
+          <a
+            href={`/factuur/${order.portal_token}/${order.payment_split === 'split_70_10' ? 'hoofdfactuur' : 'slotfactuur'}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-ghost btn-full"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+          >
+            📋 Factuur {order.payment_split === 'split_70_10' ? '70%' : '80%'} downloaden
+          </a>
+
           <IDealButton order={order} paymentType="main" label={`Betaal ${formatEuro(calcMain(order.total_amount, order.payment_split))} via iDEAL`} />
 
           <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
@@ -1860,6 +1889,16 @@ function Phase6({ order, onRefresh, showToast }) {
                   description="Deze betaling wordt vrijgegeven zodra alle open punten zijn opgelost."
                   reference={`Slotbetaling ${order.id.slice(0, 8).toUpperCase()}`}
                 />
+
+                <a
+                  href={`/factuur/${order.portal_token}/slotbetaling`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-ghost btn-full"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  📋 Factuur slotbetaling downloaden (10%)
+                </a>
 
                 <IDealButton order={order} paymentType="final" label={`Betaal ${formatEuro(calcFinal(order.total_amount))} via iDEAL`} />
 
