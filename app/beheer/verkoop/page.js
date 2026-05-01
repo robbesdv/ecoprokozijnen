@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
 import { getPhase, formatEuro, formatDate } from '@/lib/phases'
 import { ralName, KozijnSVG } from '@/lib/KozijnSVG'
@@ -782,6 +783,38 @@ export default function VerkoopPage() {
                         📋 {label}
                       </a>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* QR-code portaal */}
+              {selectedOfferte?.portal_token && (
+                <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 12 }}>Klantportaal — scan met telefoon</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                    <div style={{ background: 'white', padding: 8, border: '1px solid var(--border)', borderRadius: 8, flexShrink: 0 }}>
+                      <QRCodeSVG
+                        value={`https://ecoprokozijnen.vercel.app/portaal/${selectedOfferte.portal_token}`}
+                        size={140}
+                        bgColor="#ffffff"
+                        fgColor="#1A3A2A"
+                        level="M"
+                      />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{selectedOfferte.customer_name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', wordBreak: 'break-all', marginBottom: 10 }}>
+                        ecoprokozijnen.vercel.app/portaal/{selectedOfferte.portal_token}
+                      </div>
+                      <a
+                        href={`/portaal/${selectedOfferte.portal_token}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, color: 'var(--text)', textDecoration: 'none', fontWeight: 500 }}
+                      >
+                        🔗 Portaal openen
+                      </a>
+                    </div>
                   </div>
                 </div>
               )}
