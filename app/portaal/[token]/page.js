@@ -2433,8 +2433,56 @@ function PaymentCard({ title, amount, description, reference }) {
   )
 }
 
+function WarmtefondsLink({ order }) {
+  const url = `/api/warmtefonds?token=${encodeURIComponent(order.portal_token)}`
+  return (
+    <a
+      href={url}
+      download
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '12px 14px',
+        textDecoration: 'none',
+        border: '1px solid #bbf7d0',
+        borderRadius: 14,
+        background: '#f0fdf4',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+      }}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: '#dcfce7',
+          fontSize: 20,
+          flexShrink: 0,
+        }}
+      >
+        🏠
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>
+          Warmtefonds verklaring
+        </div>
+        <div style={{ fontSize: 11, color: '#15803d', marginTop: 2 }}>
+          Vooringevuld voor uw aanvraag — klik om te downloaden
+        </div>
+      </div>
+      <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600, flexShrink: 0 }}>↓ PDF</div>
+    </a>
+  )
+}
+
 function OrderFiles({ order }) {
   const files = (order.order_files || []).filter((f) => f.file_url)
+  const totalCount = files.length + 1 // +1 for warmtefonds
 
   return (
     <div className="card" style={{ overflow: 'hidden' }}>
@@ -2448,102 +2496,90 @@ function OrderFiles({ order }) {
         }}
       >
         <div style={{ fontWeight: 600, fontSize: 15 }}>Documenten & foto&apos;s</div>
-        {files.length > 0 && <span className="badge badge-productie">{files.length}</span>}
+        <span className="badge badge-productie">{totalCount}</span>
       </div>
 
-      {files.length === 0 ? (
-        <div
-          style={{
-            padding: '18px 20px',
-            fontSize: 13,
-            color: 'var(--text-light)',
-            fontStyle: 'italic',
-          }}
-        >
-          Nog geen documenten toegevoegd door EcoPro Kozijnen.
-        </div>
-      ) : (
-        <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {files.map((f) => {
-            const meta = getFileMeta(f)
+      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <WarmtefondsLink order={order} />
 
-            return (
-              <a
-                key={f.id}
-                href={f.file_url}
-                target="_blank"
-                rel="noopener noreferrer"
+        {files.length > 0 && files.map((f) => {
+          const meta = getFileMeta(f)
+          return (
+            <a
+              key={f.id}
+              href={f.file_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 14px',
+                textDecoration: 'none',
+                border: '1px solid var(--border)',
+                borderRadius: 14,
+                background: 'white',
+                transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              }}
+            >
+              <div
                 style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 14px',
-                  textDecoration: 'none',
-                  border: '1px solid var(--border)',
-                  borderRadius: 14,
-                  background: 'white',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  background: meta.tint,
+                  border: `1px solid ${meta.border}`,
+                  flexShrink: 0,
                 }}
               >
+                {meta.icon}
+              </div>
+
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 20,
-                    background: meta.tint,
-                    border: `1px solid ${meta.border}`,
-                    flexShrink: 0,
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: 'var(--text)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  {meta.icon}
+                  {f.filename}
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
+                  <span
                     style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      background: meta.tint,
+                      border: `1px solid ${meta.border}`,
+                      color: meta.color,
                     }}
                   >
-                    {f.filename}
-                  </div>
+                    {meta.label}
+                  </span>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: '4px 8px',
-                        borderRadius: 999,
-                        background: meta.tint,
-                        border: `1px solid ${meta.border}`,
-                        color: meta.color,
-                      }}
-                    >
-                      {meta.label}
-                    </span>
-
-                    <span style={{ fontSize: 11, color: 'var(--text-light)' }}>
-                      Openen / downloaden
-                    </span>
-                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--text-light)' }}>
+                    Openen / downloaden
+                  </span>
                 </div>
+              </div>
 
-                <div style={{ fontSize: 18, color: 'var(--text-light)', flexShrink: 0 }}>›</div>
-              </a>
-            )
-          })}
-        </div>
-      )}
+              <div style={{ fontSize: 18, color: 'var(--text-light)', flexShrink: 0 }}>›</div>
+            </a>
+          )
+        })}
+      </div>
     </div>
   )
 }
