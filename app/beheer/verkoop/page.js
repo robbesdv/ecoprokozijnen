@@ -453,7 +453,7 @@ export default function VerkoopPage() {
   })()
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
       <BeheerNav topSlot={
         tab === 'kozijnlab' ? (
           <button onClick={requestSubmit} style={{ width: '100%', background: '#22c55e', border: '1px solid #16a34a', color: 'white', padding: '9px 14px', borderRadius: 9, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700 }}>
@@ -791,8 +791,8 @@ export default function VerkoopPage() {
               {selectedOfferte?.portal_token && (
                 <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 20px' }}>
                   <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 12 }}>Klantportaal — scan met telefoon</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-                    <div style={{ background: 'white', padding: 8, border: '1px solid var(--border)', borderRadius: 8, flexShrink: 0, colorScheme: 'light' }}>
+                  <div className="qr-portal-row">
+                    <div className="qr-portal-qr">
                       <QRCodeSVG
                         value={`https://ecoprokozijnen.vercel.app/portaal/${selectedOfferte.portal_token}`}
                         size={140}
@@ -803,14 +803,14 @@ export default function VerkoopPage() {
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{selectedOfferte.customer_name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', wordBreak: 'break-all', marginBottom: 10 }}>
+                      <div className="qr-portal-url">
                         ecoprokozijnen.vercel.app/portaal/{selectedOfferte.portal_token}
                       </div>
                       <a
                         href={`/portaal/${selectedOfferte.portal_token}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, color: 'var(--text)', textDecoration: 'none', fontWeight: 500 }}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 16px', fontSize: 13, color: 'var(--text)', textDecoration: 'none', fontWeight: 500 }}
                       >
                         🔗 Portaal openen
                       </a>
@@ -910,7 +910,7 @@ export default function VerkoopPage() {
 
       {/* ── Toast ─────────────────────────────────────────────────── */}
       {toast && (
-        <div className="animate-fade" style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? 'var(--danger)' : '#1A1A1A', color: 'white', padding: '11px 20px', borderRadius: 10, fontSize: 14, fontWeight: 500, zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="animate-fade" style={{ position: 'fixed', bottom: 'max(24px, calc(env(safe-area-inset-bottom) + 12px))', left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? 'var(--danger)' : '#1A1A1A', color: 'white', padding: '11px 20px', borderRadius: 10, fontSize: 14, fontWeight: 500, zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
         </div>
       )}

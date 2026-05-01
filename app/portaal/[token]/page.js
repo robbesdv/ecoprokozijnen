@@ -208,7 +208,7 @@ export default function PortaalPage({ params: paramsPromise }) {
           className="animate-fade"
           style={{
             position: 'fixed',
-            bottom: 28,
+            bottom: 'max(28px, calc(env(safe-area-inset-bottom) + 12px))',
             left: '50%',
             transform: 'translateX(-50%)',
             background: toast.type === 'error' ? 'var(--danger)' : '#1A1A1A',
