@@ -14,6 +14,24 @@ import {
 } from '@/lib/phases'
 import { KozijnSVG, kozijnSVGString, svgToPngDataUrl, ralName, PANE_NAMES, normalizeEl } from '@/lib/KozijnSVG'
 
+const _PACK_RANK_GLOBAL = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
+function fixDesc(description, element_config) {
+  let cfg = element_config
+  if (typeof cfg === 'string') { try { cfg = JSON.parse(cfg) } catch { return description } }
+  if (!cfg) return description
+  const cols = cfg.columns || []
+  const doorPanels = cfg.type === 'deur' && Array.isArray(cfg.doorPanels) ? cfg.doorPanels : []
+  const glassRows = [
+    ...cols.flatMap(c => (c.rows || []).filter(r => r.fill !== 'panel')),
+    ...doorPanels.filter(p => p.fill === 'glass'),
+  ]
+  const rawPacks = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
+  const maxRank = Math.max(0, ...rawPacks.map(p => _PACK_RANK_GLOBAL[p] ?? 0))
+  const packs = maxRank > 0 ? rawPacks.filter(p => (_PACK_RANK_GLOBAL[p] ?? 0) === maxRank) : rawPacks
+  if (!packs.length) return description
+  return (description || '').replace(/,\s*HR\+{1,3}(?:\/HR\+{1,3})*\s*$/, `, ${packs.join('/')}`)
+}
+
 const COMPANY = {
   name: 'EcoPro Kozijnen B.V.',
   iban: 'NL37ABNA0126549974',
@@ -797,7 +815,7 @@ function Phase0({ order, onRefresh, showToast }) {
         ...items.map((i) => {
           const excl = i.unit_price * i.quantity
           const incl = excl * 1.21
-          return [String(i.quantity), i.description, eur(excl), '21%', eur(incl)]
+          return [String(i.quantity), fixDesc(i.description, i.element_config), eur(excl), '21%', eur(incl)]
         }),
         ...(hasKorting ? [['', 'Korting', eur(-(kortingIncl / 1.21)), '', eur(-kortingIncl)]] : []),
       ],
@@ -1186,7 +1204,7 @@ function Phase0({ order, onRefresh, showToast }) {
               }}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>{item.description}</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{fixDesc(item.description, item.element_config)}</div>
                 {item.quantity > 1 && (
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
                     {item.quantity} stuks × {formatEuro(item.unit_price)}
