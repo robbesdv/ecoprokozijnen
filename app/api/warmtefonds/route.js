@@ -6,9 +6,9 @@ const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.ve
 // Y positions (pt from bottom of A4 page = 842pt) for text overlay fallback.
 // Adjust these if the text lands in the wrong place.
 const FIELD_Y = {
-  naam:     559,  // "Naam" row
-  straat:   534,  // "Straat en huisnummer" row
-  postcode: 509,  // "Postcode en woonplaats" row
+  naam:     638,  // "Naam" row
+  straat:   613,  // "Straat en huisnummer" row
+  postcode: 588,  // "Postcode en woonplaats" row
 }
 const FIELD_X = 180 // x start — after the label text
 
