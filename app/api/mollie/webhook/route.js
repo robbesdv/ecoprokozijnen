@@ -119,17 +119,24 @@ export async function POST(request) {
     }
 
     const prevPhase = order.phase
+    const paidAt = payment.paidAt || new Date().toISOString()
+
+    // Best-effort: store per-payment timestamp (requires deposit_paid_at/main_paid_at/final_paid_at columns)
+    const paidAtField = paymentType === 'deposit' ? 'deposit_paid_at'
+      : paymentType === 'main' ? 'main_paid_at'
+      : 'final_paid_at'
+    updates[paidAtField] = paidAt
+
     await supabase.from('orders').update(updates).eq('id', orderId)
 
-    // Log phase change
-    if (updates.phase && updates.phase !== prevPhase) {
-      await supabase.from('status_history').insert({
-        order_id: orderId,
-        from_phase: prevPhase,
-        to_phase: updates.phase,
-        changed_by: 'mollie_webhook',
-      }).catch(() => {})
-    }
+    // Always log a status_history entry for iDEAL payments so bewijs can find the payment date
+    await supabase.from('status_history').insert({
+      order_id: orderId,
+      from_phase: prevPhase,
+      to_phase: updates.phase || prevPhase,
+      changed_by: 'mollie_webhook',
+      note: JSON.stringify({ payment_type: paymentType, amount: payment.amount?.value, mollie_id: paymentId, paid_at: paidAt, to_phase: updates.phase || prevPhase }),
+    }).catch(() => {})
 
     // Send customer notification
     if (notifyType && order.customer_email) {

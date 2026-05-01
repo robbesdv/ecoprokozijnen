@@ -1502,15 +1502,7 @@ function Phase1({ order, onRefresh, showToast }) {
           kozijnen worden nu besteld bij de fabriek.
         </div>
         <StatusTimeline phase={1} order={order} />
-        <a
-          href={`/factuur/${order.portal_token}/aanbetaling`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn btn-ghost btn-full"
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-        >
-          📋 Factuur aanbetaling bekijken (20%)
-        </a>
+        <InvoiceLinks order={order} />
         <ContactCard />
       </div>
     )
@@ -1554,16 +1546,7 @@ function Phase1({ order, onRefresh, showToast }) {
         </div>
       )}
 
-      <a
-        href={`/factuur/${order.portal_token}/aanbetaling`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="btn btn-ghost btn-full"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-      >
-        📋 Factuur aanbetaling downloaden (20%)
-      </a>
-
+      <InvoiceLinks order={order} />
       <ContactCard />
       <OrderFiles order={order} />
     </div>
@@ -1581,6 +1564,7 @@ function Phase2({ order }) {
         ontvangen. Wij bestellen uw kozijnen bij de fabriek.
       </div>
       <StatusTimeline phase={2} order={order} />
+      <InvoiceLinks order={order} />
       <ContactCard />
       <OrderFiles order={order} />
     </div>
@@ -1613,6 +1597,7 @@ function Phase3({ order }) {
       )}
 
       <StatusTimeline phase={3} order={order} />
+      <InvoiceLinks order={order} />
       <ContactCard />
       <OrderFiles order={order} />
 
@@ -1635,6 +1620,7 @@ function Phase4({ order }) {
         de montagedatum.
       </div>
       <StatusTimeline phase={4} order={order} />
+      <InvoiceLinks order={order} />
       <ContactCard />
       <OrderFiles order={order} />
     </div>
@@ -1693,6 +1679,7 @@ function Phase5({ order }) {
       )}
 
       <StatusTimeline phase={5} order={order} />
+      <InvoiceLinks order={order} />
       <ContactCard />
       <OrderFiles order={order} />
     </div>
@@ -1810,16 +1797,6 @@ function Phase6({ order, onRefresh, showToast }) {
             reference={`Restbetaling ${order.id.slice(0, 8).toUpperCase()}`}
           />
 
-          <a
-            href={`/factuur/${order.portal_token}/${order.payment_split === 'split_70_10' ? 'hoofdfactuur' : 'slotfactuur'}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-ghost btn-full"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          >
-            📋 Factuur {order.payment_split === 'split_70_10' ? '70%' : '80%'} downloaden
-          </a>
-
           <IDealButton order={order} paymentType="main" label={`Betaal ${formatEuro(calcMain(order.total_amount, order.payment_split))} via iDEAL`} />
 
           <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>of</div>
@@ -1889,16 +1866,6 @@ function Phase6({ order, onRefresh, showToast }) {
                   description="Deze betaling wordt vrijgegeven zodra alle open punten zijn opgelost."
                   reference={`Slotbetaling ${order.id.slice(0, 8).toUpperCase()}`}
                 />
-
-                <a
-                  href={`/factuur/${order.portal_token}/slotbetaling`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-ghost btn-full"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                >
-                  📋 Factuur slotbetaling downloaden (10%)
-                </a>
 
                 <IDealButton order={order} paymentType="final" label={`Betaal ${formatEuro(calcFinal(order.total_amount))} via iDEAL`} />
 
@@ -2028,6 +1995,7 @@ function Phase6({ order, onRefresh, showToast }) {
         </div>
       </div>
 
+      <InvoiceLinks order={order} />
       <ContactCard />
       <OrderFiles order={order} />
     </div>
@@ -2266,8 +2234,86 @@ function Phase7({ order, showToast }) {
         )}
       </div>
 
+      <InvoiceLinks order={order} />
       <ContactCard />
       <OrderFiles order={order} />
+    </div>
+  )
+}
+
+function InvoiceLinks({ order }) {
+  const token = order.portal_token
+  const split = order.payment_split
+  const depositDone = order.deposit_confirmed
+  const mainDone = order.main_payment_confirmed
+  const finalDone = order.final_payment_confirmed
+  const splitKnown = split && split !== 'pending'
+
+  const links = []
+
+  // Factuur aanbetaling always available from phase 1+
+  links.push({ href: `/factuur/${token}/aanbetaling`, label: 'Factuur aanbetaling (20%)', icon: '📋' })
+
+  // Bewijs aanbetaling after deposit confirmed
+  if (depositDone) {
+    links.push({ href: `/factuur/${token}/bewijs-aanbetaling`, label: 'Betalingsbewijs aanbetaling', icon: '✓' })
+  }
+
+  // Main invoice only after deposit is confirmed and split is decided
+  if (depositDone && splitKnown) {
+    const mainType = split === 'split_70_10' ? 'hoofdfactuur' : 'slotfactuur'
+    const mainLabel = split === 'split_70_10' ? 'Factuur na montage (70%)' : 'Slotfactuur (80%)'
+    links.push({ href: `/factuur/${token}/${mainType}`, label: mainLabel, icon: '📋' })
+
+    if (mainDone) {
+      const bewijsType = split === 'split_70_10' ? 'bewijs-hoofdfactuur' : 'bewijs-slotfactuur'
+      const bewijsLabel = split === 'split_70_10' ? 'Betalingsbewijs 70%' : 'Betalingsbewijs slotfactuur'
+      links.push({ href: `/factuur/${token}/${bewijsType}`, label: bewijsLabel, icon: '✓' })
+    }
+  }
+
+  // Final installment (10%) only after main is confirmed
+  if (split === 'split_70_10' && mainDone) {
+    links.push({ href: `/factuur/${token}/slotbetaling`, label: 'Factuur slotbetaling (10%)', icon: '📋' })
+    if (finalDone) {
+      links.push({ href: `/factuur/${token}/bewijs-slotbetaling`, label: 'Betalingsbewijs slotbetaling', icon: '✓' })
+    }
+  }
+
+  if (!links.length) return null
+
+  return (
+    <div className="card" style={{ padding: '16px 20px' }}>
+      <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 12 }}>
+        Facturen & betalingsbewijzen
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {links.map(({ href, label, icon }) => (
+          <a
+            key={href}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '10px 14px',
+              background: icon === '✓' ? 'var(--success-bg, #F0FDF4)' : 'var(--bg)',
+              border: `1px solid ${icon === '✓' ? 'var(--success-border, #BBF7D0)' : 'var(--border)'}`,
+              borderRadius: 10,
+              fontSize: 14,
+              fontWeight: 500,
+              color: icon === '✓' ? 'var(--success, #15803D)' : 'var(--text)',
+              textDecoration: 'none',
+            }}
+          >
+            <span style={{ flexShrink: 0 }}>{icon}</span>
+            <span>{label}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, opacity: 0.5 }}>↗</span>
+          </a>
+        ))}
+      </div>
     </div>
   )
 }
