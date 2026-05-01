@@ -5,20 +5,20 @@ const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.ve
 
 // Y positions (pt from bottom of A4 = 842pt) for customer text fields.
 const FIELD_Y = {
-  naam:     610,
-  straat:   585,
-  postcode: 560,
+  naam:     602,
+  straat:   582,
+  postcode: 562,
 }
-const FIELD_X = 180
+const FIELD_X = 160
 
 // Checkbox positions [x, y from bottom] — draw a filled square here.
 // These match the small checkbox squares in the Warmtefonds form.
 const CHECK = {
-  hoogrendementsbeglazing:   [40, 392],
+  hoogrendementsbeglazing:   [42, 410],
   inclusief_hout_kunststof:  [57, 374],
-  isolerende_deuren:         [40, 338],
-  isolerende_panelen_dubbel: [40, 320],
-  isolerende_panelen_triple: [40, 302],
+  isolerende_deuren:         [42, 338],
+  isolerende_panelen_dubbel: [42, 375],
+  isolerende_panelen_triple: [42, 360],
 }
 
 function parseItems(items) {
