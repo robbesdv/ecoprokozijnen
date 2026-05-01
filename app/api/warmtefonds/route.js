@@ -5,9 +5,9 @@ const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.ve
 
 // Y positions (pt from bottom of A4 = 842pt) for customer text fields.
 const FIELD_Y = {
-  naam:     638,
-  straat:   613,
-  postcode: 588,
+  naam:     645,
+  straat:   620,
+  postcode: 595,
 }
 const FIELD_X = 180
 
@@ -148,9 +148,7 @@ export async function GET(request) {
   // 3. Draw filled checkboxes (always — covers both AcroForm and fallback cases)
   for (const [key, [cx, cy]] of Object.entries(CHECK)) {
     if (toCheck.has(key)) {
-      // Filled square to simulate a checked checkbox
       page.drawRectangle({ x: cx, y: cy, width: 7, height: 7, color: green })
-      page.drawText('✓', { x: cx + 0.5, y: cy + 0.5, size: 7, font, color: rgb(1, 1, 1) })
     }
   }
 
