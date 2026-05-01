@@ -14,11 +14,11 @@ const FIELD_X = 150
 // Checkbox positions [x, y from bottom] — draw a filled square here.
 // These match the small checkbox squares in the Warmtefonds form.
 const CHECK = {
-  hoogrendementsbeglazing:   [43, 460],
-  inclusief_hout_kunststof:  [57, 440],
-  isolerende_deuren:         [43, 420],
-  isolerende_panelen_dubbel: [43, 400],
-  isolerende_panelen_triple: [43, 390],
+  hoogrendementsbeglazing:   [43, 456],
+  inclusief_hout_kunststof:  [58, 441],
+  isolerende_deuren:         [43, 417],
+  isolerende_panelen_dubbel: [43, 403],
+  isolerende_panelen_triple: [43, 389],
 }
 
 function parseItems(items) {
