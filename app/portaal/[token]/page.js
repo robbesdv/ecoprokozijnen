@@ -1000,10 +1000,13 @@ function Phase0({ order, onRefresh, showToast }) {
       const pdfHasDoorPanels = el.type === 'deur'
         || (el.doorPanels?.some(p => p.fill === 'panel'))
         || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
-      const pdfGlasPacks = [...new Set([
-        ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack).filter(Boolean) || []),
-        ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack).filter(Boolean) || []),
+      const _PDF_PACK_RANK = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
+      const _pdfRawPacks = [...new Set([
+        ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack?.trim()).filter(Boolean) || []),
+        ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack?.trim()).filter(Boolean) || []),
       ])]
+      const _pdfMaxRank = Math.max(0, ..._pdfRawPacks.map(p => _PDF_PACK_RANK[p] ?? 0))
+      const pdfGlasPacks = _pdfMaxRank > 0 ? _pdfRawPacks.filter(p => (_PDF_PACK_RANK[p] ?? 0) === _pdfMaxRank) : _pdfRawPacks
       const specsBody = [
         ['Type', el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—'],
         ['Breedte × Hoogte', `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm`],
@@ -1426,10 +1429,13 @@ function KozijnElementenSection({ items }) {
         const hasDoorPanels = el.type === 'deur'
           || (el.doorPanels?.some(p => p.fill === 'panel'))
           || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
-        const glassPacks = [...new Set([
-          ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack).filter(Boolean) || []),
-          ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack).filter(Boolean) || []),
+        const _PACK_RANK = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
+        const _rawPacks = [...new Set([
+          ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack?.trim()).filter(Boolean) || []),
+          ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack?.trim()).filter(Boolean) || []),
         ])]
+        const _maxRank = Math.max(0, ..._rawPacks.map(p => _PACK_RANK[p] ?? 0))
+        const glassPacks = _maxRank > 0 ? _rawPacks.filter(p => (_PACK_RANK[p] ?? 0) === _maxRank) : _rawPacks
         const specRows = [
           { label: 'Type', value: el.type?.charAt(0).toUpperCase() + el.type?.slice(1) || '—' },
           { label: 'Breedte × Hoogte', value: `${el.widthMM ?? '—'} × ${el.heightMM ?? '—'} mm` },

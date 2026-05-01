@@ -5,9 +5,9 @@ const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.ve
 
 // Y positions (pt from bottom of A4 = 842pt) for customer text fields.
 const FIELD_Y = {
-  naam:     645,
-  straat:   620,
-  postcode: 595,
+  naam:     610,
+  straat:   585,
+  postcode: 560,
 }
 const FIELD_X = 180
 

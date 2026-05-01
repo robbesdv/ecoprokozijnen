@@ -27,7 +27,10 @@ function buildItemDescription(el) {
     if (!seenTypes.includes(label)) seenTypes.push(label)
   })
   const glassRows = [...allRows.filter(r => r.fill !== 'panel'), ...doorPanels.filter(r => r.fill === 'glass')]
-  const glassPacks = [...new Set(glassRows.map(r => r.glassPack).filter(Boolean))]
+  const PACK_RANK = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
+  const rawPacks = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
+  const maxRank = Math.max(0, ...rawPacks.map(p => PACK_RANK[p] ?? 0))
+  const glassPacks = maxRank > 0 ? rawPacks.filter(p => (PACK_RANK[p] ?? 0) === maxRank) : rawPacks
   const glassStr = glassPacks.length > 0 ? glassPacks.join('/') : 'HR++'
   const w = el.dimensions?.widthMM
   const h = el.dimensions?.heightMM
