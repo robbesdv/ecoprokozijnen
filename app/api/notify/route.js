@@ -1,7 +1,6 @@
 import { Resend } from 'resend'
 
-// Afzender — verander naar info@ecoprokozijnen.nl zodra domein geverifieerd is
-const FROM = 'EcoPro Kozijnen <onboarding@resend.dev>' // Wijzig naar info@ecoprokozijnen.nl na domeinverificatie
+const FROM = 'EcoPro Kozijnen <noreply@ecoprokozijnen.nl>'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app'
 
 // ─── E-mail templates per type ────────────────────────────────────────────────
