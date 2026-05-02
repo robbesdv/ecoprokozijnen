@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="nl" data-theme="light" data-accent="emerald" data-density="comfortable">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>DakkapelLAB — Configurator</title>
+<link rel="stylesheet" href="../KozijnLAB/styles.css"/>
+<style>
+  .dakkapel-mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--acc-600);
+  }
+  .dakkapel-note {
+    margin: 0 20px 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--acc-100);
+    background: var(--acc-50);
+    border-radius: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  [data-theme="dark"] .dakkapel-note {
+    background: color-mix(in srgb, var(--acc-500) 14%, transparent);
+    border-color: color-mix(in srgb, var(--acc-500) 28%, transparent);
+  }
+</style>
+<script>
+  // DakkapelLAB gebruikt dezelfde KozijnLAB-engine, maar met eigen localStorage-namespace.
+  // Daardoor overschrijft DakkapelLAB je KozijnLAB-projecten niet.
+  (function namespaceDakkapelStorage() {
+    var map = function (key) { return key === 'KL_V2_STATE' ? 'DL_V1_STATE' : key; };
+    var proto = Storage.prototype;
+    var getItem = proto.getItem;
+    var setItem = proto.setItem;
+    var removeItem = proto.removeItem;
+    proto.getItem = function (key) { return getItem.call(this, map(key)); };
+    proto.setItem = function (key, value) { return setItem.call(this, map(key), value); };
+    proto.removeItem = function (key) { return removeItem.call(this, map(key)); };
+  })();
+</script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 11.5 12 4l9 7.5"/>
+          <path d="M5 10.5V20h14v-9.5"/>
+          <path d="M8 20v-6h8v6"/>
+          <path d="M9 11h6"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">DakkapelLAB</div>
+        <div class="brand-sub">Configurator v0.1</div>
+      </div>
+    </div>
+    <div class="offer-chip">
+      <span class="offer-lbl">Offerte</span>
+      <span class="offer-val mono" id="offer-code">—</span>
+    </div>
+    <div class="dakkapel-mode-chip">🏠 Dakkapelmodus</div>
+  </div>
+  <div class="topbar-center">
+    <div class="save-state">
+      <span class="save-dot" id="save-dot"></span>
+      <span id="save-label">Opgeslagen</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-ghost" id="btn-toggle-config" aria-label="Config">☰</button>
+    <button class="btn btn-icon" id="btn-theme-toggle" title="Thema"></button>
+    <button class="btn btn-ghost" id="btn-print" title="Print / PDF">🖨</button>
+    <button class="btn btn-ghost" id="btn-new-offer">Nieuwe dakkapel</button>
+    <button class="btn btn-ghost" id="btn-import" title="Open opgeslagen .json project">⬆ Importeer</button>
+    <input type="file" id="file-import" accept=".json" style="display:none"/>
+    <button class="btn btn-primary" id="btn-export">Exporteer JSON</button>
+    <button class="btn btn-success" id="btn-to-ecopro">→ EcoPro</button>
+    <button class="btn btn-ghost" id="btn-toggle-meta" aria-label="Overzicht">▤</button>
+  </div>
+</header>
+
+<main class="app">
+  <aside class="col-config">
+    <div class="col-head">
+      <h2 class="col-title">Dakkapel configuratie</h2>
+      <div class="col-sub">Gebruik de KozijnLAB-engine als basis voor dakkapel-offertes.</div>
+    </div>
+    <div class="dakkapel-note">
+      Start met voorzijde, zijwangen en extra's. Deze kopie staat los van KozijnLAB, zodat je bestaande kozijnflow veilig blijft.
+    </div>
+    <div class="col-scroll">
+      <div id="config-root"></div>
+    </div>
+  </aside>
+
+  <section class="col-preview">
+    <div class="preview-toolbar">
+      <div class="tool-group">
+        <button class="tool-btn" data-mode-opt="sales">Verkoop</button>
+        <button class="tool-btn" data-mode-opt="factory">Fabriek</button>
+      </div>
+      <div class="tool-group">
+        <button class="tool-btn" data-preview-opt="2d">2D</button>
+        <button class="tool-btn" data-preview-opt="3d">3D</button>
+        <button class="tool-btn" data-preview-opt="house">In huis</button>
+      </div>
+      <div class="tool-group">
+        <button class="tool-btn" id="toggle-dims" title="Maatvoering">📏 Maat</button>
+        <button class="tool-btn" id="toggle-fielddims" title="Veldmaten">⊞ Veldmaten</button>
+        <button class="tool-btn" id="toggle-labels" title="Labels">🏷 Labels</button>
+      </div>
+    </div>
+
+    <div class="preview-stage is-2d" id="preview-stage">
+      <svg id="preview-svg" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="preview-3d" hidden></div>
+    </div>
+
+    <div class="preview-footer">
+      <div class="stat"><span class="stat-label">Afmeting</span><span class="stat-value mono" id="stat-dims">—</span></div>
+      <div class="stat"><span class="stat-label">Oppervlakte</span><span class="stat-value mono" id="stat-area">—</span></div>
+      <div class="stat"><span class="stat-label">Vakken</span><span class="stat-value mono" id="stat-vakken">—</span></div>
+      <div class="stat stat-price"><span class="stat-label">Stukprijs (×aantal)</span><span class="stat-value mono" id="stat-price">—</span></div>
+    </div>
+  </section>
+
+  <aside class="col-meta">
+    <div class="col-head">
+      <h2 class="col-title">Dakkapel project</h2>
+      <div class="col-sub" id="elem-count">—</div>
+    </div>
+    <div class="col-scroll">
+      <div class="panel">
+        <div class="panel-head"><span>Onderdelen</span><button class="btn btn-sm btn-primary" id="btn-add-element">＋ Toevoegen</button></div>
+        <div class="element-list" id="element-list"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><span>Extra's</span><button class="btn btn-sm btn-primary" id="btn-add-extra">＋ Extra</button></div>
+        <div id="extras-list" style="padding:0 4px 4px;"></div>
+      </div>
+      <div class="panel panel-totals">
+        <div class="panel-head"><span>Totalen</span></div>
+        <div class="totals" id="totals-table"></div>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<div class="print-notes" id="print-notes" hidden></div>
+
+<div class="drawer-overlay" id="drawer-overlay"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div>
+      <h3 class="drawer-title">Dakkapel export</h3>
+      <div class="drawer-sub mono" id="drawer-offer">Gestructureerde JSON klaar voor koppeling</div>
+    </div>
+    <button class="btn btn-ghost" id="drawer-close">✕</button>
+  </div>
+  <div class="drawer-actions">
+    <button class="btn btn-primary" id="btn-download-json">⬇ Download .json</button>
+    <button class="btn btn-ghost" id="btn-copy-json">⧉ Kopieer</button>
+  </div>
+  <pre class="drawer-body"><code id="json-output"></code></pre>
+</div>
+
+<div class="tweaks-panel" id="tweaks-panel">
+  <div class="tweaks-head">
+    <div class="tweaks-title">Tweaks</div>
+    <button class="btn btn-ghost btn-sm" id="tw-close">✕</button>
+  </div>
+  <div class="tweaks-body">
+    <div class="tw-group">
+      <div class="tw-label">Thema</div>
+      <div class="tw-opts"><button data-theme-opt="light">☀ Licht</button><button data-theme-opt="dark">☾ Donker</button></div>
+    </div>
+    <div class="tw-group">
+      <div class="tw-label">Accent</div>
+      <div class="tw-opts tw-colors">
+        <button data-accent-opt="sky" style="--acc:#0284c7"></button>
+        <button data-accent-opt="emerald" style="--acc:#059669"></button>
+        <button data-accent-opt="amber" style="--acc:#d97706"></button>
+        <button data-accent-opt="rose" style="--acc:#e11d48"></button>
+        <button data-accent-opt="violet" style="--acc:#7c3aed"></button>
+        <button data-accent-opt="slate" style="--acc:#475569"></button>
+      </div>
+    </div>
+    <div class="tw-group">
+      <div class="tw-label">Dichtheid</div>
+      <div class="tw-opts"><button data-density-opt="compact">Compact</button><button data-density-opt="comfortable">Comfortabel</button><button data-density-opt="spacious">Ruim</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="../KozijnLAB/kozijn3d.js"></script>
+<script src="../KozijnLAB/app.js"></script>
+<script src="dakkapellab.js"></script>
+</body>
+</html>
