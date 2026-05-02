@@ -1,6 +1,6 @@
 import { Resend } from 'resend'
 
-const FROM = 'EcoPro Kozijnen <noreply@ecoprokozijnen.nl>'
+const FROM = 'EcoPro Kozijnen <noreply@send.ecoprokozijnen.nl>'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app'
 
 // ─── E-mail templates per type ────────────────────────────────────────────────
