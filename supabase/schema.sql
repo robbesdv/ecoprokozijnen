@@ -1,6 +1,7 @@
 -- ============================================================
 -- EcoPro Kozijnen — Database Schema
--- Voer dit uit in de Supabase SQL Editor van je project
+-- Voor een NIEUW/LEEG Supabase project.
+-- Bestaat je database al? Gebruik dan supabase/leads_migration.sql voor de lead-module.
 -- ============================================================
 
 -- Zorg dat UUID generatie beschikbaar is
@@ -11,7 +12,7 @@ create extension if not exists "pgcrypto";
 -- TABEL: orders
 -- Eén rij per klantorder, van offerte tot oplevering
 -- ============================================================
-create table public.orders (
+create table if not exists public.orders (
   id              uuid primary key default gen_random_uuid(),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
@@ -68,7 +69,7 @@ create table public.orders (
 -- TABEL: order_items
 -- Offerteregels per order
 -- ============================================================
-create table public.order_items (
+create table if not exists public.order_items (
   id          uuid primary key default gen_random_uuid(),
   order_id    uuid not null references public.orders(id) on delete cascade,
   description text not null,
@@ -83,7 +84,7 @@ create table public.order_items (
 -- TABEL: defects
 -- Bevindingen die klant meldt na montage
 -- ============================================================
-create table public.defects (
+create table if not exists public.defects (
   id           uuid primary key default gen_random_uuid(),
   order_id     uuid not null references public.orders(id) on delete cascade,
   description  text not null,
@@ -95,10 +96,44 @@ create table public.defects (
 
 
 -- ============================================================
+-- TABEL: leads
+-- Binnenkomende aanvragen vanuit Slimster, Meta/Facebook of handmatig
+-- ============================================================
+create table if not exists public.leads (
+  id               uuid primary key default gen_random_uuid(),
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  lead_date        timestamptz not null default now(),
+
+  source           text not null default 'webhook',
+  source_lead_id   text not null,
+  status           text not null default 'nieuw', -- nieuw | contact | afspraak | offerte | gewonnen | verloren
+
+  customer_name    text not null default 'Onbekende lead',
+  customer_email   text,
+  customer_phone   text,
+  customer_address text,
+  postcode         text,
+  city             text,
+
+  project_type     text,
+  message          text,
+  potential_amount numeric(10,2) not null default 0,
+  assigned_to      text,
+  last_contact_at  timestamptz,
+
+  order_id         uuid references public.orders(id) on delete set null,
+  raw_payload      jsonb not null default '{}'::jsonb,
+
+  unique (source, source_lead_id)
+);
+
+
+-- ============================================================
 -- TABEL: status_history
 -- Audittrail van alle fasewijzigingen
 -- ============================================================
-create table public.status_history (
+create table if not exists public.status_history (
   id          uuid primary key default gen_random_uuid(),
   order_id    uuid not null references public.orders(id) on delete cascade,
   from_phase  integer,
@@ -120,8 +155,14 @@ begin
 end;
 $$;
 
+drop trigger if exists orders_updated_at on public.orders;
 create trigger orders_updated_at
   before update on public.orders
+  for each row execute function public.update_updated_at();
+
+drop trigger if exists leads_updated_at on public.leads;
+create trigger leads_updated_at
+  before update on public.leads
   for each row execute function public.update_updated_at();
 
 
@@ -133,12 +174,20 @@ create trigger orders_updated_at
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 alter table public.defects enable row level security;
+alter table public.leads enable row level security;
 alter table public.status_history enable row level security;
 
 -- Tijdelijk: volledige toegang via anon key (veilig achter middleware)
+drop policy if exists "Volledige toegang orders" on public.orders;
+drop policy if exists "Volledige toegang order_items" on public.order_items;
+drop policy if exists "Volledige toegang defects" on public.defects;
+drop policy if exists "Volledige toegang leads" on public.leads;
+drop policy if exists "Volledige toegang status_history" on public.status_history;
+
 create policy "Volledige toegang orders"        on public.orders        for all using (true) with check (true);
 create policy "Volledige toegang order_items"   on public.order_items   for all using (true) with check (true);
 create policy "Volledige toegang defects"       on public.defects       for all using (true) with check (true);
+create policy "Volledige toegang leads"         on public.leads         for all using (true) with check (true);
 create policy "Volledige toegang status_history" on public.status_history for all using (true) with check (true);
 
 

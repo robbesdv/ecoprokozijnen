@@ -42,6 +42,16 @@ function ActionNeeded({ order }) {
   return <span style={{ color: 'var(--warn)', fontSize: 12, fontWeight: 500 }}>⚠ {msg}</span>
 }
 
+function getRealizedRevenue(order) {
+  const total = Number(order.total_amount) || 0
+  if (Number(order.phase) === 7) return total
+  let paid = 0
+  if (order.deposit_confirmed || order.deposit_paid_at) paid += calcDeposit(total)
+  if (order.main_payment_confirmed) paid += total * (order.payment_split === 'split_70_10' ? 0.7 : 0.8)
+  if (order.final_payment_confirmed) paid += total * 0.1
+  return Math.min(total, Math.round(paid * 100) / 100)
+}
+
 export default function BeheerPage() {
   const [orders, setOrders]             = useState([])
   const [selected, setSelected]         = useState(null)
@@ -54,6 +64,7 @@ export default function BeheerPage() {
   const [loading, setLoading]           = useState(true)
   const [toast, setToast]               = useState(null)
   const [activeView, setActiveView]     = useState('orders')
+  const [query, setQuery]               = useState({ view: '', order: '' })
 
   const loadOrders = useCallback(async () => {
     const { data } = await supabase
@@ -73,6 +84,30 @@ export default function BeheerPage() {
   }, [loadOrders])
 
   useEffect(() => {
+    const readQuery = () => {
+      const params = new URLSearchParams(window.location.search)
+      setQuery({ view: params.get('view') || '', order: params.get('order') || '' })
+    }
+    readQuery()
+    window.addEventListener('popstate', readQuery)
+    return () => window.removeEventListener('popstate', readQuery)
+  }, [])
+
+  useEffect(() => {
+    if (query.order) return
+    setActiveView(query.view === 'klanten' ? 'klanten' : 'orders')
+  }, [query.view, query.order])
+
+  useEffect(() => {
+    if (!query.order || loading) return
+    const order = orders.find(o => o.id === query.order)
+    if (order) {
+      setActiveView('orders')
+      setSelected(order)
+    }
+  }, [query.order, loading, orders])
+
+  useEffect(() => {
     if (selected) {
       const updated = orders.find(o => o.id === selected.id)
       if (updated) setSelected(updated)
@@ -89,12 +124,22 @@ export default function BeheerPage() {
     window.location.href = '/beheer/login'
   }
 
+  function setView(view) {
+    setActiveView(view)
+    window.history.replaceState(null, '', view === 'klanten' ? '/beheer?view=klanten' : '/beheer')
+    setQuery({ view: view === 'klanten' ? 'klanten' : '', order: '' })
+  }
+
   const stats = {
     actief:    orders.filter(o => o.phase < 7).length,
     urgent:    orders.filter(o => o.phase < 7 && getPhase(o.phase).actionNeeded(o)).length,
     inplannen: orders.filter(o => o.phase === 4).length,
-    omzet:     orders.filter(o => o.phase < 7).reduce((s, o) => s + (o.total_amount || 0), 0),
+    omzet:     orders.filter(o => o.phase < 7).reduce((s, o) => s + (Number(o.total_amount) || 0), 0),
+    gerealiseerd: orders.reduce((s, o) => s + getRealizedRevenue(o), 0),
   }
+  stats.realisatiePct = (stats.omzet + stats.gerealiseerd) > 0
+    ? Math.round((stats.gerealiseerd / (stats.omzet + stats.gerealiseerd)) * 100)
+    : 0
 
   let visible = orders.filter(o => {
     if (filterPhase !== null && o.phase !== filterPhase) return false
@@ -128,7 +173,7 @@ export default function BeheerPage() {
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <BeheerSidebar activeView={activeView} setActiveView={setActiveView} onLogout={logout} onNewOrder={() => setShowNewModal(true)} />
+      <BeheerSidebar activeView={activeView} setActiveView={setView} onLogout={logout} onNewOrder={() => setShowNewModal(true)} />
 
       {/* ── Main column ─────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
@@ -148,12 +193,13 @@ export default function BeheerPage() {
 
       {/* ── KPI + Pipeline ────────────────────────────────────────────── */}
       <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '20px 24px 16px', flexShrink: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 14, marginBottom: 20 }}>
           {[
             { label: 'Actieve orders',    value: stats.actief,            icon: '📋', sub: 'Lopende trajecten',  accent: 'var(--brand)',  onClick: () => { setFilterPhase(null); setFilterUrgent(false) } },
             { label: 'Actie vereist',     value: stats.urgent,            icon: '⚠',  sub: 'Wacht op aandacht', accent: stats.urgent > 0 ? '#f59e0b' : '#cbd5e1', warn: stats.urgent > 0, onClick: () => setFilterUrgent(u => !u) },
             { label: 'Montage plannen',   value: stats.inplannen,         icon: '🔧', sub: 'Datum instellen',    accent: stats.inplannen > 0 ? '#3b82f6' : '#cbd5e1', warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
-            { label: 'Openstaande omzet', value: formatEuro(stats.omzet), icon: '💶', sub: 'Incl. BTW',          accent: 'var(--brand)',  isText: true },
+            { label: 'Openstaande omzet', value: formatEuro(stats.omzet), icon: '💶', sub: 'Potentieel incl. BTW', accent: 'var(--brand)',  isText: true },
+            { label: 'Gerealiseerde omzet', value: formatEuro(stats.gerealiseerd), icon: '✓', sub: `${stats.realisatiePct}% van totaal`, accent: 'var(--success)', isText: true, progress: stats.realisatiePct },
           ].map(s => (
             <div key={s.label} onClick={s.onClick}
               style={{ position: 'relative', background: '#FAFAFA', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px 14px', cursor: s.onClick ? 'pointer' : 'default', overflow: 'hidden', transition: 'box-shadow 0.15s', borderLeft: `4px solid ${s.accent}` }}
@@ -166,6 +212,11 @@ export default function BeheerPage() {
               </div>
               <div style={{ fontSize: s.isText ? 21 : 34, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, color: s.warn ? s.accent : 'var(--text)' }}>{s.value}</div>
               <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 6 }}>{s.sub}</div>
+              {s.progress !== undefined && (
+                <div style={{ height: 5, borderRadius: 999, background: 'var(--border)', overflow: 'hidden', marginTop: 9 }}>
+                  <div style={{ width: `${Math.min(100, Math.max(0, s.progress))}%`, height: '100%', background: s.accent }} />
+                </div>
+              )}
               {s.onClick && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: s.accent, marginTop: 5, opacity: 0.8 }}>Filteren →</div>}
             </div>
           ))}
@@ -370,6 +421,7 @@ function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
         <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', padding: '0 14px 8px' }}>Overzicht</div>
         {NAV_TOP.map(item => navItem(activeView === item.key, () => setActiveView(item.key), item.icon, item.label))}
 
+        {navItem(false, () => { window.location.href='/beheer/leads' }, '☎', 'Leads')}
         {navItem(false, () => { window.location.href='/beheer/agenda' }, '📅', 'Agenda')}
 
         <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 4px' }} />
