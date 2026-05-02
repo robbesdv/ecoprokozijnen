@@ -119,6 +119,7 @@ export default function LeadsPage() {
       `Leadbron: ${lead.source || 'onbekend'}`,
       lead.source_lead_id ? `Extern ID: ${lead.source_lead_id}` : '',
       lead.project_type ? `Type aanvraag: ${lead.project_type}` : '',
+      Number(lead.potential_amount) > 0 ? `Lead-schatting: ${formatEuro(lead.potential_amount)}` : '',
       lead.message ? `Bericht: ${lead.message}` : '',
     ].filter(Boolean).join('\n')
 
@@ -129,7 +130,7 @@ export default function LeadsPage() {
         customer_email: lead.customer_email || '',
         customer_phone: lead.customer_phone || '',
         customer_address: address,
-        total_amount: Number(lead.potential_amount) || 0,
+        total_amount: 0,
         phase: 0,
         internal_notes: notes,
       })
@@ -148,9 +149,9 @@ export default function LeadsPage() {
       note: `Aangemaakt vanuit lead (${lead.source || 'onbekend'})`,
       changed_by: 'beheer',
     })
-    await notifyCustomer(order, Number(order.total_amount) > 0 ? 'nieuwe_offerte' : 'welkomst')
+    await notifyCustomer(order, 'welkomst')
     showToast('Order aangemaakt vanuit lead & klant genotificeerd')
-    window.location.href = `/beheer?order=${order.id}`
+    window.location.href = `/beheer/verkoop?edit=${order.id}`
   }
 
   async function copy(value) {

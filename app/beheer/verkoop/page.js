@@ -58,6 +58,30 @@ function toExportExtra(item) {
   }
 }
 
+function starterElementForOrder(order) {
+  return {
+    id: `starter_${order.id || Date.now()}`,
+    name: 'Kozijn 1',
+    type: 'kozijn',
+    qty: 1,
+    dimensions: { widthMM: 1200, heightMM: 1400 },
+    profile: { frameMM: 70, sashMM: 60, mullionMM: 60, transomMM: 60 },
+    finish: {
+      colorOutside: 'RAL7016',
+      colorInside: 'same',
+      colorSash: 'same',
+      colorPanel: 'same',
+      finishOutside: 'smooth',
+      finishInside: 'smooth',
+    },
+    hardware: 'siegenia',
+    pricePerUnit: 0,
+    priceTotal: 0,
+    columns: [{ widthPct: 100, rows: [{ paneType: 'vast', heightPct: 100, fill: 'glass', glassPack: 'HR++' }] }],
+    notes: 'Starter element - pas afmetingen en indeling aan.',
+  }
+}
+
 const NAV = [
   { key: 'dashboard',  label: 'Dashboard',    icon: '▣' },
   { key: 'kozijnlab',  label: 'KozijnLAB',    icon: '⚡' },
@@ -222,6 +246,9 @@ export default function VerkoopPage() {
 
   function buildKozijnLabPayload(order, items) {
     const [address = '', postcode = '', city = ''] = String(order.customer_address || '').split(',').map(s => s.trim())
+    const elements = items
+      .filter(it => it.element_config)
+      .map((it, idx) => toExportElement(it.element_config || {}, it, idx))
     return {
       version: 'kozijnlab.v2',
       offerCode: order.crm_reference || `ORD-${String(order.id).slice(0, 8).toUpperCase()}`,
@@ -243,9 +270,7 @@ export default function VerkoopPage() {
       extras: items
         .filter(it => !it.element_config)
         .map(toExportExtra),
-      elements: items
-        .filter(it => it.element_config)
-        .map((it, idx) => toExportElement(it.element_config || {}, it, idx)),
+      elements: elements.length ? elements : [starterElementForOrder(order)],
     }
   }
 
@@ -269,10 +294,6 @@ export default function VerkoopPage() {
     if (error) { showToast('Kon offerte niet laden: ' + error.message, 'error'); return }
 
     const payload = buildKozijnLabPayload(order, data || [])
-    if (!payload.elements.length) {
-      showToast('Deze offerte bevat geen KozijnLAB elementdata om te openen.', 'error')
-      return
-    }
 
     setEditingOrder(order)
     setSelectedOfferte(null)
