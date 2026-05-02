@@ -6,6 +6,7 @@ import BeheerNav from '@/lib/BeheerNav'
 import { supabase } from '@/lib/supabase'
 import { formatEuro, formatDate } from '@/lib/phases'
 import { formatLeadAddress, LEAD_STATUSES } from '@/lib/lead-normalize'
+import { notifyCustomer } from '@/lib/notifyCustomer'
 
 const STATUS_STYLE = {
   nieuw:    { bg: 'var(--warn-bg)', color: 'var(--warn)', border: 'var(--warn-border)' },
@@ -147,7 +148,8 @@ export default function LeadsPage() {
       note: `Aangemaakt vanuit lead (${lead.source || 'onbekend'})`,
       changed_by: 'beheer',
     })
-    showToast('Order aangemaakt vanuit lead')
+    await notifyCustomer(order, Number(order.total_amount) > 0 ? 'nieuwe_offerte' : 'welkomst')
+    showToast('Order aangemaakt vanuit lead & klant genotificeerd')
     window.location.href = `/beheer?order=${order.id}`
   }
 

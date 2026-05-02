@@ -527,6 +527,21 @@ function OrderDetailPanel({ order, onClose, onSave, savingId, showToast, onRefre
         notifyType = 'status_update'
         notifyExtra = { phaseLabel: FASES[phase]?.label || '' }
       }
+    } else {
+      const changes = [
+        (monteur || '') !== (order.assigned_monteur || '') ? 'Monteur/planning bijgewerkt' : '',
+        (installDate || '') !== (order.installation_date?.slice(0,10) || '') ? `Montagedatum bijgewerkt${installDate ? ` naar ${new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}` : '',
+        notes !== (order.montage_notes || '') ? 'Montage-informatie bijgewerkt' : '',
+      ].filter(Boolean)
+      if (changes.length) {
+        notifyType = 'order_bijgewerkt'
+        notifyExtra = {
+          title: 'Montagegegevens bijgewerkt',
+          intro: 'We hebben de montagegegevens van uw order bijgewerkt.',
+          changes,
+          installDate: installDate ? new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : null,
+        }
+      }
     }
 
     await onSave(order.id, updates, notifyType, notifyExtra)

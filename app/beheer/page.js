@@ -624,6 +624,17 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
     if (phase >= 3 && !order.factory_ordered_at) updates.factory_ordered_at = new Date().toISOString()
     if (phase === 6 && !order.installation_done_at) updates.installation_done_at = new Date().toISOString()
     if (phase === 7 && !order.completed_at) updates.completed_at = new Date().toISOString()
+    const changes = [
+      phase !== order.phase ? `Status gewijzigd naar ${PHASES.find(p => p.id === phase)?.adminLabel || 'nieuwe status'}` : '',
+      paymentSplit !== order.payment_split ? 'Betaalkeuze bijgewerkt' : '',
+      (installDate || '') !== (order.installation_date || '') ? `Montagedatum bijgewerkt${installDate ? ` naar ${new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}` : '',
+      (deliveryExpected || '') !== (order.factory_delivery_expected || '') ? 'Verwachte leverdatum bijgewerkt' : '',
+      notes !== (order.montage_notes || '') ? 'Opmerkingen of montage-informatie bijgewerkt' : '',
+      (monteur || '') !== (order.assigned_monteur || '') ? 'Monteur/planning bijgewerkt' : '',
+      depositConf !== order.deposit_confirmed ? 'Aanbetaling bijgewerkt' : '',
+      mainConf !== order.main_payment_confirmed ? 'Hoofdbetaling bijgewerkt' : '',
+      finalConf !== order.final_payment_confirmed ? 'Slotbetaling bijgewerkt' : '',
+    ].filter(Boolean)
     const { error } = await supabase.from('orders').update(updates).eq('id', order.id)
     if (!error && phase !== order.phase) {
       await supabase.from('status_history').insert({ order_id: order.id, from_phase: order.phase, to_phase: phase, changed_by: 'beheer' })
@@ -639,7 +650,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
           phaseLabel,
           installDate: installDate ? new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : null,
         }
-        notifyCustomer(order, type, extra).then(r => {
+        notifyCustomer({ ...order, ...updates }, type, extra).then(r => {
           if (!r.success) console.warn('E-mail niet verzonden:', r.error)
         })
       }
@@ -648,6 +659,14 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
       }
       if (finalConf && !order.final_payment_confirmed) {
         notifyCustomer(order, 'betaling_bevestigd', { amount: order.total_amount * 0.1, final: true })
+      }
+      if (phase === order.phase && !(mainConf && !order.main_payment_confirmed) && !(finalConf && !order.final_payment_confirmed) && changes.length) {
+        notifyCustomer({ ...order, ...updates }, 'order_bijgewerkt', {
+          title: 'Ordergegevens bijgewerkt',
+          changes,
+          amount: order.total_amount,
+          installDate: installDate ? new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : null,
+        })
       }
       showToast('Opgeslagen & klant genotificeerd')
       onUpdate()

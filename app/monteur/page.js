@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { notifyCustomer } from '@/lib/notifyCustomer'
 
 export default function MonteurPage() {
   const [orders, setOrders]       = useState([])
@@ -595,6 +596,7 @@ function OpleverBon({ order, showToast, onRefresh }) {
     const sigUrl = canvasRef.current.toDataURL('image/png')
     await supabase.from('orders').update({ oplevering_naam: naam, oplevering_signed_at: now, oplevering_punten: JSON.stringify(PUNTEN), phase: 7, completed_at: now }).eq('id', order.id)
     await supabase.from('status_history').insert({ order_id: order.id, to_phase: 7, changed_by: 'monteur-opleverbon' })
+    await notifyCustomer({ ...order, phase: 7, completed_at: now }, 'compleet')
     const blob = await fetch(sigUrl).then(r => r.blob())
     const path = `${order.id}/opleverbon-handtekening.png`
     const { error: upErr } = await supabase.storage.from('order-files').upload(path, blob, { upsert: true })
@@ -603,7 +605,7 @@ function OpleverBon({ order, showToast, onRefresh }) {
       await supabase.from('order_files').upsert({ order_id: order.id, filename: 'Opleverbon – handtekening.png', storage_path: path, file_url: publicUrl, file_type: 'image/png' }, { onConflict: 'storage_path' })
     }
     setSaving(false); setDone(true); onRefresh()
-    showToast('Opleverbon opgeslagen & order afgerond!')
+    showToast('Opleverbon opgeslagen, order afgerond & klant genotificeerd!')
   }
 
   if (done || order.oplevering_signed_at) {

@@ -85,6 +85,26 @@ function emailTemplates(order, type, extra = {}) {
       `,
     },
 
+    order_bijgewerkt: {
+      subject: extra.subject || `Uw order bij EcoPro Kozijnen is bijgewerkt`,
+      body: `
+        <p>Beste ${order.customer_name},</p>
+        <p>${extra.intro || 'Er is iets bijgewerkt aan uw order of offerte bij EcoPro Kozijnen.'}</p>
+        <div style="background:#EBF2EC; border-left:4px solid #1A3A2A; padding:14px 18px; border-radius:0 8px 8px 0; margin:20px 0;">
+          <strong style="color:#1A3A2A; font-size:16px;">${extra.title || 'Order bijgewerkt'}</strong>
+          ${Array.isArray(extra.changes) && extra.changes.length ? `
+            <ul style="margin:10px 0 0; padding-left:18px; color:#374151; line-height:1.8;">
+              ${extra.changes.map(change => `<li>${change}</li>`).join('')}
+            </ul>
+          ` : ''}
+        </div>
+        ${extra.installDate ? `<p>📅 Montagedatum: <strong>${extra.installDate}</strong></p>` : ''}
+        ${extra.amount !== undefined ? `<p>Actueel bedrag: <strong>${formatEuro(extra.amount)}</strong></p>` : ''}
+        <p>U kunt de actuele gegevens bekijken in uw persoonlijke portaal.</p>
+        ${portalButton}
+      `,
+    },
+
     // ── Montage ingepland ─────────────────────────────────────────────────────
     montage_gepland: {
       subject: `Montagedatum bevestigd — ${extra.installDate}`,

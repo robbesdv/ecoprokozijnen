@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { getPhase, formatEuro, formatDate } from '@/lib/phases'
 import { ralName, KozijnSVG } from '@/lib/KozijnSVG'
 import BeheerNav from '@/lib/BeheerNav'
+import { notifyCustomer } from '@/lib/notifyCustomer'
 
 const PANE_LABEL = {
   vast: 'vast glas', draai: 'draai', kiep: 'kiep',
@@ -163,10 +164,18 @@ export default function VerkoopPage() {
     const newExcl = offerteItems.reduce((s, it) => s + (Number(editPrices[it.id]) || 0) * (it.quantity || 1), 0)
     const newTotal = Math.round(newExcl * 1.21 * 100) / 100
     await supabase.from('orders').update({ total_amount: newTotal }).eq('id', selectedOfferte.id)
+    const updatedOfferte = { ...selectedOfferte, total_amount: newTotal }
     setSelectedOfferte(prev => ({ ...prev, total_amount: newTotal }))
+    await notifyCustomer(updatedOfferte, 'order_bijgewerkt', {
+      subject: 'Uw offerte is bijgewerkt',
+      title: 'Offertebedrag bijgewerkt',
+      intro: 'We hebben uw offerte bijgewerkt.',
+      changes: [`Nieuw totaalbedrag: ${formatEuro(newTotal)}`],
+      amount: newTotal,
+    })
     await loadOrders()
     setSavingOfferte(false)
-    showToast('Wijzigingen opgeslagen')
+    showToast('Wijzigingen opgeslagen & klant genotificeerd')
   }
 
   function showToast(msg, type = 'success') {
@@ -347,6 +356,17 @@ export default function VerkoopPage() {
       changed_by: 'verkoop',
     })
 
+    await notifyCustomer({ ...current, ...updates, id: orderId }, 'order_bijgewerkt', {
+      subject: 'Uw offerte is bijgewerkt',
+      title: 'Offerte bijgewerkt',
+      intro: 'We hebben uw offerte bijgewerkt vanuit EcoPro KozijnLAB.',
+      changes: [
+        `Offertenummer: ${kl.offerCode || current?.crm_reference || 'bekend in uw portaal'}`,
+        `Totaalbedrag: ${formatEuro(total_amount)}`,
+      ],
+      amount: total_amount,
+    })
+
     setSubmitting(false)
     setConfirmData(null)
     setEditingOrder(null)
@@ -383,6 +403,7 @@ export default function VerkoopPage() {
 
     if (error) { showToast('Fout: ' + error.message, 'error'); setSubmitting(false); return }
 
+    const orderForMail = { ...order, crm_reference: kl.offerCode || null }
     await supabase.from('orders').update({ crm_reference: kl.offerCode || null }).eq('id', order.id)
 
     const items = buildOrderItems(order.id, kl)
@@ -393,6 +414,8 @@ export default function VerkoopPage() {
       note: `Aangemaakt vanuit KozijnLAB (${kl.offerCode})`,
       changed_by: 'verkoop',
     })
+
+    await notifyCustomer(orderForMail, total_amount > 0 ? 'nieuwe_offerte' : 'welkomst')
 
     setSubmitting(false)
     setConfirmData(null)
