@@ -2597,9 +2597,12 @@ function refreshTweaksUI() {
 // ============================================================
 function markDeviceContext() {
   const ua = navigator.userAgent || '';
-  const isIPad = /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const touchPoints = navigator.maxTouchPoints || 0;
+  const hasTouch = touchPoints > 1 || 'ontouchend' in document;
+  const isIPad = /iPad/i.test(ua) || (/Macintosh/i.test(ua) && hasTouch);
   document.documentElement.classList.toggle('is-ipad', isIPad);
   document.body.classList.toggle('is-ipad', isIPad);
+  return isIPad;
 }
 
 function syncSidePanelState() {
@@ -2607,6 +2610,24 @@ function syncSidePanelState() {
   const metaOpen = document.querySelector('.col-meta')?.classList.contains('is-open');
   document.body.classList.toggle('panel-config-open', !!configOpen);
   document.body.classList.toggle('panel-meta-open', !!metaOpen);
+}
+
+function normalizePanelsForDevice() {
+  const config = document.querySelector('.col-config');
+  const meta = document.querySelector('.col-meta');
+  const isIPad = document.body.classList.contains('is-ipad');
+  if (isIPad && config?.classList.contains('is-open') && meta?.classList.contains('is-open')) {
+    meta.classList.remove('is-open');
+  }
+  syncSidePanelState();
+}
+
+let viewportSyncTimer;
+function syncViewportContext() {
+  markDeviceContext();
+  normalizePanelsForDevice();
+  window.clearTimeout(viewportSyncTimer);
+  viewportSyncTimer = window.setTimeout(renderPreview, 120);
 }
 
 function toggleSidePanel(selector, oppositeSelector) {
@@ -2620,7 +2641,7 @@ function toggleSidePanel(selector, oppositeSelector) {
   }
 
   panel.classList.toggle('is-open', shouldOpen);
-  syncSidePanelState();
+  normalizePanelsForDevice();
   window.setTimeout(renderPreview, 240);
 }
 
@@ -2710,6 +2731,9 @@ function init() {
   window.addEventListener('message', e => {
     if (e.data?.type === 'REQUEST_SUBMIT') submitToEcoPro();
   });
+  window.addEventListener('resize', syncViewportContext);
+  window.addEventListener('orientationchange', syncViewportContext);
+  window.visualViewport?.addEventListener('resize', syncViewportContext);
 
   // Keyboard shortcuts
   window.addEventListener('keydown', e => {

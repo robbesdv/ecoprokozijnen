@@ -1005,10 +1005,18 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
   .stat:nth-child(2) { border-right: 0; }
   .stat:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
 }
-@media (min-width: 700px) and (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+@media (min-width: 1025px) {
+  #btn-toggle-config, #btn-toggle-meta { display: none; }
+}
+@media (max-width: 1366px) {
   html.is-ipad .app {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    height: calc(100dvh - 57px);
     overflow: hidden;
+  }
+  html.is-ipad #btn-toggle-config,
+  html.is-ipad #btn-toggle-meta {
+    display: inline-flex;
   }
   html.is-ipad .col-config,
   html.is-ipad .col-meta {
@@ -1029,7 +1037,7 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
     transform: none;
   }
   html.is-ipad body.panel-config-open .app {
-    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
   }
   html.is-ipad body.panel-config-open .col-config {
     display: flex;
@@ -1041,7 +1049,7 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
     grid-row: 1;
   }
   html.is-ipad body.panel-meta-open .app {
-    grid-template-columns: minmax(0, 1fr) minmax(300px, 340px);
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   }
   html.is-ipad body.panel-meta-open .col-preview {
     grid-column: 1;
@@ -1082,6 +1090,18 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
     font-size: 13px;
   }
 }
-@media (min-width: 1025px) {
-  #btn-toggle-config, #btn-toggle-meta { display: none; }
+@media (max-width: 699px) {
+  html.is-ipad body.panel-config-open .app,
+  html.is-ipad body.panel-meta-open .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html.is-ipad body.panel-config-open .col-preview,
+  html.is-ipad body.panel-meta-open .col-preview {
+    display: none;
+  }
+  html.is-ipad body.panel-config-open .col-config,
+  html.is-ipad body.panel-meta-open .col-meta {
+    grid-column: 1;
+    width: 100%;
+  }
 }
