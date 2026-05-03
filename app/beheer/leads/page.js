@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { formatEuro, formatDate } from '@/lib/phases'
 import { formatLeadAddress, LEAD_STATUSES } from '@/lib/lead-normalize'
 import { notifyCustomer } from '@/lib/notifyCustomer'
+import { sendLeadLabEvent } from '@/lib/leadLabWebhook'
 
 const STATUS_STYLE = {
   nieuw:    { bg: 'var(--warn-bg)', color: 'var(--warn)', border: 'var(--warn-border)' },
@@ -150,6 +151,7 @@ export default function LeadsPage() {
       changed_by: 'beheer',
     })
     await notifyCustomer(order, 'welkomst')
+    await sendLeadLabEvent('offerte_verzonden', { orderId: order.id })
     showToast('Order aangemaakt vanuit lead & klant genotificeerd')
     window.location.href = `/beheer/verkoop?edit=${order.id}`
   }

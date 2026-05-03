@@ -13,6 +13,7 @@ import {
   formatDate,
 } from '@/lib/phases'
 import { KozijnSVG, kozijnSVGString, svgToPngDataUrl, ralName, PANE_NAMES, normalizeEl } from '@/lib/KozijnSVG'
+import { sendLeadLabEvent } from '@/lib/leadLabWebhook'
 
 const _PACK_RANK_GLOBAL = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
 function fixDesc(description, element_config) {
@@ -1107,6 +1108,11 @@ function Phase0({ order, onRefresh, showToast }) {
       from_phase: 0,
       to_phase: 1,
       changed_by: 'klant',
+    })
+
+    await sendLeadLabEvent('akkoord_gegeven', {
+      orderId: order.id,
+      portalToken: order.portal_token,
     })
 
     showToast('Akkoord bevestigd! U wordt doorgestuurd naar de betalingspagina.')
