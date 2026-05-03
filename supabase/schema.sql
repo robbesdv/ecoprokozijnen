@@ -58,6 +58,7 @@ create table if not exists public.orders (
   -- Intern
   internal_notes  text,
   crm_reference   text,
+  sales_owner     text,
 
   -- Portaal toegang via unieke token in de URL
   portal_token    text unique not null default encode(gen_random_bytes(24), 'hex'),

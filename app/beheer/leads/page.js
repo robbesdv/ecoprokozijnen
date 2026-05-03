@@ -8,6 +8,7 @@ import { formatEuro, formatDate } from '@/lib/phases'
 import { formatLeadAddress, LEAD_STATUSES } from '@/lib/lead-normalize'
 import { notifyCustomer } from '@/lib/notifyCustomer'
 import { sendLeadLabEvent } from '@/lib/leadLabWebhook'
+import { SELLERS, sellerName, calcPotentialCommission } from '@/lib/sales'
 
 const STATUS_STYLE = {
   nieuw:    { bg: 'var(--warn-bg)', color: 'var(--warn)', border: 'var(--warn-border)' },
@@ -92,6 +93,7 @@ export default function LeadsPage() {
       lead.city,
       lead.project_type,
       lead.message,
+      lead.assigned_to,
     ].filter(Boolean).some(value => String(value).toLowerCase().includes(q))
   })
 
@@ -134,6 +136,7 @@ export default function LeadsPage() {
         total_amount: 0,
         phase: 0,
         internal_notes: notes,
+        sales_owner: lead.assigned_to || null,
       })
       .select('*')
       .single()
@@ -226,8 +229,8 @@ export default function LeadsPage() {
                 <span style={{ fontSize: 12, color: 'var(--text-light)', whiteSpace: 'nowrap', marginLeft: 'auto' }}>{visible.length} leads</span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr 1fr 120px 32px', padding: '8px 16px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
-                {['Lead', 'Bron', 'Potentieel', 'Datum', ''].map(h => (
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr 1fr 1fr 120px 32px', padding: '8px 16px', background: '#F8FAFC', borderBottom: '1px solid var(--border)' }}>
+                {['Lead', 'Bron', 'Potentieel', 'Verkoper', 'Datum', ''].map(h => (
                   <div key={h} style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 800 }}>{h}</div>
                 ))}
               </div>
@@ -246,7 +249,7 @@ export default function LeadsPage() {
                 const active = selected?.id === lead.id
                 return (
                   <div key={lead.id} onClick={() => setSelected(active ? null : lead)}
-                    style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr 1fr 120px 32px', gap: 0, alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: active ? '#EEF6F0' : 'white', borderLeft: active ? '3px solid var(--brand)' : '3px solid transparent' }}>
+                    style={{ display: 'grid', gridTemplateColumns: '2fr 1.1fr 1fr 1fr 120px 32px', gap: 0, alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: active ? '#EEF6F0' : 'white', borderLeft: active ? '3px solid var(--brand)' : '3px solid transparent' }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lead.customer_name}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -258,6 +261,7 @@ export default function LeadsPage() {
                       <StatusBadge status={lead.status} />
                     </div>
                     <div style={{ fontWeight: 800, fontSize: 14 }}>{formatEuro(lead.potential_amount)}</div>
+                    <div style={{ fontSize: 12, color: lead.assigned_to ? 'var(--text)' : 'var(--text-muted)', fontWeight: lead.assigned_to ? 700 : 500 }}>{sellerName(lead.assigned_to)}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDate(lead.lead_date)}</div>
                     <div style={{ color: 'var(--text-light)', fontSize: 18, textAlign: 'right' }}>›</div>
                   </div>
@@ -292,11 +296,23 @@ export default function LeadsPage() {
                   <InfoRow label="Extern ID" value={selected.source_lead_id || '-'} />
                   <InfoRow label="Type" value={selected.project_type || '-'} />
                   <InfoRow label="Potentieel" value={<strong>{formatEuro(selected.potential_amount)}</strong>} />
+                  <InfoRow label="Pot. commissie" value={<strong>{formatEuro(calcPotentialCommission(selected.potential_amount))}</strong>} />
                   {selected.message && (
                     <div style={{ marginTop: 10, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 10, padding: 12, fontSize: 13, whiteSpace: 'pre-wrap', color: 'var(--text)' }}>
                       {selected.message}
                     </div>
                   )}
+                </section>
+
+                <section>
+                  <SectionTitle>Verkoper</SectionTitle>
+                  <select value={selected.assigned_to || ''} onChange={e => updateLead(selected, { assigned_to: e.target.value || null })} style={{ fontSize: 13 }}>
+                    <option value="">Niet toegewezen</option>
+                    {SELLERS.map(s => <option key={s.key} value={s.key}>{s.name}</option>)}
+                  </select>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+                    De verkoper ziet deze lead in zijn eigen verkoopportaal.
+                  </div>
                 </section>
 
                 <section>
@@ -368,6 +384,7 @@ function NewLeadModal({ onClose, onCreated, showToast }) {
     city: '',
     project_type: '',
     potential_amount: '',
+    assigned_to: '',
     message: '',
   })
   const [saving, setSaving] = useState(false)
@@ -384,6 +401,7 @@ function NewLeadModal({ onClose, onCreated, showToast }) {
     setSaving(true)
     const { error } = await supabase.from('leads').insert({
       ...form,
+      assigned_to: form.assigned_to || null,
       source_lead_id: `manual-${Date.now()}`,
       status: 'nieuw',
       potential_amount: Number(form.potential_amount) || 0,
@@ -414,6 +432,7 @@ function NewLeadModal({ onClose, onCreated, showToast }) {
           <div><label>Plaats</label><input type="text" value={form.city} onChange={e => setField('city', e.target.value)} /></div>
           <div><label>Type aanvraag</label><input type="text" value={form.project_type} onChange={e => setField('project_type', e.target.value)} /></div>
           <div><label>Potentiele waarde</label><input type="number" value={form.potential_amount} onChange={e => setField('potential_amount', e.target.value)} /></div>
+          <div><label>Verkoper</label><select value={form.assigned_to} onChange={e => setField('assigned_to', e.target.value)}><option value="">Niet toegewezen</option>{SELLERS.map(s => <option key={s.key} value={s.key}>{s.name}</option>)}</select></div>
           <div style={{ gridColumn: '1 / -1' }}><label>Bericht</label><textarea value={form.message} onChange={e => setField('message', e.target.value)} /></div>
         </div>
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
