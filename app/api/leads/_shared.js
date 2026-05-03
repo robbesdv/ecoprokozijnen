@@ -27,8 +27,7 @@ export function getRequestToken(request) {
 
 export function isLeadRequestAuthorized(request, extraKeys = []) {
   const configured = [
-    process.env.LEADS_API_KEY,
-    process.env.SLIMSTER_API_KEY,
+    process.env.LEADLAB_API_KEY,
     ...extraKeys,
   ].filter(Boolean)
   if (!configured.length) return false
@@ -60,7 +59,7 @@ export async function saveLeadRows(rows) {
   return data || []
 }
 
-export async function ingestLeadRequest(request, defaultSource) {
+export async function ingestLeadRequest(request, defaultSource, options = {}) {
   if (!isLeadRequestAuthorized(request)) {
     return Response.json({ error: 'Ongeldige of ontbrekende lead API key' }, { status: 401 })
   }
@@ -68,7 +67,10 @@ export async function ingestLeadRequest(request, defaultSource) {
   try {
     const url = new URL(request.url)
     const body = await request.json()
-    const source = url.searchParams.get('source') || body.source || defaultSource || 'webhook'
+    const allowSourceOverride = options.allowSourceOverride !== false
+    const source = allowSourceOverride
+      ? url.searchParams.get('source') || body.source || defaultSource || 'webhook'
+      : defaultSource || 'webhook'
     const rows = normalizeLeadRows(body, { source })
     const data = await saveLeadRows(rows)
     return Response.json({ success: true, count: data.length, leads: data })

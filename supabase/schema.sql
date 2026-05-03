@@ -97,7 +97,7 @@ create table if not exists public.defects (
 
 -- ============================================================
 -- TABEL: leads
--- Binnenkomende aanvragen vanuit Slimster, Meta/Facebook of handmatig
+-- Binnenkomende aanvragen vanuit LeadLAB of handmatig
 -- ============================================================
 create table if not exists public.leads (
   id               uuid primary key default gen_random_uuid(),

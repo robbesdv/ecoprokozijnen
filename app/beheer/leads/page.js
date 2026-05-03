@@ -170,7 +170,7 @@ export default function LeadsPage() {
         <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 28px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>Leads</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Slimster, Facebook en handmatige aanvragen</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>LeadLAB en handmatige aanvragen</div>
           </div>
           <button className="btn btn-primary btn-sm" onClick={() => setShowNewModal(true)} style={{ fontWeight: 700 }}>+ Nieuwe lead</button>
         </div>
@@ -191,10 +191,9 @@ export default function LeadsPage() {
               ))}
             </div>
 
-            <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
               {[
-                { label: 'Slimster webhook', value: `${baseUrl}/api/leads/slimster` },
-                { label: 'Facebook webhook', value: `${baseUrl}/api/leads/facebook` },
+                { label: 'LeadLAB webhook', value: `${baseUrl}/api/leads/leadlab` },
               ].map(item => (
                 <div key={item.label} style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>{item.label}</div>
@@ -202,6 +201,9 @@ export default function LeadsPage() {
                     style={{ width: '100%', textAlign: 'left', background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)', borderRadius: 8, padding: '8px 10px', fontSize: 12, fontFamily: 'inherit', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.value}
                   </button>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 7 }}>
+                    Authenticatie via header <strong>x-api-key</strong> met de Vercel env var <strong>LEADLAB_API_KEY</strong>.
+                  </div>
                 </div>
               ))}
             </div>
