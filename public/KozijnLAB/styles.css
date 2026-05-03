@@ -1005,6 +1005,51 @@ body.is-dragging-v, body.is-dragging-v * { cursor: ns-resize !important; user-se
   .stat:nth-child(2) { border-right: 0; }
   .stat:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
 }
+@media (min-width: 700px) and (max-width: 1024px) and (hover: none) and (pointer: coarse) {
+  html.is-ipad .app {
+    overflow: hidden;
+  }
+  html.is-ipad .col-config,
+  html.is-ipad .col-meta {
+    width: min(340px, 42vw);
+    max-width: 340px;
+  }
+  html.is-ipad .col-preview {
+    min-width: 0;
+    transition: margin .22s;
+  }
+  html.is-ipad body.panel-config-open .col-preview {
+    margin-left: min(340px, 42vw);
+  }
+  html.is-ipad body.panel-meta-open .col-preview {
+    margin-right: min(340px, 42vw);
+  }
+  html.is-ipad .preview-stage {
+    padding: 16px;
+  }
+  html.is-ipad .preview-footer {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  html.is-ipad .stat {
+    min-width: 0;
+    padding: 10px 12px;
+    border-bottom: 0;
+  }
+  html.is-ipad .stat:nth-child(2) {
+    border-right: 1px solid var(--border);
+  }
+  html.is-ipad .stat-label {
+    font-size: 9px;
+    line-height: 1.15;
+  }
+  html.is-ipad .stat-value {
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  html.is-ipad .stat-price .stat-value {
+    font-size: 13px;
+  }
+}
 @media (min-width: 1025px) {
   #btn-toggle-config, #btn-toggle-meta { display: none; }
 }

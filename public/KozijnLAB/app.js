@@ -2595,7 +2595,37 @@ function refreshTweaksUI() {
 // ============================================================
 // INIT
 // ============================================================
+function markDeviceContext() {
+  const ua = navigator.userAgent || '';
+  const isIPad = /iPad/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  document.documentElement.classList.toggle('is-ipad', isIPad);
+  document.body.classList.toggle('is-ipad', isIPad);
+}
+
+function syncSidePanelState() {
+  const configOpen = document.querySelector('.col-config')?.classList.contains('is-open');
+  const metaOpen = document.querySelector('.col-meta')?.classList.contains('is-open');
+  document.body.classList.toggle('panel-config-open', !!configOpen);
+  document.body.classList.toggle('panel-meta-open', !!metaOpen);
+}
+
+function toggleSidePanel(selector, oppositeSelector) {
+  const panel = document.querySelector(selector);
+  const opposite = document.querySelector(oppositeSelector);
+  if (!panel) return;
+
+  const shouldOpen = !panel.classList.contains('is-open');
+  if (document.body.classList.contains('is-ipad') && shouldOpen) {
+    opposite?.classList.remove('is-open');
+  }
+
+  panel.classList.toggle('is-open', shouldOpen);
+  syncSidePanelState();
+  window.setTimeout(renderPreview, 240);
+}
+
 function init() {
+  markDeviceContext();
   applyTweaks();
   bindTweaks();
 
@@ -2673,8 +2703,8 @@ function init() {
     URL.revokeObjectURL(url);
   };
 
-  document.getElementById('btn-toggle-config').onclick = () => document.querySelector('.col-config').classList.toggle('is-open');
-  document.getElementById('btn-toggle-meta').onclick = () => document.querySelector('.col-meta').classList.toggle('is-open');
+  document.getElementById('btn-toggle-config').onclick = () => toggleSidePanel('.col-config', '.col-meta');
+  document.getElementById('btn-toggle-meta').onclick = () => toggleSidePanel('.col-meta', '.col-config');
 
   document.getElementById('btn-to-ecopro').onclick = submitToEcoPro;
   window.addEventListener('message', e => {
