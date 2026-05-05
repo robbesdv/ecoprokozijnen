@@ -104,6 +104,18 @@ const NAV = [
   { key: 'planning',   label: 'Planning',      icon: '📅' },
 ]
 
+async function postSalesAction(action, payload = {}) {
+  const res = await fetch(`/api/admin/sales-action?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
+
 export default function VerkoopPage() {
   const [tab, setTab]               = useState('dashboard')
   const [orders, setOrders]         = useState([])
@@ -193,27 +205,28 @@ export default function VerkoopPage() {
 
   async function saveOfferteChanges() {
     setSavingOfferte(true)
-    for (const it of offerteItems) {
-      const newPrice = Number(editPrices[it.id])
-      if (!isNaN(newPrice)) {
-        await supabase.from('order_items').update({ unit_price: newPrice }).eq('id', it.id)
-      }
+    try {
+      const result = await postSalesAction('save_prices', {
+        orderId: selectedOfferte.id,
+        prices: offerteItems.map(item => ({ itemId: item.id, unitPrice: editPrices[item.id] ?? item.unit_price })),
+      })
+      const newTotal = Number(result.totalAmount ?? result.order?.total_amount) || 0
+      const updatedOfferte = { ...selectedOfferte, ...(result.order || {}), total_amount: newTotal }
+      setSelectedOfferte(prev => ({ ...prev, ...(result.order || {}), total_amount: newTotal }))
+      await notifyCustomer(updatedOfferte, 'order_bijgewerkt', {
+        subject: 'Uw offerte is bijgewerkt',
+        title: 'Offertebedrag bijgewerkt',
+        intro: 'We hebben uw offerte bijgewerkt.',
+        changes: [`Nieuw totaalbedrag: ${formatEuro(newTotal)}`],
+        amount: newTotal,
+      })
+      await loadOrders()
+      showToast('Wijzigingen opgeslagen & klant genotificeerd')
+    } catch (err) {
+      showToast('Wijzigingen niet opgeslagen: ' + err.message, 'error')
+    } finally {
+      setSavingOfferte(false)
     }
-    const newExcl = offerteItems.reduce((s, it) => s + (Number(editPrices[it.id]) || 0) * (it.quantity || 1), 0)
-    const newTotal = Math.round(newExcl * 1.21 * 100) / 100
-    await supabase.from('orders').update({ total_amount: newTotal }).eq('id', selectedOfferte.id)
-    const updatedOfferte = { ...selectedOfferte, total_amount: newTotal }
-    setSelectedOfferte(prev => ({ ...prev, total_amount: newTotal }))
-    await notifyCustomer(updatedOfferte, 'order_bijgewerkt', {
-      subject: 'Uw offerte is bijgewerkt',
-      title: 'Offertebedrag bijgewerkt',
-      intro: 'We hebben uw offerte bijgewerkt.',
-      changes: [`Nieuw totaalbedrag: ${formatEuro(newTotal)}`],
-      amount: newTotal,
-    })
-    await loadOrders()
-    setSavingOfferte(false)
-    showToast('Wijzigingen opgeslagen & klant genotificeerd')
   }
 
   function showToast(msg, type = 'success') {
@@ -350,65 +363,32 @@ export default function VerkoopPage() {
     }
 
     const c = kl.customer || {}
-    const totals = kl.totals || {}
-    const d = 1 - ((kl.project?.discountPct || 0) / 100)
-    const total_amount = totals.gross || 0
-    const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
-    const updates = {
-      customer_name:    c.name || 'Onbekend',
-      customer_email:   c.email || '',
-      customer_phone:   c.phone || '',
-      customer_address: address,
-      total_amount,
-      montage_notes:    kl.project?.notes || '',
-      crm_reference:    kl.offerCode || null,
+    const total_amount = Number(kl.totals?.gross) || 0
+    try {
+      const result = await postSalesAction('update_from_kozijnlab', { orderId, kozijnLab: kl })
+      const orderForMail = result.order || { ...current, id: orderId, total_amount }
+      await notifyCustomer(orderForMail, 'order_bijgewerkt', {
+        subject: 'Uw offerte is bijgewerkt',
+        title: 'Offerte bijgewerkt',
+        intro: 'We hebben uw offerte bijgewerkt vanuit EcoPro KozijnLAB.',
+        changes: [
+          `Offertenummer: ${kl.offerCode || orderForMail.crm_reference || 'bekend in uw portaal'}`,
+          `Totaalbedrag: ${formatEuro(total_amount)}`,
+        ],
+        amount: total_amount,
+      })
+
+      setConfirmData(null)
+      setEditingOrder(null)
+      await loadOrders()
+      setTab('offertes')
+      window.history.replaceState(null, '', '/beheer/verkoop')
+      showToast(`Offerte bijgewerkt voor ${c.name || current?.customer_name || 'klant'}`)
+    } catch (err) {
+      showToast('Fout: ' + err.message, 'error')
+    } finally {
+      setSubmitting(false)
     }
-
-    const { error: orderError } = await supabase.from('orders').update(updates).eq('id', orderId)
-    if (orderError) { showToast('Fout: ' + orderError.message, 'error'); setSubmitting(false); return }
-
-    const { data: oldItems, error: oldItemsError } = await supabase
-      .from('order_items')
-      .select('id')
-      .eq('order_id', orderId)
-    if (oldItemsError) { showToast('Bestaande offerteregels konden niet worden gelezen: ' + oldItemsError.message, 'error'); setSubmitting(false); return }
-
-    const items = buildOrderItems(orderId, kl)
-    if (items.length) {
-      const { error: itemsError } = await supabase.from('order_items').insert(items)
-      if (itemsError) { showToast('Offerteregels niet opgeslagen: ' + itemsError.message, 'error'); setSubmitting(false); return }
-    }
-    const oldItemIds = (oldItems || []).map(it => it.id)
-    if (oldItemIds.length) {
-      const { error: deleteItemsError } = await supabase.from('order_items').delete().in('id', oldItemIds)
-      if (deleteItemsError) { showToast('Oude offerteregels konden niet worden opgeruimd: ' + deleteItemsError.message, 'error'); setSubmitting(false); return }
-    }
-
-    await supabase.from('status_history').insert({
-      order_id: orderId,
-      to_phase: current?.phase ?? 0,
-      note: `Offerte bijgewerkt vanuit KozijnLAB (${kl.offerCode})`,
-      changed_by: 'verkoop',
-    })
-
-    await notifyCustomer({ ...current, ...updates, id: orderId }, 'order_bijgewerkt', {
-      subject: 'Uw offerte is bijgewerkt',
-      title: 'Offerte bijgewerkt',
-      intro: 'We hebben uw offerte bijgewerkt vanuit EcoPro KozijnLAB.',
-      changes: [
-        `Offertenummer: ${kl.offerCode || current?.crm_reference || 'bekend in uw portaal'}`,
-        `Totaalbedrag: ${formatEuro(total_amount)}`,
-      ],
-      amount: total_amount,
-    })
-
-    setSubmitting(false)
-    setConfirmData(null)
-    setEditingOrder(null)
-    await loadOrders()
-    setTab('offertes')
-    window.history.replaceState(null, '', '/beheer/verkoop')
-    showToast(`Offerte bijgewerkt voor ${c.name || current?.customer_name || 'klant'}`)
   }
 
   async function createOrder(kl) {
@@ -418,45 +398,21 @@ export default function VerkoopPage() {
     }
     setSubmitting(true)
     const c = kl.customer || {}
-    const totals = kl.totals || {}
-    const d = 1 - ((kl.project?.discountPct || 0) / 100)
-    const total_amount = totals.gross || 0
-    const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
+    const total_amount = Number(kl.totals?.gross) || 0
+    try {
+      const result = await postSalesAction('create_from_kozijnlab', { kozijnLab: kl })
+      const orderForMail = result.order || {}
+      await notifyCustomer(orderForMail, total_amount > 0 ? 'nieuwe_offerte' : 'welkomst')
 
-    const { data: order, error } = await supabase
-      .from('orders')
-      .insert({
-        customer_name:    c.name  || 'Onbekend',
-        customer_email:   c.email || '',
-        customer_phone:   c.phone || '',
-        customer_address: address,
-        total_amount,
-        phase: 0,
-        montage_notes: kl.project?.notes || '',
-      })
-      .select('*').single()
-
-    if (error) { showToast('Fout: ' + error.message, 'error'); setSubmitting(false); return }
-
-    const orderForMail = { ...order, crm_reference: kl.offerCode || null }
-    await supabase.from('orders').update({ crm_reference: kl.offerCode || null }).eq('id', order.id)
-
-    const items = buildOrderItems(order.id, kl)
-    if (items.length) await supabase.from('order_items').insert(items)
-
-    await supabase.from('status_history').insert({
-      order_id: order.id, to_phase: 0,
-      note: `Aangemaakt vanuit KozijnLAB (${kl.offerCode})`,
-      changed_by: 'verkoop',
-    })
-
-    await notifyCustomer(orderForMail, total_amount > 0 ? 'nieuwe_offerte' : 'welkomst')
-
-    setSubmitting(false)
-    setConfirmData(null)
-    showToast(`Order aangemaakt voor ${c.name}`)
-    loadOrders()
-    setTimeout(() => { window.location.href = '/beheer' }, 2000)
+      setConfirmData(null)
+      showToast(`Order aangemaakt voor ${c.name || orderForMail.customer_name || 'klant'}`)
+      loadOrders()
+      setTimeout(() => { window.location.href = '/beheer' }, 2000)
+    } catch (err) {
+      showToast('Fout: ' + err.message, 'error')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   function eventKey(e) { return e.id || `${e.order_id}_${e.created_at}` }
