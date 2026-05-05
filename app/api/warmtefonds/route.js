@@ -23,7 +23,7 @@ const CHECK = {
 
 function parseItems(items) {
   let hasDoor = false
-  const glassPacks = new Set()
+  const panelPacks = new Set()
 
   for (const item of items || []) {
     let cfg = item.element_config
@@ -35,16 +35,18 @@ function parseItems(items) {
     const cols = cfg.columns || []
     const allRows = cols.flatMap(c => c.rows || [])
     const doorPanels = (cfg.type === 'deur' && Array.isArray(cfg.doorPanels)) ? cfg.doorPanels : []
-    const glassRows = [
-      ...allRows.filter(r => r.fill !== 'panel'),
-      ...doorPanels.filter(p => p.fill === 'glass'),
+    const isDoorLeafRow = (row) => cfg.type === 'deur' && doorPanels.length > 0 && ['deur', 'deur2'].includes(row.paneType)
+    const panelRows = [
+      ...allRows.filter(r => r.fill === 'panel' && !isDoorLeafRow(r)),
+      ...doorPanels.filter(p => p.fill === 'panel'),
     ]
-    for (const row of glassRows) {
-      if (row.glassPack) glassPacks.add(row.glassPack)
+    for (const row of panelRows) {
+      panelPacks.add(row.panelPack || 'HR++')
     }
+    if (cfg.doorOptions?.dddPaneel || cfg.doorOptions?.paneelSierrooster) panelPacks.add('HR++')
   }
 
-  return { hasDoor, glassPacks }
+  return { hasDoor, panelPacks }
 }
 
 export async function GET(request) {
@@ -71,15 +73,15 @@ export async function GET(request) {
     .select('element_config')
     .eq('order_id', order.id)
 
-  const { hasDoor, glassPacks } = parseItems(items)
-  const hasTriple = glassPacks.has('HR+++')
-  const hasDouble = glassPacks.has('HR++') || (!hasTriple && glassPacks.size === 0)
+  const { hasDoor, panelPacks } = parseItems(items)
+  const hasTriplePanel = panelPacks.has('HR+++')
+  const hasDoublePanel = panelPacks.has('HR++')
 
   // Which checkboxes to tick
   const toCheck = new Set(['hoogrendementsbeglazing', 'inclusief_hout_kunststof'])
   if (hasDoor)   toCheck.add('isolerende_deuren')
-  if (hasTriple) toCheck.add('isolerende_panelen_triple')
-  else if (hasDouble) toCheck.add('isolerende_panelen_dubbel')
+  if (hasTriplePanel) toCheck.add('isolerende_panelen_triple')
+  if (hasDoublePanel) toCheck.add('isolerende_panelen_dubbel')
 
   const [street = '', postcode = '', city = ''] = (order.customer_address || '').split(',').map(s => s.trim())
   const postcodeCity = [postcode, city].filter(Boolean).join(' ')

@@ -155,6 +155,7 @@ function defaultDoorPanel(fill = 'panel') {
   return {
     heightPct: 100,
     fill,
+    panelPack: 'HR++',
     glassPack: 'HR++',
     glassFinish: 'clear',
   };
@@ -164,6 +165,7 @@ function cloneDoorPanelDetail(p = {}, fallbackGlassPack = 'HR++') {
   const panel = {
     heightPct: Math.max(1, Number(p.heightPct) || 0),
     fill: p.fill === 'glass' ? 'glass' : 'panel',
+    panelPack: p.panelPack || 'HR++',
     glassPack: p.glassPack || fallbackGlassPack,
     glassFinish: p.glassFinish || 'clear',
     gelaagd: !!p.gelaagd,
@@ -277,6 +279,7 @@ function normalizeElementType(el) {
   if (!el) return el;
   if (el.type === 'hefschuif' && !el.slideSystem) el.slideSystem = 'hst';
   if (el.type === 'schuifpui' && !el.slideSystem) el.slideSystem = 'psk';
+  syncSlidingPaneDirections(el);
   return el;
 }
 
@@ -313,6 +316,7 @@ function normalizeDoorPanels(el) {
     panels = source.map((r, i) => ({
       heightPct: r.heightPct || (100 / source.length),
       fill: r.fill || (isDoorPaneType(r.paneType) ? 'panel' : 'glass'),
+      panelPack: r.panelPack || 'HR++',
       glassPack: r.glassPack || el.glassPack || 'HR++',
       glassFinish: r.glassFinish || 'clear',
       _active: i === 0,
@@ -346,8 +350,10 @@ function tuindeurRowFrom(el) {
     hingeStyle: src.hingeStyle || 'flag',
     fill: src.fill || (el.doorPanels?.[0]?.fill || 'panel'),
     heightPct: 100,
+    panelPack: src.panelPack || el.doorPanels?.find(p => p.fill === 'panel')?.panelPack || 'HR++',
     glassPack: src.glassPack || el.glassPack || 'HR++',
     glassFinish: src.glassFinish || 'clear',
+    padk: !!src.padk,
   };
 }
 
@@ -372,7 +378,19 @@ function applyDoorSubtypeLayout(el) {
   const zijlichtKant = opts.zijlichtKant || (opts.zijlicht ? 'rechts' : null);
   const hasBovenlicht = !!opts.bovenlicht;
   const bovPct = hasBovenlicht ? 20 : 0;
-  const glasRow = (pct) => ({ paneType: 'vast', fill: 'glass', heightPct: pct, glassPack: 'HR++', glassFinish: 'clear' });
+  const zijlichtGlass = {
+    glassPack: opts.zijlichtGlassPack || 'HR++',
+    glassFinish: opts.zijlichtGlassFinish || 'clear',
+    gelaagd: !!opts.zijlichtGelaagd,
+  };
+  const glasRow = (pct, extra = {}) => ({
+    paneType: 'vast',
+    fill: 'glass',
+    heightPct: pct,
+    glassPack: extra.glassPack || 'HR++',
+    glassFinish: extra.glassFinish || 'clear',
+    gelaagd: !!extra.gelaagd,
+  });
 
   // Build rows for a column: optional bovenlicht on top, then main row below
   const colRows = (mainRow) => hasBovenlicht
@@ -380,8 +398,8 @@ function applyDoorSubtypeLayout(el) {
     : [{ ...mainRow, heightPct: 100 }];
 
   const sidelightRows = () => hasBovenlicht
-    ? [glasRow(bovPct), glasRow(100 - bovPct)]
-    : [glasRow(100)];
+    ? [glasRow(bovPct, zijlichtGlass), glasRow(100 - bovPct, zijlichtGlass)]
+    : [glasRow(100, zijlichtGlass)];
 
   const sidelightCol = (pct) => ({ widthPct: pct, _isSidelight: true, rows: sidelightRows() });
 
@@ -507,6 +525,20 @@ function priceElement(el) {
       if (opts.bovenlicht)    base += 515;
     }
 
+    let glassUpgrade = 0;
+    el.columns.forEach(col => col.rows.forEach(r => {
+      if (r.fill !== 'glass' || isDoorPaneType(r.paneType)) return;
+      const colW = el.widthMM * (col.widthPct / 100);
+      const rowH = el.heightMM * (r.heightPct / 100);
+      const am2 = (colW * rowH) / 1e6;
+      const pack = r.glassPack || 'HR++';
+      if (pack === 'HR+++' || pack === 'Triple') glassUpgrade += am2 * 105;
+      if (r.gelaagd) glassUpgrade += am2 * 48.40;
+      if (isMatteGlassFinish(r.glassFinish)) glassUpgrade += am2 * 20;
+      if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
+    }));
+    base += glassUpgrade;
+
   } else if (el.type === 'hefschuif') {
     base = 3502 + m2 * 1133;
     let sgUpgrade = 0;
@@ -569,6 +601,27 @@ function svgEl(tag, attrs = {}) {
 
 function isDoorPaneType(type) {
   return type === 'deur' || type === 'deur2';
+}
+
+function slideDirectionFor(cols, colIndex) {
+  const hasFixed = (col) => (col?.rows || []).some(row => row.paneType !== 'schuif');
+  const rightHasFixed = (cols || []).slice(colIndex + 1).some(hasFixed);
+  if (rightHasFixed) return 'right';
+  const leftHasFixed = (cols || []).slice(0, colIndex).some(hasFixed);
+  if (leftHasFixed) return 'left';
+  return colIndex > 0 ? 'left' : 'right';
+}
+
+function syncSlidingPaneDirections(el) {
+  if (!['schuifpui', 'hefschuif'].includes(el?.type)) return;
+  (el.columns || []).forEach((col, ci) => {
+    (col.rows || []).forEach(row => {
+      if (row.paneType !== 'schuif') return;
+      const dir = slideDirectionFor(el.columns, ci);
+      row.slideDirection = dir;
+      row.hinge = dir === 'left' ? 'right' : 'left';
+    });
+  });
 }
 
 // Geometry cache for drag interactions
@@ -680,6 +733,7 @@ function drawElement(svg, el, opts = {}) {
       rowGeoms.push({ x: cxPx, y: cyPos, w: cwPx, h: rh, row: r });
       drawPane(svg, cxPx, cyPos, cwPx, rh, r, el, sashPx, {
         isFactory,
+        slideDirection: r.slideDirection || slideDirectionFor(cols, ci),
         colorHex: isFactory ? null : (colorObj?.hex || null),
         sashColorHex: isFactory ? null : (sashColorObj?.hex || colorObj?.hex || null),
         panelColorHex: isFactory ? null : (panelColorObj?.hex || colorObj?.hex || null),
@@ -1191,7 +1245,11 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
   if (pType === 'schuif') {
     const ay = sy + sh / 2;
     const ax1 = sx + sw * 0.25, ax2 = sx + sw * 0.75;
-    svg.appendChild(svgEl('path', { d: `M ${ax1} ${ay} L ${ax2} ${ay} M ${ax2 - 8} ${ay - 5} L ${ax2} ${ay} L ${ax2 - 8} ${ay + 5}`, class: 'svg-arrow' }));
+    const dir = opts.slideDirection || row.slideDirection || (row.hinge === 'right' ? 'left' : 'right');
+    const d = dir === 'left'
+      ? `M ${ax2} ${ay} L ${ax1} ${ay} M ${ax1 + 8} ${ay - 5} L ${ax1} ${ay} L ${ax1 + 8} ${ay + 5}`
+      : `M ${ax1} ${ay} L ${ax2} ${ay} M ${ax2 - 8} ${ay - 5} L ${ax2} ${ay} L ${ax2 - 8} ${ay + 5}`;
+    svg.appendChild(svgEl('path', { d, class: 'svg-arrow' }));
   }
   if (pType === 'vent') {
     svg.appendChild(svgEl('rect', { x: x + 6, y: y + 6, width: w - 12, height: h - 12, fill: 'none', stroke: 'var(--draw-sash)', 'stroke-width': 1, rx: 1 }));
@@ -1575,6 +1633,7 @@ function renderConfig() {
             <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="rechts" ${kant==='rechts'?'checked':''}/> Rechts</label>
             <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="links" ${kant==='links'?'checked':''}/> Links</label>
             <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="beide" ${kant==='beide'?'checked':''}/> Beide kanten</label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="zijlicht-gelaagd" ${opts.zijlichtGelaagd ? 'checked' : ''}/> Gelaagd glas</label>
           </div>
         </div>`;
       }
@@ -1583,7 +1642,12 @@ function renderConfig() {
         <span style="flex:1">${o.label}</span>
         <span style="color:var(--text-muted);font-size:12px;">+${fmtEuro(o.price)}</span>
       </label>`;
-    }).join('');
+    }).join('') + (sub === 'tuindeur' && (opts.zijlichtKlein || opts.zijlichtGroot) ? `
+      <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;">
+        <input type="checkbox" id="zijlicht-gelaagd" ${opts.zijlichtGelaagd ? 'checked' : ''}/>
+        <span style="flex:1">Zijlicht gelaagd glas</span>
+        <span style="color:var(--text-muted);font-size:12px;">+gelaagd glas</span>
+      </label>` : '');
 
     const zijlichtToggle = optsList.querySelector('#zijlicht-toggle');
     if (zijlichtToggle) {
@@ -1607,6 +1671,14 @@ function renderConfig() {
         render();
       };
     });
+    const zijlichtGelaagd = optsList.querySelector('#zijlicht-gelaagd');
+    if (zijlichtGelaagd) {
+      zijlichtGelaagd.onchange = () => {
+        if (!el.doorOptions) el.doorOptions = {};
+        el.doorOptions.zijlichtGelaagd = zijlichtGelaagd.checked;
+        render();
+      };
+    }
     optsList.querySelectorAll('[data-door-opt]').forEach(cb => {
       cb.onchange = () => {
         if (!el.doorOptions) el.doorOptions = {};
@@ -1737,6 +1809,11 @@ function renderConfig() {
   hingeStyleField.style.display = showHingeStyle ? '' : 'none';
   if (showHingeStyle) hingeStyleField.querySelector('select').value = activeRow.hingeStyle || 'flag';
 
+  const padkField = root.querySelector('#padk-field');
+  const showPadk = activeRow.paneType === 'draaikiep';
+  padkField.style.display = showPadk ? '' : 'none';
+  if (showPadk) padkField.querySelector('#padk-vent').checked = !!activeRow.padk;
+
   const fillField = root.querySelector('#fill-field');
   const showFill = ['vast', 'draai', 'draaikiep', 'kiep', 'deur', 'deur2'].includes(activeRow.paneType);
   fillField.style.display = showFill ? '' : 'none';
@@ -1750,11 +1827,17 @@ function renderConfig() {
     glassFields.querySelector('#glass-finish').value = activeRow.glassFinish || 'clear';
     glassFields.querySelector('#glass-gelaagd').checked = !!activeRow.gelaagd;
   }
+  const panelFields = root.querySelector('#panel-fields');
+  const showPanel = activeRow.fill === 'panel' && activeRow.paneType !== 'vent';
+  panelFields.style.display = showPanel ? '' : 'none';
+  if (showPanel) panelFields.querySelector('#panel-pack').value = activeRow.panelPack || 'HR++';
   if (isDoor) {
     hingeField.style.display = 'none';
     hingeStyleField.style.display = 'none';
+    if (!isSidelightActive) padkField.style.display = 'none';
     fillField.style.display = 'none';
     glassFields.style.display = 'none';
+    panelFields.style.display = 'none';
   }
 
   root.querySelector('#color-outside').value = el.colorOutside;
@@ -1764,8 +1847,7 @@ function renderConfig() {
   root.querySelector('#finish-outside').value = el.finishOutside;
   root.querySelector('#finish-inside').value = el.finishInside;
 
-  const hasDoorPanels = el.type === 'deur'
-    || (el.doorPanels?.some(p => p.fill === 'panel'))
+  const hasDoorPanels = (el.doorPanels?.some(p => p.fill === 'panel'))
     || (el.columns?.some(col => col.rows?.some(r => r.fill === 'panel')));
   root.querySelector('#color-panel-field').style.display = hasDoorPanels ? '' : 'none';
 
@@ -1853,6 +1935,11 @@ function renderDoorPanelControls(root, el) {
     root.querySelector('#door-panel-glass-finish').value = activePanel.glassFinish || 'clear';
     root.querySelector('#door-panel-glass-gelaagd').checked = !!activePanel.gelaagd;
   }
+  const panelFields = root.querySelector('#door-panel-fields');
+  panelFields.style.display = activePanel.fill === 'panel' ? '' : 'none';
+  if (activePanel.fill === 'panel') {
+    root.querySelector('#door-panel-panel-pack').value = activePanel.panelPack || 'HR++';
+  }
 }
 
 function buildConfigShell() {
@@ -1933,6 +2020,7 @@ function buildConfigShell() {
         <div class="field"><label class="label">Type vak</label><select class="select" id="pane-type"></select></div>
         <div class="field" id="hinge-field" style="display:none"><label class="label">Scharnierzijde</label><select class="select"><option value="left">Links</option><option value="right">Rechts</option></select></div>
         <div class="field" id="hinge-style-field" style="display:none"><label class="label">Scharnier type</label><select class="select"><option value="flag">Vlagscharnier</option><option value="roller">Rollerbandscharnier</option></select></div>
+        <div class="field" id="padk-field" style="display:none"><label class="check-label"><input type="checkbox" id="padk-vent"/> PADK ventilatiestand</label></div>
         <div class="field" id="fill-field" style="display:none"><label class="label">Vulling</label><select class="select"><option value="glass">Glas</option><option value="panel">Paneel</option></select></div>
         <div id="glass-fields" style="display:none">
           <div class="field-row">
@@ -1944,6 +2032,11 @@ function buildConfigShell() {
             </div>
           </div>
           <div class="field"><label class="check-label"><input type="checkbox" id="glass-gelaagd"/> Gelaagd glas <span class="label-hint">(+€40/m²)</span></label></div>
+        </div>
+        <div id="panel-fields" style="display:none">
+          <div class="field"><label class="label">Paneelisolatie</label>
+            <select class="select" id="panel-pack"><option value="HR++">HR++ paneel</option><option value="HR+++">HR+++ paneel</option></select>
+          </div>
         </div>
         <div id="door-vakken-fields" style="display:none">
           <div class="field">
@@ -1968,6 +2061,11 @@ function buildConfigShell() {
               </div>
             </div>
             <div class="field"><label class="check-label"><input type="checkbox" id="door-panel-glass-gelaagd"/> Gelaagd glas <span class="label-hint">(+€40/m²)</span></label></div>
+          </div>
+          <div id="door-panel-fields" style="display:none">
+            <div class="field"><label class="label">Paneelisolatie</label>
+              <select class="select" id="door-panel-panel-pack"><option value="HR++">HR++ paneel</option><option value="HR+++">HR+++ paneel</option></select>
+            </div>
           </div>
         </div>
       </div>
@@ -2046,8 +2144,16 @@ function bindConfigShell() {
     }
     if (t.id === 'door-panel-fill') {
       normalizeDoorPanels(el);
-      el.doorPanels[el._activeDoorPanelIdx || 0].fill = t.value;
+      const panel = el.doorPanels[el._activeDoorPanelIdx || 0];
+      panel.fill = t.value;
+      if (panel.fill === 'panel' && !panel.panelPack) panel.panelPack = 'HR++';
+      if (panel.fill === 'glass' && !panel.glassPack) panel.glassPack = 'HR++';
       el._doorPreset = null;
+      render(); return;
+    }
+    if (t.id === 'door-panel-panel-pack') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].panelPack = t.value;
       render(); return;
     }
     if (t.id === 'door-panel-glass-pack') {
@@ -2081,6 +2187,7 @@ function bindConfigShell() {
       if (!r.fill) r.fill = 'glass';
       if (!r.hinge) r.hinge = 'left';
       if (isDoorPaneType(r.paneType) && !r.hingeStyle) r.hingeStyle = 'flag';
+      if (r.paneType !== 'draaikiep') delete r.padk;
       render(); return;
     }
     if (t.id === 'color-outside') { el.colorOutside = t.value; render(); return; }
@@ -2089,8 +2196,26 @@ function bindConfigShell() {
     if (t.id === 'color-panel') { el.colorPanel = t.value; render(); return; }
     if (t.id === 'finish-outside') { el.finishOutside = t.value; render(); return; }
     if (t.id === 'finish-inside') { el.finishInside = t.value; render(); return; }
-    if (t.id === 'glass-pack') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassPack = t.value; render(); return; }
-    if (t.id === 'glass-finish') { el.columns[el._activeColIdx].rows[el._activeRowIdx].glassFinish = t.value; render(); return; }
+    if (t.id === 'glass-pack') {
+      el.columns[el._activeColIdx].rows[el._activeRowIdx].glassPack = t.value;
+      if (el.columns[el._activeColIdx]?._isSidelight) {
+        el.doorOptions = el.doorOptions || {};
+        el.doorOptions.zijlichtGlassPack = t.value;
+      }
+      render(); return;
+    }
+    if (t.id === 'panel-pack') {
+      el.columns[el._activeColIdx].rows[el._activeRowIdx].panelPack = t.value;
+      render(); return;
+    }
+    if (t.id === 'glass-finish') {
+      el.columns[el._activeColIdx].rows[el._activeRowIdx].glassFinish = t.value;
+      if (el.columns[el._activeColIdx]?._isSidelight) {
+        el.doorOptions = el.doorOptions || {};
+        el.doorOptions.zijlichtGlassFinish = t.value;
+      }
+      render(); return;
+    }
     if (t.id === 'montage') { state.montageEuro = +t.value || 0; render(); return; }
     if (t.id === 'discount') { state.discountPct = +t.value || 0; render(); return; }
     if (t.id === 'project-notes') { state.notes = t.value; saveState(); return; }
@@ -2098,7 +2223,13 @@ function bindConfigShell() {
     if (t.id?.startsWith('cust-')) { state.customer[t.id.replace('cust-', '')] = t.value; render(); return; }
     if (t.closest('#hinge-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].hinge = t.value; render(); return; }
     if (t.closest('#hinge-style-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].hingeStyle = t.value; render(); return; }
-    if (t.closest('#fill-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].fill = t.value; render(); return; }
+    if (t.closest('#fill-field')) {
+      const row = el.columns[el._activeColIdx].rows[el._activeRowIdx];
+      row.fill = t.value;
+      if (row.fill === 'panel' && !row.panelPack) row.panelPack = 'HR++';
+      if (row.fill === 'glass' && !row.glassPack) row.glassPack = 'HR++';
+      render(); return;
+    }
   });
   root.addEventListener('change', e => {
     const el = activeElement();
@@ -2114,7 +2245,15 @@ function bindConfigShell() {
     }
     if (e.target.id === 'door-panel-fill') {
       normalizeDoorPanels(el);
-      el.doorPanels[el._activeDoorPanelIdx || 0].fill = e.target.value;
+      const panel = el.doorPanels[el._activeDoorPanelIdx || 0];
+      panel.fill = e.target.value;
+      if (panel.fill === 'panel' && !panel.panelPack) panel.panelPack = 'HR++';
+      if (panel.fill === 'glass' && !panel.glassPack) panel.glassPack = 'HR++';
+      render(); return;
+    }
+    if (e.target.id === 'door-panel-panel-pack') {
+      normalizeDoorPanels(el);
+      el.doorPanels[el._activeDoorPanelIdx || 0].panelPack = e.target.value;
       render(); return;
     }
     if (e.target.id === 'door-panel-glass-pack') {
@@ -2129,6 +2268,18 @@ function bindConfigShell() {
     }
     if (e.target.id === 'glass-gelaagd') {
       el.columns[el._activeColIdx].rows[el._activeRowIdx].gelaagd = e.target.checked;
+      if (el.columns[el._activeColIdx]?._isSidelight) {
+        el.doorOptions = el.doorOptions || {};
+        el.doorOptions.zijlichtGelaagd = e.target.checked;
+      }
+      render(); return;
+    }
+    if (e.target.id === 'panel-pack') {
+      el.columns[el._activeColIdx].rows[el._activeRowIdx].panelPack = e.target.value;
+      render(); return;
+    }
+    if (e.target.id === 'padk-vent') {
+      el.columns[el._activeColIdx].rows[el._activeRowIdx].padk = e.target.checked;
       render(); return;
     }
     if (e.target.id === 'door-panel-glass-gelaagd') {
@@ -2439,7 +2590,10 @@ function buildExportPayload() {
             heightPct: +r.heightPct.toFixed(2),
             paneType: r.paneType, fill: r.fill, hinge: r.hinge,
             hingeStyle: r.hingeStyle || 'flag',
+            panelPack: r.panelPack || 'HR++',
             glassPack: r.glassPack, glassFinish: r.glassFinish, gelaagd: r.gelaagd || false,
+            padk: !!r.padk,
+            slideDirection: r.slideDirection,
           };
           const doorPanels = exportDoorPanelsForRow(el, r);
           if (doorPanels) row.doorPanels = doorPanels;
@@ -2495,9 +2649,12 @@ function importFromJSON(data) {
           fill: r.fill || 'glass',
           hinge: r.hinge || 'left',
           hingeStyle: r.hingeStyle || 'flag',
+          panelPack: r.panelPack || 'HR++',
           glassPack: r.glassPack || 'HR++',
           glassFinish: r.glassFinish || 'clear',
           gelaagd: !!r.gelaagd,
+          padk: !!r.padk,
+          slideDirection: r.slideDirection,
           doorPanels: Array.isArray(r.doorPanels) ? r.doorPanels.map(p => cloneDoorPanelDetail({ ...p, heightPct: p.heightPct || 100 })) : undefined,
         })),
       })),

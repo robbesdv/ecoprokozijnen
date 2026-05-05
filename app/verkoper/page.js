@@ -60,10 +60,18 @@ function buildItemDescription(el) {
     const label = PANE_LABEL[r.paneType] || r.paneType
     if (label && !seenTypes.includes(label)) seenTypes.push(label)
   })
-  const glassRows = [...allRows.filter(r => r.fill !== 'panel'), ...doorPanels.filter(r => r.fill === 'glass')]
+  const isDoorLeafRow = (row) => el.type === 'deur' && doorPanels.length > 0 && ['deur', 'deur2'].includes(row.paneType)
+  const glassRows = [...allRows.filter(r => r.fill !== 'panel' && !isDoorLeafRow(r)), ...doorPanels.filter(r => r.fill === 'glass')]
+  const panelRows = [...allRows.filter(r => r.fill === 'panel' && !isDoorLeafRow(r)), ...doorPanels.filter(r => r.fill === 'panel')]
   const packs = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
+  const panelPacks = [...new Set(panelRows.map(r => r.panelPack || 'HR++'))]
   const finishLabels = [...new Set(glassRows.map(r => glassFinishLabel(r.glassFinish)).filter(Boolean))]
-  const glassStr = [packs[0] || 'HR++', ...finishLabels].join(', ')
+  const extras = [
+    ...finishLabels,
+    ...(panelPacks.length ? [`Paneel: ${panelPacks.join('/')}`] : []),
+    ...(allRows.some(r => r.paneType === 'draaikiep' && r.padk) ? ['PADK ventilatiestand'] : []),
+  ]
+  const glassStr = [glassRows.length > 0 ? (packs[0] || 'HR++') : null, ...extras].filter(Boolean).join(', ') || 'HR++'
   const w = el.dimensions?.widthMM
   const h = el.dimensions?.heightMM
   const colorCode = el.finish?.colorOutside || ''

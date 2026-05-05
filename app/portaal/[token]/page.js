@@ -22,8 +22,9 @@ function fixDesc(description, element_config) {
   if (!cfg) return description
   const cols = cfg.columns || []
   const doorPanels = cfg.type === 'deur' && Array.isArray(cfg.doorPanels) ? cfg.doorPanels : []
+  const isDoorLeafRow = (row) => cfg.type === 'deur' && doorPanels.length > 0 && ['deur', 'deur2'].includes(row.paneType)
   const glassRows = [
-    ...cols.flatMap(c => (c.rows || []).filter(r => r.fill !== 'panel')),
+    ...cols.flatMap(c => (c.rows || []).filter(r => r.fill !== 'panel' && !isDoorLeafRow(r))),
     ...doorPanels.filter(p => p.fill === 'glass'),
   ]
   const rawPacks = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
@@ -1016,12 +1017,17 @@ function Phase0({ order, onRefresh, showToast }) {
       const pdfSashCode = el.colorSash && el.colorSash !== 'same' ? el.colorSash : null
       const pdfPanelCode = el.colorPanel && el.colorPanel !== 'same' ? el.colorPanel : null
       const pdfHasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd)) || (el.doorPanels?.some(p => p.gelaagd))
-      const pdfHasDoorPanels = el.type === 'deur'
-        || (el.doorPanels?.some(p => p.fill === 'panel'))
-        || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
+      const pdfHasPadk = cols.some(col => col.rows?.some(r => r.paneType === 'draaikiep' && r.padk))
+      const pdfIsDoorLeafRow = (row) => el.type === 'deur' && el.doorPanels?.length > 0 && ['deur', 'deur2'].includes(row.paneType)
+      const pdfHasDoorPanels = (el.doorPanels?.some(p => p.fill === 'panel'))
+        || (cols.some(col => col.rows?.some(r => r.fill === 'panel' && !pdfIsDoorLeafRow(r))))
+      const pdfPanelPacks = [...new Set([
+        ...cols.flatMap(col => col.rows?.filter(r => r.fill === 'panel' && !pdfIsDoorLeafRow(r)).map(r => r.panelPack || 'HR++') || []),
+        ...(el.doorPanels?.filter(p => p.fill === 'panel').map(p => p.panelPack || 'HR++') || []),
+      ])]
       const _PDF_PACK_RANK = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
       const _pdfRawPacks = [...new Set([
-        ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack?.trim()).filter(Boolean) || []),
+        ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel' && !pdfIsDoorLeafRow(r)).map(r => r.glassPack?.trim()).filter(Boolean) || []),
         ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack?.trim()).filter(Boolean) || []),
       ])]
       const _pdfMaxRank = Math.max(0, ..._pdfRawPacks.map(p => _PDF_PACK_RANK[p] ?? 0))
@@ -1033,8 +1039,10 @@ function Phase0({ order, onRefresh, showToast }) {
         ['Kleur binnen', el.colorInside === 'same' ? `Zelfde als buiten` : `${el.colorInside} — ${ralName(el.colorInside)}`],
         ['Kleur draaidelen', pdfSashCode ? `${pdfSashCode} — ${ralName(pdfSashCode)}` : 'Zelfde als kozijn'],
         ...(pdfHasDoorPanels ? [['Kleur panelen', pdfPanelCode ? `${pdfPanelCode} — ${ralName(pdfPanelCode)}` : 'Zelfde als kozijn']] : []),
+        ...(pdfHasDoorPanels ? [['Paneelpakket', pdfPanelPacks.length > 0 ? pdfPanelPacks.join(', ') : 'HR++']] : []),
         ['Glasspakket', pdfGlasPacks.length > 0 ? pdfGlasPacks.join(', ') : '—'],
         ['Gelaagd glas', pdfHasGelaagd ? 'Ja' : 'Nee'],
+        ...(pdfHasPadk ? [['PADK ventilatiestand', 'Ja']] : []),
         ['Afwerking', `Buiten: ${el.finishOutside === 'woodgrain' ? 'Houtnerf' : 'Glad'}  /  Binnen: ${el.finishInside === 'woodgrain' ? 'Houtnerf' : 'Glad'}`],
         ['Aantal kolommen', String(cols.length)],
         ...cols.map((col, ci) => {
@@ -1450,12 +1458,17 @@ function KozijnElementenSection({ items }) {
         const panelCode = el.colorPanel && el.colorPanel !== 'same' ? el.colorPanel : null
         const panelLabel = panelCode ? `${panelCode} ${ralName(panelCode)}` : `Zelfde als kozijn`
         const hasGelaagd = cols.some(col => col.rows?.some(r => r.gelaagd)) || (el.doorPanels?.some(p => p.gelaagd))
-        const hasDoorPanels = el.type === 'deur'
-          || (el.doorPanels?.some(p => p.fill === 'panel'))
-          || (cols.some(col => col.rows?.some(r => r.fill === 'panel')))
+        const hasPadk = cols.some(col => col.rows?.some(r => r.paneType === 'draaikiep' && r.padk))
+        const isDoorLeafRow = (row) => el.type === 'deur' && el.doorPanels?.length > 0 && ['deur', 'deur2'].includes(row.paneType)
+        const hasDoorPanels = (el.doorPanels?.some(p => p.fill === 'panel'))
+          || (cols.some(col => col.rows?.some(r => r.fill === 'panel' && !isDoorLeafRow(r))))
+        const panelPacks = [...new Set([
+          ...cols.flatMap(col => col.rows?.filter(r => r.fill === 'panel' && !isDoorLeafRow(r)).map(r => r.panelPack || 'HR++') || []),
+          ...(el.doorPanels?.filter(p => p.fill === 'panel').map(p => p.panelPack || 'HR++') || []),
+        ])]
         const _PACK_RANK = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
         const _rawPacks = [...new Set([
-          ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel').map(r => r.glassPack?.trim()).filter(Boolean) || []),
+          ...cols.flatMap(col => col.rows?.filter(r => r.fill !== 'panel' && !isDoorLeafRow(r)).map(r => r.glassPack?.trim()).filter(Boolean) || []),
           ...(el.doorPanels?.filter(p => p.fill === 'glass').map(p => p.glassPack?.trim()).filter(Boolean) || []),
         ])]
         const _maxRank = Math.max(0, ..._rawPacks.map(p => _PACK_RANK[p] ?? 0))
@@ -1467,8 +1480,10 @@ function KozijnElementenSection({ items }) {
           { label: 'Kleur binnen', value: el.colorInside === 'same' ? `Zelfde (${ralName(el.colorOutside)})` : `${colorInside} ${ralName(colorInside)}` },
           { label: 'Kleur draaidelen', value: sashLabel },
           ...(hasDoorPanels ? [{ label: 'Kleur panelen', value: panelLabel }] : []),
+          ...(hasDoorPanels ? [{ label: 'Paneelpakket', value: panelPacks.length > 0 ? panelPacks.join(', ') : 'HR++' }] : []),
           { label: 'Glasspakket', value: glassPacks.length > 0 ? glassPacks.join(', ') : '—' },
           { label: 'Gelaagd glas', value: hasGelaagd ? 'Ja' : 'Nee' },
+          ...(hasPadk ? [{ label: 'PADK ventilatiestand', value: 'Ja' }] : []),
           { label: 'Kolommen', value: String(cols.length) },
           { label: 'Vakken', value: panesSummary || '—' },
           ...(el.notes ? [{ label: 'Opmerkingen', value: el.notes, full: true }] : []),
