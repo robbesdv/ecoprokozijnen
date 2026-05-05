@@ -26,6 +26,18 @@ async function notifyCustomer(order, type, extra = {}) {
   }
 }
 
+async function postAdminOrderAction(orderId, action, payload = {}) {
+  const res = await fetch(`/api/admin/order-action?action=${encodeURIComponent(action)}&orderId=${encodeURIComponent(orderId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
+
 function getNotifyTypeForPhase(phase) {
   const map = { 2: 'aanbetaling_bevestigd', 5: 'montage_gepland', 6: 'montage_klaar', 7: 'compleet' }
   return map[phase] || 'status_update'
@@ -618,12 +630,29 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
 
   async function save() {
     setSaving(true)
-    const updates = { phase, payment_split: paymentSplit, montage_notes: notes, assigned_monteur: monteur || null, deposit_confirmed: depositConf, main_payment_confirmed: mainConf, final_payment_confirmed: finalConf }
-    if (installDate)      updates.installation_date = installDate
-    if (deliveryExpected) updates.factory_delivery_expected = deliveryExpected
-    if (phase >= 3 && !order.factory_ordered_at) updates.factory_ordered_at = new Date().toISOString()
-    if (phase === 6 && !order.installation_done_at) updates.installation_done_at = new Date().toISOString()
-    if (phase === 7 && !order.completed_at) updates.completed_at = new Date().toISOString()
+    const updatePayload = {
+      phase,
+      paymentSplit,
+      montageNotes: notes,
+      assignedMonteur: monteur || '',
+      depositConfirmed: depositConf,
+      mainPaymentConfirmed: mainConf,
+      finalPaymentConfirmed: finalConf,
+      installationDate: installDate || '',
+      factoryDeliveryExpected: deliveryExpected || '',
+    }
+    const nextOrder = {
+      ...order,
+      phase,
+      payment_split: paymentSplit,
+      montage_notes: notes,
+      assigned_monteur: monteur || null,
+      deposit_confirmed: depositConf,
+      main_payment_confirmed: mainConf,
+      final_payment_confirmed: finalConf,
+      installation_date: installDate || null,
+      factory_delivery_expected: deliveryExpected || null,
+    }
     const changes = [
       phase !== order.phase ? `Status gewijzigd naar ${PHASES.find(p => p.id === phase)?.adminLabel || 'nieuwe status'}` : '',
       paymentSplit !== order.payment_split ? 'Betaalkeuze bijgewerkt' : '',
@@ -635,14 +664,8 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
       mainConf !== order.main_payment_confirmed ? 'Hoofdbetaling bijgewerkt' : '',
       finalConf !== order.final_payment_confirmed ? 'Slotbetaling bijgewerkt' : '',
     ].filter(Boolean)
-    const { error } = await supabase.from('orders').update(updates).eq('id', order.id)
-    if (!error && phase !== order.phase) {
-      await supabase.from('status_history').insert({ order_id: order.id, from_phase: order.phase, to_phase: phase, changed_by: 'beheer' })
-    }
-    setSaving(false)
-    if (error) {
-      showToast('Fout: ' + error.message, 'error')
-    } else {
+    try {
+      await postAdminOrderAction(order.id, 'update', updatePayload)
       if (phase !== order.phase) {
         const type = getNotifyTypeForPhase(phase)
         const phaseLabel = PHASES.find(p => p.id === phase)?.adminLabel || ''
@@ -650,7 +673,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
           phaseLabel,
           installDate: installDate ? new Date(installDate).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }) : null,
         }
-        notifyCustomer({ ...order, ...updates }, type, extra).then(r => {
+        notifyCustomer(nextOrder, type, extra).then(r => {
           if (!r.success) console.warn('E-mail niet verzonden:', r.error)
         })
       }
@@ -661,7 +684,7 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
         notifyCustomer(order, 'betaling_bevestigd', { amount: order.total_amount * 0.1, final: true })
       }
       if (phase === order.phase && !(mainConf && !order.main_payment_confirmed) && !(finalConf && !order.final_payment_confirmed) && changes.length) {
-        notifyCustomer({ ...order, ...updates }, 'order_bijgewerkt', {
+        notifyCustomer(nextOrder, 'order_bijgewerkt', {
           title: 'Ordergegevens bijgewerkt',
           changes,
           amount: order.total_amount,
@@ -670,15 +693,21 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
       }
       showToast('Opgeslagen & klant genotificeerd')
       onUpdate()
+    } catch (err) {
+      showToast('Fout: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
     }
   }
 
   async function resolveDefect(id) {
-    const defect = (order.defects || []).find(d => d.id === id)
-    await supabase.from('defects').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id)
-    const remainingOpen = (order.defects || []).filter(d => d.id !== id && d.status === 'open').length
-    notifyCustomer(order, 'bevinding_opgelost', { defect: defect?.description || '', allResolved: remainingOpen === 0 })
-    onUpdate(); showToast('Bevinding opgelost & klant genotificeerd')
+    try {
+      const result = await postAdminOrderAction(order.id, 'resolve_defect', { defectId: id })
+      notifyCustomer(order, 'bevinding_opgelost', { defect: result.defect?.description || '', allResolved: Number(result.remainingOpen || 0) === 0 })
+      onUpdate(); showToast('Bevinding opgelost & klant genotificeerd')
+    } catch (err) {
+      showToast('Fout: ' + err.message, 'error')
+    }
   }
 
   async function uploadFile(e) {
@@ -702,19 +731,24 @@ function DetailPanel({ order, onClose, onUpdate, showToast, inline = false }) {
 
   async function deleteOrder() {
     setDeleting(true)
-    const filePaths = (order.order_files || []).map(f => f.storage_path).filter(Boolean)
-    if (filePaths.length > 0) await supabase.storage.from('order-files').remove(filePaths)
-    const { error } = await supabase.from('orders').delete().eq('id', order.id)
-    setDeleting(false)
-    if (error) { showToast('Fout bij verwijderen: ' + error.message, 'error'); return }
-    showToast('Order verwijderd')
-    onClose(); onUpdate()
+    try {
+      await postAdminOrderAction(order.id, 'delete_order')
+      showToast('Order verwijderd')
+      onClose(); onUpdate()
+    } catch (err) {
+      showToast('Fout bij verwijderen: ' + err.message, 'error')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function deleteFile(fileId, filePath) {
-    await supabase.storage.from('order-files').remove([filePath])
-    await supabase.from('order_files').delete().eq('id', fileId)
-    onUpdate(); showToast('Bestand verwijderd')
+    try {
+      await postAdminOrderAction(order.id, 'delete_file', { fileId, filePath })
+      onUpdate(); showToast('Bestand verwijderd')
+    } catch (err) {
+      showToast('Fout bij verwijderen: ' + err.message, 'error')
+    }
   }
 
   const TABS = [
