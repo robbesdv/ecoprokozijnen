@@ -6,8 +6,18 @@ import { formatEuro, formatDate, getPhase } from '@/lib/phases'
 import { formatLeadAddress, LEAD_STATUSES } from '@/lib/lead-normalize'
 import { calcPotentialCommission } from '@/lib/sales'
 import { notifyCustomer } from '@/lib/notifyCustomer'
-import { sendLeadLabEvent } from '@/lib/leadLabWebhook'
-import { ralName } from '@/lib/KozijnSVG'
+
+async function postSellerAction(action, payload = {}) {
+  const res = await fetch(`/api/seller/action?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
 
 const NAV = [
   { key: 'dashboard', label: 'Overzicht', icon: '▦' },
@@ -37,68 +47,6 @@ function StatusBadge({ status }) {
       {statusLabel(status)}
     </span>
   )
-}
-
-const PANE_LABEL = {
-  vast: 'vast glas', draai: 'draai', kiep: 'kiep', draaikiep: 'draai-kiep',
-  vent: 'ventilatie', deur: 'deur', deur2: 'dubbele deur', schuif: 'schuif',
-  glas: 'glas', paneel: 'paneel',
-}
-
-function glassFinishLabel(value) {
-  const map = { satinato: 'Satinato', milk: 'Melkglas', melkglas: 'Melkglas', solar: 'Zonwerend' }
-  return map[String(value || '').toLowerCase()] || ''
-}
-
-function buildItemDescription(el) {
-  const cols = el.columns || []
-  const allRows = cols.flatMap(c => c.rows || [])
-  const doorPanels = el.type === 'deur' && Array.isArray(el.doorPanels) ? el.doorPanels : []
-  const typeRows = doorPanels.length ? doorPanels.map(p => ({ paneType: p.fill === 'glass' ? 'glas' : 'paneel' })) : allRows
-  const seenTypes = []
-  typeRows.forEach(r => {
-    const label = PANE_LABEL[r.paneType] || r.paneType
-    if (label && !seenTypes.includes(label)) seenTypes.push(label)
-  })
-  const isDoorLeafRow = (row) => el.type === 'deur' && doorPanels.length > 0 && ['deur', 'deur2'].includes(row.paneType)
-  const glassRows = [...allRows.filter(r => r.fill !== 'panel' && !isDoorLeafRow(r)), ...doorPanels.filter(r => r.fill === 'glass')]
-  const panelRows = [...allRows.filter(r => r.fill === 'panel' && !isDoorLeafRow(r)), ...doorPanels.filter(r => r.fill === 'panel')]
-  const packs = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
-  const panelPacks = [...new Set(panelRows.map(r => r.panelPack || 'HR++'))]
-  const finishLabels = [...new Set(glassRows.map(r => glassFinishLabel(r.glassFinish)).filter(Boolean))]
-  const extras = [
-    ...finishLabels,
-    ...(panelPacks.length ? [`Paneel: ${panelPacks.join('/')}`] : []),
-    ...(allRows.some(r => r.paneType === 'draaikiep' && r.padk) ? ['PADK ventilatiestand'] : []),
-  ]
-  const glassStr = [glassRows.length > 0 ? (packs[0] || 'HR++') : null, ...extras].filter(Boolean).join(', ') || 'HR++'
-  const w = el.dimensions?.widthMM
-  const h = el.dimensions?.heightMM
-  const colorCode = el.finish?.colorOutside || ''
-  const colorName = ralName(colorCode)
-  return `Premium Schuco Living Variant ${doorPanels.length || allRows.length || 1}-vaks, ${seenTypes.join(' / ') || 'vast glas'}, ${w} x ${h}mm bxh, Kleur: ${colorCode}${colorName && colorName !== colorCode ? ` - ${colorName}` : ''}, ${glassStr}`
-}
-
-function buildOrderItems(orderId, kl) {
-  const elementItems = (kl.elements || []).map((el, idx) => ({
-    order_id: orderId,
-    description: buildItemDescription(el),
-    quantity: el.qty || 1,
-    unit_price: Number(el.pricePerUnit) || 0,
-    sort_order: idx,
-    element_config: el,
-  }))
-  const extraItems = (kl.extras || [])
-    .filter(ex => String(ex.name || '').trim() || Number(ex.unitPrice) > 0)
-    .map((ex, idx) => ({
-      order_id: orderId,
-      description: `Extra: ${String(ex.name || '').trim() || 'Project extra'}`,
-      quantity: ex.qty || 1,
-      unit_price: Number(ex.unitPrice) || 0,
-      sort_order: elementItems.length + idx,
-      element_config: null,
-    }))
-  return [...elementItems, ...extraItems]
 }
 
 function starterElement(id = Date.now()) {
@@ -230,69 +178,37 @@ export default function VerkoperPage() {
   }
 
   async function updateLead(lead, updates) {
-    const { error } = await supabase.from('leads').update(updates).eq('id', lead.id).eq('assigned_to', user.username)
-    if (error) { showToast('Lead niet bijgewerkt: ' + error.message, 'error'); return }
-    showToast('Lead bijgewerkt')
-    loadData()
+    try {
+      await postSellerAction('update_lead', { leadId: lead.id, updates })
+      showToast('Lead bijgewerkt')
+      loadData()
+    } catch (err) {
+      showToast('Lead niet bijgewerkt: ' + err.message, 'error')
+    }
   }
 
   async function createOrder(kl) {
     setSubmitting(true)
     const lead = activeLeadRef.current
-    const c = kl.customer || {}
-    const total_amount = Number(kl.totals?.gross) || 0
-    const address = [c.address, c.postcode, c.city].filter(Boolean).join(', ')
-    const internalNotes = [
-      `Verkoper: ${user.name} (${user.username})`,
-      lead ? `Lead: ${lead.customer_name} (${lead.source_lead_id || lead.id})` : '',
-      kl.project?.notes ? `Notities: ${kl.project.notes}` : '',
-    ].filter(Boolean).join('\n')
+    try {
+      const result = await postSellerAction('create_order', {
+        leadId: lead?.id || null,
+        kozijnLab: kl,
+      })
+      const order = result.order
+      const total_amount = Number(order?.total_amount || kl.totals?.gross) || 0
+      await notifyCustomer({ ...order, crm_reference: kl.offerCode || order?.crm_reference || null }, total_amount > 0 ? 'nieuwe_offerte' : 'welkomst')
 
-    const { data: order, error } = await supabase.from('orders').insert({
-      customer_name: c.name || 'Onbekend',
-      customer_email: c.email || '',
-      customer_phone: c.phone || '',
-      customer_address: address,
-      total_amount,
-      phase: 0,
-      montage_notes: kl.project?.notes || '',
-      crm_reference: kl.offerCode || null,
-      sales_owner: user.username,
-      internal_notes: internalNotes,
-    }).select('*').single()
-
-    if (error) {
+      setConfirmData(null)
+      activeLeadRef.current = null
+      await loadData()
+      setTab('orders')
+      showToast(`Order aangemaakt voor ${kl.customer?.name || order?.customer_name || 'klant'}`)
+    } catch (err) {
+      showToast('Order niet aangemaakt: ' + err.message, 'error')
+    } finally {
       setSubmitting(false)
-      showToast('Order niet aangemaakt: ' + error.message, 'error')
-      return
     }
-
-    const items = buildOrderItems(order.id, kl)
-    if (items.length) {
-      const { error: itemsError } = await supabase.from('order_items').insert(items)
-      if (itemsError) showToast('Order aangemaakt, maar offerteregels niet opgeslagen: ' + itemsError.message, 'error')
-    }
-
-    if (lead) {
-      await supabase.from('leads').update({ status: 'offerte', order_id: order.id }).eq('id', lead.id).eq('assigned_to', user.username)
-      await sendLeadLabEvent('offerte_verzonden', { orderId: order.id })
-    }
-
-    await supabase.from('status_history').insert({
-      order_id: order.id,
-      to_phase: 0,
-      note: `Aangemaakt vanuit verkoperportaal (${kl.offerCode || 'KozijnLAB'})`,
-      changed_by: user.name || 'verkoper',
-    })
-
-    await notifyCustomer({ ...order, crm_reference: kl.offerCode || null }, total_amount > 0 ? 'nieuwe_offerte' : 'welkomst')
-
-    setSubmitting(false)
-    setConfirmData(null)
-    activeLeadRef.current = null
-    await loadData()
-    setTab('orders')
-    showToast(`Order aangemaakt voor ${c.name || 'klant'}`)
   }
 
   const openLeads = leads.filter(l => !['gewonnen', 'verloren'].includes(l.status))
