@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
+import { AUTH_COOKIE_NAME, verifyAuthCookie } from '@/lib/auth-cookie'
 
 const LEADLAB_WEBHOOK_URL =
   process.env.LEADLAB_WEBHOOK_URL ||
@@ -20,10 +21,10 @@ function supabaseServer() {
 
 async function hasAdminSession() {
   const cookieStore = await cookies()
-  const val = cookieStore.get('ecopro-auth')?.value
+  const val = cookieStore.get(AUTH_COOKIE_NAME)?.value
 
   try {
-    const auth = val ? JSON.parse(val) : null
+    const auth = await verifyAuthCookie(val)
     return Boolean(auth?.ok && auth.role !== 'monteur')
   } catch {
     return false

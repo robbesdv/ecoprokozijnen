@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { AUTH_COOKIE_MAX_AGE, AUTH_COOKIE_NAME, createAuthCookie } from '@/lib/auth-cookie'
 
 const USERS = [
   { username: 'ecopro',   passwordEnv: 'ADMIN_PASSWORD',           role: 'admin',   name: 'EcoPro Admin'   },
@@ -36,16 +37,11 @@ export async function POST(request) {
       redirect: redirectForRole(user.role),
     })
 
-    response.cookies.set('ecopro-auth', JSON.stringify({
-      ok: true,
-      role: user.role,
-      username: user.username,
-      name: user.name,
-    }), {
+    response.cookies.set(AUTH_COOKIE_NAME, await createAuthCookie(user), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: AUTH_COOKIE_MAX_AGE,
       path: '/',
     })
 
@@ -57,6 +53,6 @@ export async function POST(request) {
 
 export async function DELETE() {
   const response = NextResponse.json({ success: true })
-  response.cookies.delete('ecopro-auth')
+  response.cookies.delete(AUTH_COOKIE_NAME)
   return response
 }

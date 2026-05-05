@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
+import { AUTH_COOKIE_NAME, verifyAuthCookie } from './lib/auth-cookie'
 
-export function middleware(request) {
+export async function middleware(request) {
   const path = request.nextUrl.pathname
 
   // Login en API routes altijd doorlaten
@@ -8,9 +9,8 @@ export function middleware(request) {
     return NextResponse.next()
   }
 
-  const cookieVal = request.cookies.get('ecopro-auth')?.value
-  let auth = null
-  try { auth = cookieVal ? JSON.parse(cookieVal) : null } catch {}
+  const cookieVal = request.cookies.get(AUTH_COOKIE_NAME)?.value
+  const auth = await verifyAuthCookie(cookieVal)
 
   // /beheer alleen voor admin
   if (path.startsWith('/beheer')) {
