@@ -13,7 +13,23 @@ import {
   formatDate,
 } from '@/lib/phases'
 import { KozijnSVG, kozijnSVGString, svgToPngDataUrl, ralName, PANE_NAMES, normalizeEl } from '@/lib/KozijnSVG'
-import { sendLeadLabEvent } from '@/lib/leadLabWebhook'
+
+async function postPortalAction(order, action, payload = {}) {
+  const res = await fetch('/api/portal/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action,
+      orderId: order.id,
+      token: order.portal_token,
+      ...payload,
+    }),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
 
 const _PACK_RANK_GLOBAL = { 'HR+++': 3, 'HR++': 2, 'HR+': 1 }
 function fixDesc(description, element_config) {
@@ -1100,35 +1116,22 @@ function Phase0({ order, onRefresh, showToast }) {
     }
 
     setAccepting(true)
-
-    await supabase
-      .from('orders')
-      .update({
-        phase: 1,
-        quote_accepted_at: new Date().toISOString(),
-        signature_name: signName.trim(),
-        signature_at: new Date().toISOString(),
+    try {
+      await postPortalAction(order, 'accept_quote', {
+        signatureName: signName.trim(),
+        termsAccepted,
       })
-      .eq('id', order.id)
 
-    await supabase.from('status_history').insert({
-      order_id: order.id,
-      from_phase: 0,
-      to_phase: 1,
-      changed_by: 'klant',
-    })
-
-    await sendLeadLabEvent('akkoord_gegeven', {
-      orderId: order.id,
-      portalToken: order.portal_token,
-    })
-
-    showToast('Akkoord bevestigd! U wordt doorgestuurd naar de betalingspagina.')
-    setAccepting(false)
-    setShowSign(false)
-    setSignName('')
-    setTermsAccepted(false)
-    onRefresh()
+      showToast('Akkoord bevestigd! U wordt doorgestuurd naar de betalingspagina.')
+      setShowSign(false)
+      setSignName('')
+      setTermsAccepted(false)
+      onRefresh()
+    } catch (err) {
+      setSignError(err.message || 'Akkoord verwerken is mislukt')
+    } finally {
+      setAccepting(false)
+    }
   }
 
   return (
@@ -1530,10 +1533,15 @@ function Phase1({ order, onRefresh, showToast }) {
 
   async function notifyPayment() {
     setNotifying(true)
-    await supabase.from('orders').update({ deposit_notified: true }).eq('id', order.id)
-    showToast('Betaling gemeld! Wij verwerken dit zo snel mogelijk.')
-    setNotifying(false)
-    onRefresh()
+    try {
+      await postPortalAction(order, 'notify_deposit_payment')
+      showToast('Betaling gemeld! Wij verwerken dit zo snel mogelijk.')
+      onRefresh()
+    } catch (err) {
+      showToast(err.message || 'Betaling melden is mislukt', 'error')
+    } finally {
+      setNotifying(false)
+    }
   }
 
   if (order.deposit_confirmed) {
@@ -1743,41 +1751,57 @@ function Phase6({ order, onRefresh, showToast }) {
 
   async function chooseSplit(split) {
     setChoosingSplit(true)
-    await supabase.from('orders').update({ payment_split: split }).eq('id', order.id)
-    showToast(split === 'full_80' ? '80% betaling geselecteerd' : '70% + 10% geselecteerd')
-    setChoosingSplit(false)
-    onRefresh()
+    try {
+      await postPortalAction(order, 'choose_payment_split', { split })
+      showToast(split === 'full_80' ? '80% betaling geselecteerd' : '70% + 10% geselecteerd')
+      onRefresh()
+    } catch (err) {
+      showToast(err.message || 'Betaalkeuze opslaan is mislukt', 'error')
+    } finally {
+      setChoosingSplit(false)
+    }
   }
 
   async function notifyMainPayment() {
     setNotifyingMain(true)
-    await supabase.from('orders').update({ main_payment_notified: true }).eq('id', order.id)
-    showToast('Betaling gemeld!')
-    setNotifyingMain(false)
-    onRefresh()
+    try {
+      await postPortalAction(order, 'notify_main_payment')
+      showToast('Betaling gemeld!')
+      onRefresh()
+    } catch (err) {
+      showToast(err.message || 'Betaling melden is mislukt', 'error')
+    } finally {
+      setNotifyingMain(false)
+    }
   }
 
   async function notifyFinalPayment() {
     setNotifyingFinal(true)
-    await supabase.from('orders').update({ final_payment_notified: true }).eq('id', order.id)
-    showToast('Slotbetaling gemeld!')
-    setNotifyingFinal(false)
-    onRefresh()
+    try {
+      await postPortalAction(order, 'notify_final_payment')
+      showToast('Slotbetaling gemeld!')
+      onRefresh()
+    } catch (err) {
+      showToast(err.message || 'Slotbetaling melden is mislukt', 'error')
+    } finally {
+      setNotifyingFinal(false)
+    }
   }
 
   async function addDefect() {
     if (!defectText.trim()) return
 
     setAddingDefect(true)
-    await supabase.from('defects').insert({
-      order_id: order.id,
-      description: defectText.trim(),
-      status: 'open',
-    })
-    setDefectText('')
-    showToast('Bevinding gemeld. Wij pakken dit op.')
-    setAddingDefect(false)
-    onRefresh()
+    try {
+      await postPortalAction(order, 'add_defect', { description: defectText.trim() })
+      setDefectText('')
+      showToast('Bevinding gemeld. Wij pakken dit op.')
+      onRefresh()
+    } catch (err) {
+      showToast(err.message || 'Bevinding melden is mislukt', 'error')
+    } finally {
+      setAddingDefect(false)
+    }
   }
 
   return (
@@ -2055,12 +2079,13 @@ function Phase7({ order, showToast }) {
 
   async function submitRating(stars) {
     setRating(stars)
-    await supabase
-      .from('orders')
-      .update({ satisfaction_rating: stars, satisfaction_feedback: feedback })
-      .eq('id', order.id)
-    setSubmitted(true)
-    showToast('Bedankt voor uw beoordeling!')
+    try {
+      await postPortalAction(order, 'submit_rating', { stars, feedback })
+      setSubmitted(true)
+      showToast('Bedankt voor uw beoordeling!')
+    } catch (err) {
+      showToast(err.message || 'Beoordeling opslaan is mislukt', 'error')
+    }
   }
 
   const opleverPunten = safeParseArray(order.oplevering_punten)
