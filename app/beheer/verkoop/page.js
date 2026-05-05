@@ -491,7 +491,27 @@ export default function VerkoopPage() {
     })
   }
 
-  const visibleEvents = statusEvents.filter(e => !dismissedEvents.has(eventKey(e)))
+  function eventRequiresAttention(e) {
+    if (!e.order) return false
+
+    const eventAt = new Date(e.created_at).getTime()
+    const orderUpdatedAt = new Date(e.order.updated_at || 0).getTime()
+    if (orderUpdatedAt > eventAt + 30000) return false
+
+    const phase = Number(e.order.phase || 0)
+    if (e.changed_by === 'klant' && e.from_phase === 0 && e.to_phase === 1) {
+      return phase === 1 && !e.order.deposit_confirmed
+    }
+    if (e.changed_by === 'mollie_webhook' && e.to_phase === 2) {
+      return phase === 2 && !!e.order.deposit_confirmed
+    }
+    if (e.changed_by === 'mollie_webhook' && e.to_phase === 7) {
+      return phase === 7
+    }
+    return phase === Number(e.to_phase)
+  }
+
+  const visibleEvents = statusEvents.filter(e => eventRequiresAttention(e) && !dismissedEvents.has(eventKey(e)))
 
   const leads    = orders.filter(o => o.phase === 0)
   const offertes = orders.filter(o => o.phase <= 1)
