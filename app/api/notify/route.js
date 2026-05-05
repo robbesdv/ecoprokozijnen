@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { verifyInternalRequest } from '@/lib/internal-auth'
 
 const FROM = 'EcoPro Kozijnen <noreply@send.ecoprokozijnen.nl>'
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app'
@@ -260,6 +261,11 @@ function formatDate(dateStr) {
 
 export async function POST(request) {
   try {
+    const auth = await verifyInternalRequest(request, ['admin', 'verkoper', 'monteur'])
+    if (!auth) {
+      return Response.json({ error: 'Niet bevoegd om notificaties te versturen' }, { status: 401 })
+    }
+
     const { order, type, extra } = await request.json()
 
     if (!order?.customer_email) {

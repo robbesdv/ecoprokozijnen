@@ -1,23 +1,12 @@
 import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
 import { AUTH_COOKIE_NAME, verifyAuthCookie } from '@/lib/auth-cookie'
+import { createServiceSupabaseClient } from '@/lib/supabase-server'
 
 const LEADLAB_WEBHOOK_URL =
   process.env.LEADLAB_WEBHOOK_URL ||
   'https://balanced-analysis-production-27b5.up.railway.app/webhook/kozijnsuite'
 
 const ALLOWED_EVENTS = new Set(['offerte_verzonden', 'akkoord_gegeven'])
-
-function supabaseServer() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!url || !key) throw new Error('Supabase configuratie ontbreekt')
-  return createClient(url, key)
-}
 
 async function hasAdminSession() {
   const cookieStore = await cookies()
@@ -32,7 +21,7 @@ async function hasAdminSession() {
 }
 
 async function getOrder({ event, orderId, portalToken }) {
-  let query = supabaseServer()
+  let query = createServiceSupabaseClient()
     .from('orders')
     .select('id, portal_token, phase, quote_accepted_at, customer_email, customer_phone')
     .eq('id', orderId)

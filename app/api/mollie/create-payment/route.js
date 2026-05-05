@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import createMollieClient from '@mollie/api-client'
+import { createServiceSupabaseClient } from '@/lib/supabase-server'
 
 const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app').replace(/^http:/, 'https:')
 const WEBHOOK_URL = (process.env.MOLLIE_WEBHOOK_BASE_URL || BASE_URL).replace(/\/$/, '')
@@ -16,10 +16,7 @@ export async function POST(request) {
       return Response.json({ error: 'Ontbrekende parameters' }, { status: 400 })
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
+    const supabase = createServiceSupabaseClient()
 
     const { data: order, error } = await supabase
       .from('orders')

@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
 import createMollieClient from '@mollie/api-client'
 import { Resend } from 'resend'
+import { internalApiHeaders } from '@/lib/internal-auth'
+import { createServiceSupabaseClient } from '@/lib/supabase-server'
 
 const FROM = 'EcoPro Kozijnen <onboarding@resend.dev>'
 const ADMIN_EMAIL = 'robbesdv@gmail.com'
@@ -72,10 +73,7 @@ export async function POST(request) {
     const { orderId, paymentType } = payment.metadata || {}
     if (!orderId || !paymentType) return new Response('OK', { status: 200 })
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    )
+    const supabase = createServiceSupabaseClient()
 
     const { data: order } = await supabase
       .from('orders')
@@ -142,7 +140,7 @@ export async function POST(request) {
     if (notifyType && order.customer_email) {
       await fetch(`${BASE_URL}/api/notify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...internalApiHeaders() },
         body: JSON.stringify({ order, type: notifyType, extra: notifyExtra }),
       }).catch(() => {})
     }

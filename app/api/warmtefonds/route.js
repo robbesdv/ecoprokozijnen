@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { createServiceSupabaseClient } from '@/lib/supabase-server'
 
 const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app').replace(/^http:/, 'https:')
 
@@ -55,10 +55,7 @@ export async function GET(request) {
 
   if (!token) return new Response('Niet gevonden', { status: 404 })
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+  const supabase = createServiceSupabaseClient()
 
   const { data: order } = await supabase
     .from('orders')

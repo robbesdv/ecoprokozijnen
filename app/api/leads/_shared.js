@@ -1,13 +1,6 @@
 import crypto from 'crypto'
-import { createClient } from '@supabase/supabase-js'
 import { normalizeLeadRows } from '@/lib/lead-normalize'
-
-function supabaseServer() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) throw new Error('Supabase configuratie ontbreekt')
-  return createClient(url, key)
-}
+import { createServiceSupabaseClient } from '@/lib/supabase-server'
 
 function getBearerToken(header = '') {
   const match = String(header).match(/^Bearer\s+(.+)$/i)
@@ -50,7 +43,7 @@ export async function saveLeadRows(rows) {
     source_lead_id: stableLeadId(row),
   }))
 
-  const { data, error } = await supabaseServer()
+  const { data, error } = await createServiceSupabaseClient()
     .from('leads')
     .upsert(prepared, { onConflict: 'source,source_lead_id' })
     .select('*')
