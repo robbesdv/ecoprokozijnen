@@ -137,7 +137,7 @@ export default function MontagePage({ params: paramsPromise }) {
             <a href="tel:+31850492456" className="btn btn-secondary btn-sm" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               📞 EcoPro
             </a>
-            <a href="https://wa.me/31850492456" target="_blank" rel="noopener noreferrer"
+            <a href="https://wa.me/31639375297" target="_blank" rel="noopener noreferrer"
               style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', background: '#dcfce7', border: '1px solid #86efac', borderRadius: 'var(--radius-sm)', color: '#15803d', textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
               💬 WhatsApp
             </a>

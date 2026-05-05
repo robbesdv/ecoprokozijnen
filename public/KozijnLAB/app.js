@@ -17,6 +17,7 @@ const COLORS = [
   { code: 'RAL7035', name: 'Lichtgrijs',      hex: '#d3d3cb' },
   { code: 'RAL7038', name: 'Agaatgrijs',      hex: '#b2b4b3' },
   { code: 'RAL7030', name: 'Steengrijs',      hex: '#969083' },
+  { code: 'RAL7023', name: 'Betongrijs',      hex: '#7d8471' },
   { code: 'RAL7039', name: 'Quartzgrijs',     hex: '#6c6960' },
   { code: 'RAL7012', name: 'Basaltgrijs',     hex: '#51565a' },
   { code: 'RAL7015', name: 'Leisteengrijs',   hex: '#434b4d' },
@@ -52,6 +53,10 @@ const ELEMENT_TYPES = [
   { id: 'hefschuif',label: 'Hef-schuif',     icon: 'schuif' },
   { id: 'dakraam',  label: 'Dakraam',        icon: 'dak'    },
 ];
+
+function isMatteGlassFinish(finish) {
+  return ['satinato', 'milk', 'melkglas'].includes(String(finish || '').toLowerCase());
+}
 
 const PANE_TYPES = {
   kozijn: [
@@ -468,7 +473,7 @@ function priceElement(el) {
       const pack = r.glassPack || el.glassPack || 'HR++';
       if (pack === 'HR+++' || pack === 'Triple') glassUpgrade += am2 * 105;
       if (r.gelaagd) glassUpgrade += am2 * 48.40;
-      if (r.glassFinish === 'satinato') glassUpgrade += am2 * 20;
+      if (isMatteGlassFinish(r.glassFinish)) glassUpgrade += am2 * 20;
       if (r.glassFinish === 'solar') glassUpgrade += am2 * 62;
     }));
     base += glassUpgrade;
@@ -1000,7 +1005,7 @@ function drawDoorLeafPanels(svg, x, y, w, h, panels, profilePx, colorHex) {
       if (colorHex) glEl.style.opacity = '1';
       svg.appendChild(glEl);
       drawDoorPanelGrooves(svg, panelRect.x, panelRect.y, panelRect.w, panelRect.h, panel.grooves, colorHex ? shade(colorHex, -22) : null);
-      if (panel.glassFinish === 'satinato') {
+      if (isMatteGlassFinish(panel.glassFinish)) {
         for (let ly = cy + 4; ly < cy + ph - 2; ly += 6) {
           svg.appendChild(svgEl('line', { x1: panelRect.x + 4, y1: ly, x2: panelRect.x + panelRect.w - 4, y2: ly, stroke: 'rgba(255,255,255,.62)', 'stroke-width': .5 }));
         }
@@ -1111,7 +1116,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
       const glEl = svgEl('rect', { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, class: 'svg-glass', rx: 1 });
       glEl.style.opacity = '1';
       svg.appendChild(glEl);
-      if (row.glassFinish === 'satinato') {
+      if (isMatteGlassFinish(row.glassFinish)) {
         for (let i = 0; i < h - 2 * inset; i += 6) {
           svg.appendChild(svgEl('line', { x1: x + inset + 2, y1: y + inset + i, x2: x + w - inset - 2, y2: y + inset + i, stroke: 'rgba(255,255,255,.6)', 'stroke-width': .5 }));
         }
@@ -1126,7 +1131,7 @@ function drawPane(svg, x, y, w, h, row, el, sashPx, opts = {}) {
     }));
   } else {
     svg.appendChild(svgEl('rect', { x: x + 4, y: y + 4, width: w - 8, height: h - 8, class: 'svg-glass', rx: 2 }));
-    if (row.glassFinish === 'satinato') {
+    if (isMatteGlassFinish(row.glassFinish)) {
       for (let i = 0; i < h; i += 6) {
         svg.appendChild(svgEl('line', { x1: x + 6, y1: y + 4 + i, x2: x + w - 6, y2: y + 4 + i, stroke: 'rgba(255,255,255,.6)', 'stroke-width': .5 }));
       }
@@ -1935,7 +1940,7 @@ function buildConfigShell() {
               <select class="select" id="glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ / Triple (Ug 0.5)</option></select>
             </div>
             <div class="field"><label class="label">Afwerking</label>
-              <select class="select" id="glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
+              <select class="select" id="glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="milk">Melkglas</option><option value="solar">Zonwerend</option></select>
             </div>
           </div>
           <div class="field"><label class="check-label"><input type="checkbox" id="glass-gelaagd"/> Gelaagd glas <span class="label-hint">(+€40/m²)</span></label></div>
@@ -1959,7 +1964,7 @@ function buildConfigShell() {
                 <select class="select" id="door-panel-glass-pack"><option value="HR++">HR++ (Ug 1.0)</option><option value="HR+++">HR+++ / Triple (Ug 0.5)</option></select>
               </div>
               <div class="field"><label class="label">Afwerking</label>
-                <select class="select" id="door-panel-glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="solar">Zonwerend</option></select>
+                <select class="select" id="door-panel-glass-finish"><option value="clear">Helder</option><option value="satinato">Satinato</option><option value="milk">Melkglas</option><option value="solar">Zonwerend</option></select>
               </div>
             </div>
             <div class="field"><label class="check-label"><input type="checkbox" id="door-panel-glass-gelaagd"/> Gelaagd glas <span class="label-hint">(+€40/m²)</span></label></div>

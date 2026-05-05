@@ -32,7 +32,8 @@
   var RAL = {
     RAL9016: "#f1f1ee", RAL9001: "#f0ead6",
     RAL7016: "#383e42", RAL7039: "#6c6960",
-    RAL7012: "#51565a", RAL7038: "#b2b4b3",
+    RAL7012: "#51565a", RAL7023: "#7d8471",
+    RAL7038: "#b2b4b3",
     RAL9005: "#0a0a0d",
     Wit: "#f1f1ee", white: "#f1f1ee", zwart: "#0a0a0d"
   };
@@ -279,7 +280,7 @@
   function addGlassUnit(scene, x1, y1, x2, y2, zCenter, row) {
     var layers  = glassLayerCount(row.glassPack);
     var spacing = layers === 3 ? 14 : 18;
-    var isSatin = row.glassFinish === "satinato";
+    var isSatin = ["satinato", "milk", "melkglas"].indexOf(String(row.glassFinish || "").toLowerCase()) !== -1;
     var glassBase = isSatin ? "#cfdce6" : "#92cceb";
 
     // Only the OUTDOOR (highest z) pane face is drawn as a filled polygon.

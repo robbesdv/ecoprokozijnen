@@ -385,7 +385,7 @@ function OrderDetail({ order, onClose, onUpdatePhase, onUploadPhotos, uploading,
           <a href="tel:+31850492456" className="btn btn-secondary btn-sm" style={{ flex: 1, textDecoration: 'none', fontSize: 12, justifyContent: 'center' }}>
             📞 EcoPro
           </a>
-          <a href="https://wa.me/31850492456" target="_blank" rel="noopener noreferrer"
+          <a href="https://wa.me/31639375297" target="_blank" rel="noopener noreferrer"
             style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 14px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 'var(--radius-sm)', fontSize: 12, fontWeight: 500, color: 'var(--success)', textDecoration: 'none', boxShadow: 'var(--shadow-sm)' }}>
             💬 WhatsApp
           </a>

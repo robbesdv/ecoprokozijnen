@@ -15,6 +15,11 @@ const PANE_LABEL = {
   glas: 'glas', paneel: 'paneel',
 }
 
+function glassFinishLabel(value) {
+  const map = { satinato: 'Satinato', milk: 'Melkglas', melkglas: 'Melkglas', solar: 'Zonwerend' }
+  return map[String(value || '').toLowerCase()] || ''
+}
+
 function buildItemDescription(el) {
   const cols = el.columns || []
   const allRows = cols.flatMap(c => c.rows || [])
@@ -33,7 +38,8 @@ function buildItemDescription(el) {
   const rawPacks = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
   const maxRank = Math.max(0, ...rawPacks.map(p => PACK_RANK[p] ?? 0))
   const glassPacks = maxRank > 0 ? rawPacks.filter(p => (PACK_RANK[p] ?? 0) === maxRank) : rawPacks
-  const glassStr = glassPacks.length > 0 ? glassPacks.join('/') : 'HR++'
+  const glassFinishes = [...new Set(glassRows.map(r => glassFinishLabel(r.glassFinish)).filter(Boolean))]
+  const glassStr = [glassPacks.length > 0 ? glassPacks.join('/') : 'HR++', ...glassFinishes].join(', ')
   const w = el.dimensions?.widthMM
   const h = el.dimensions?.heightMM
   const colorCode = el.finish?.colorOutside || ''

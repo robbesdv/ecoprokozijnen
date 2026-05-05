@@ -45,6 +45,11 @@ const PANE_LABEL = {
   glas: 'glas', paneel: 'paneel',
 }
 
+function glassFinishLabel(value) {
+  const map = { satinato: 'Satinato', milk: 'Melkglas', melkglas: 'Melkglas', solar: 'Zonwerend' }
+  return map[String(value || '').toLowerCase()] || ''
+}
+
 function buildItemDescription(el) {
   const cols = el.columns || []
   const allRows = cols.flatMap(c => c.rows || [])
@@ -57,11 +62,13 @@ function buildItemDescription(el) {
   })
   const glassRows = [...allRows.filter(r => r.fill !== 'panel'), ...doorPanels.filter(r => r.fill === 'glass')]
   const packs = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
+  const finishLabels = [...new Set(glassRows.map(r => glassFinishLabel(r.glassFinish)).filter(Boolean))]
+  const glassStr = [packs[0] || 'HR++', ...finishLabels].join(', ')
   const w = el.dimensions?.widthMM
   const h = el.dimensions?.heightMM
   const colorCode = el.finish?.colorOutside || ''
   const colorName = ralName(colorCode)
-  return `Premium Schuco Living Variant ${doorPanels.length || allRows.length || 1}-vaks, ${seenTypes.join(' / ') || 'vast glas'}, ${w} x ${h}mm bxh, Kleur: ${colorCode}${colorName && colorName !== colorCode ? ` - ${colorName}` : ''}, ${packs[0] || 'HR++'}`
+  return `Premium Schuco Living Variant ${doorPanels.length || allRows.length || 1}-vaks, ${seenTypes.join(' / ') || 'vast glas'}, ${w} x ${h}mm bxh, Kleur: ${colorCode}${colorName && colorName !== colorCode ? ` - ${colorName}` : ''}, ${glassStr}`
 }
 
 function buildOrderItems(orderId, kl) {

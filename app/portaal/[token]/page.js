@@ -40,7 +40,7 @@ const COMPANY = {
   bankName: 'ABN-AMBRO',
   phone: '085 049 24 56',
   phoneHref: '+31850492456',
-  whatsappHref: 'https://wa.me/31850492456',
+  whatsappHref: 'https://wa.me/31639375297',
   email: 'info@ecoprokozijnen.nl',
   address: 'Plataanstraat 20H, Enschede',
   fullAddress: 'Plataanstraat 20H, 7545MX Enschede',
