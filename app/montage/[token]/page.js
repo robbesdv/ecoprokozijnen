@@ -3,6 +3,18 @@
 import { useState, useEffect, use } from 'react'
 import { supabase } from '@/lib/supabase'
 
+async function postMontageAction(action, payload = {}) {
+  const res = await fetch(`/api/montage/action?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
+
 function formatDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -28,7 +40,7 @@ export default function MontagePage({ params: paramsPromise }) {
     setLoading(false)
     if (!data) { setNotFound(true); return }
     setOrder(data)
-    supabase.from('orders').update({ montage_accessed_at: new Date().toISOString() }).eq('id', data.id).then(() => {})
+    postMontageAction('mark_accessed', { orderId: data.id, token }).catch(() => {})
   }
 
   async function refresh() {
@@ -48,23 +60,32 @@ export default function MontagePage({ params: paramsPromise }) {
     const files = Array.from(e.target.files)
     if (!files.length || !order) return
     setUploading(true)
-    let ok = 0
-    for (const file of files) {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `montage/${order.id}/${Date.now()}-${safe}`
-      const { error: upErr } = await supabase.storage.from('order-files').upload(path, file)
-      if (upErr) { showToast('Upload mislukt: ' + upErr.message, 'error'); continue }
-      const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-      await supabase.from('montage_files').insert({
-        order_id: order.id, filename: file.name, storage_path: path,
-        file_url: publicUrl, file_type: file.type, uploaded_by: 'montage-link',
+    try {
+      const prepared = await postMontageAction('prepare_uploads', {
+        orderId: order.id,
+        token,
+        files: files.map(file => ({ name: file.name, type: file.type, size: file.size })),
       })
-      ok++
+      for (const [index, upload] of prepared.uploads.entries()) {
+        const { error } = await supabase.storage
+          .from('order-files')
+          .uploadToSignedUrl(upload.path, upload.token, files[index], { contentType: files[index].type || 'application/octet-stream' })
+        if (error) throw error
+      }
+      const result = await postMontageAction('register_uploads', {
+        orderId: order.id,
+        token,
+        uploads: prepared.uploads,
+      })
+      const ok = result.files?.length || 0
+      if (ok > 0) showToast(`${ok} foto${ok !== 1 ? "'s" : ''} geüpload`)
+      refresh()
+    } catch (err) {
+      showToast('Upload mislukt: ' + err.message, 'error')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
     }
-    setUploading(false)
-    if (ok > 0) showToast(`${ok} foto${ok !== 1 ? "'s" : ''} geüpload`)
-    refresh()
-    e.target.value = ''
   }
 
   if (loading) return (

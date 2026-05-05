@@ -80,6 +80,51 @@ async function updateOrder(request, supabase, orderId) {
   return Response.json({ success: true, order: data, previous: current })
 }
 
+async function updateMontageOrder(request, supabase, orderId) {
+  const current = await fetchOrder(supabase, orderId)
+  const body = await request.json()
+
+  const phase = Number(body.phase)
+  if (!ALLOWED_PHASES.has(phase)) {
+    return Response.json({ error: 'Ongeldige fase' }, { status: 400 })
+  }
+
+  const monteur = String(body.assignedMonteur || '')
+  if (!ALLOWED_MONTEURS.has(monteur)) {
+    return Response.json({ error: 'Ongeldige monteur' }, { status: 400 })
+  }
+
+  const updates = {
+    assigned_monteur: monteur || null,
+    installation_date: cleanDate(body.installationDate),
+    montage_notes: String(body.montageNotes || '').slice(0, 4000),
+    phase,
+  }
+
+  const now = new Date().toISOString()
+  if (phase === 6 && !current.installation_done_at) updates.installation_done_at = now
+  if (phase === 7 && !current.completed_at) updates.completed_at = now
+
+  const { data, error } = await supabase
+    .from('orders')
+    .update(updates)
+    .eq('id', orderId)
+    .select('*')
+    .single()
+  if (error) throw error
+
+  if (phase !== Number(current.phase)) {
+    await supabase.from('status_history').insert({
+      order_id: orderId,
+      from_phase: current.phase,
+      to_phase: phase,
+      changed_by: 'montage',
+    })
+  }
+
+  return Response.json({ success: true, order: data, previous: current })
+}
+
 async function resolveDefect(request, supabase, orderId) {
   const body = await request.json()
   const defectId = body.defectId
@@ -158,6 +203,7 @@ export async function POST(request) {
     const supabase = createServiceSupabaseClient()
 
     if (action === 'update') return updateOrder(request, supabase, orderId)
+    if (action === 'update_montage') return updateMontageOrder(request, supabase, orderId)
     if (action === 'resolve_defect') return resolveDefect(request, supabase, orderId)
     if (action === 'delete_file') return deleteFile(request, supabase, orderId)
     if (action === 'delete_order') return deleteOrder(supabase, orderId)

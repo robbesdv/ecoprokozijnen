@@ -42,6 +42,18 @@ async function notifyCustomer(order, type, extra = {}) {
 
 // ─── Hoofd component ──────────────────────────────────────────────────────────
 
+async function postAdminOrderAction(orderId, action, payload = {}) {
+  const res = await fetch(`/api/admin/order-action?action=${encodeURIComponent(action)}&orderId=${encodeURIComponent(orderId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
+
 export default function MontagePlanningPage() {
   const [orders, setOrders]               = useState([])
   const [loading, setLoading]             = useState(true)
@@ -84,25 +96,26 @@ export default function MontagePlanningPage() {
 
   async function saveOrder(id, updates, notifyType = null, notifyExtra = {}) {
     setSavingId(id)
-    const { error } = await supabase.from('orders').update(updates).eq('id', id)
-    if (!error && updates.phase !== undefined) {
-      const order = orders.find(o => o.id === id)
-      if (order && updates.phase !== order.phase) {
-        await supabase.from('status_history').insert({
-          order_id: id, from_phase: order.phase, to_phase: updates.phase, changed_by: 'montage',
-        })
+    try {
+      await postAdminOrderAction(id, 'update_montage', {
+        phase: updates.phase,
+        assignedMonteur: updates.assigned_monteur || '',
+        installationDate: updates.installation_date || '',
+        montageNotes: updates.montage_notes || '',
+      })
+
+      if (notifyType) {
+        const order = orders.find(o => o.id === id)
+        if (order) notifyCustomer({ ...order, ...updates }, notifyType, notifyExtra)
       }
-    }
-    setSavingId(null)
-    if (error) { showToast('Fout: ' + error.message, 'error'); return }
 
-    if (notifyType) {
-      const order = orders.find(o => o.id === id)
-      if (order) notifyCustomer({ ...order, ...updates }, notifyType, notifyExtra)
+      showToast('Opgeslagen')
+      loadOrders()
+    } catch (err) {
+      showToast('Fout: ' + err.message, 'error')
+    } finally {
+      setSavingId(null)
     }
-
-    showToast('Opgeslagen')
-    loadOrders()
   }
 
   const stats = {
@@ -549,9 +562,13 @@ function OrderDetailPanel({ order, onClose, onSave, savingId, showToast, onRefre
   }
 
   async function resolveDefect(id) {
-    await supabase.from('defects').update({ status: 'resolved', resolved_at: new Date().toISOString() }).eq('id', id)
-    onRefresh()
-    showToast('Bevinding opgelost')
+    try {
+      await postAdminOrderAction(order.id, 'resolve_defect', { defectId: id })
+      onRefresh()
+      showToast('Bevinding opgelost')
+    } catch (err) {
+      showToast('Fout: ' + err.message, 'error')
+    }
   }
 
   function copyLink() {

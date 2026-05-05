@@ -4,6 +4,29 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { notifyCustomer } from '@/lib/notifyCustomer'
 
+async function postMonteurAction(action, payload = {}) {
+  const res = await fetch(`/api/montage/action?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
+
+async function postMonteurForm(action, formData) {
+  const res = await fetch(`/api/montage/action?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    body: formData,
+  })
+  const text = await res.text()
+  const data = text ? JSON.parse(text) : {}
+  if (!res.ok) throw new Error(data.error || 'Actie mislukt')
+  return data
+}
+
 export default function MonteurPage() {
   const [orders, setOrders]       = useState([])
   const [selected, setSelected]   = useState(null)
@@ -60,37 +83,43 @@ export default function MonteurPage() {
   }
 
   async function updatePhase(orderId, newPhase) {
-    const prev = orders.find(o => o.id === orderId)?.phase
-    await supabase.from('orders').update({
-      phase: newPhase,
-      ...(newPhase === 6 ? { installation_done_at: new Date().toISOString() } : {}),
-      ...(newPhase === 7 ? { completed_at: new Date().toISOString() } : {}),
-    }).eq('id', orderId)
-    if (prev !== undefined) {
-      await supabase.from('status_history').insert({ order_id: orderId, from_phase: prev, to_phase: newPhase, changed_by: user?.name || 'monteur' })
+    try {
+      await postMonteurAction('update_phase', { orderId, phase: newPhase })
+      showToast('Status bijgewerkt')
+      loadOrders()
+    } catch (err) {
+      showToast('Status niet bijgewerkt: ' + err.message, 'error')
     }
-    showToast('Status bijgewerkt')
-    loadOrders()
   }
 
   async function uploadPhotos(e, orderId) {
     const files = Array.from(e.target.files)
     if (!files.length) return
     setUploading(true)
-    let ok = 0
-    for (const file of files) {
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      const path = `montage/${orderId}/${Date.now()}-${safe}`
-      const { error } = await supabase.storage.from('order-files').upload(path, file)
-      if (error) { showToast('Upload mislukt', 'error'); continue }
-      const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-      await supabase.from('montage_files').insert({ order_id: orderId, filename: file.name, storage_path: path, file_url: publicUrl, file_type: file.type, uploaded_by: user?.username || 'monteur' })
-      ok++
+    try {
+      const prepared = await postMonteurAction('prepare_uploads', {
+        orderId,
+        files: files.map(file => ({ name: file.name, type: file.type, size: file.size })),
+      })
+      for (const [index, upload] of prepared.uploads.entries()) {
+        const { error } = await supabase.storage
+          .from('order-files')
+          .uploadToSignedUrl(upload.path, upload.token, files[index], { contentType: files[index].type || 'application/octet-stream' })
+        if (error) throw error
+      }
+      const result = await postMonteurAction('register_uploads', {
+        orderId,
+        uploads: prepared.uploads,
+      })
+      const ok = result.files?.length || 0
+      if (ok > 0) showToast(`${ok} foto${ok !== 1 ? "'s" : ''} geüpload`)
+      loadOrders()
+    } catch (err) {
+      showToast('Upload mislukt: ' + err.message, 'error')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
     }
-    setUploading(false)
-    if (ok > 0) showToast(`${ok} foto${ok !== 1 ? "'s" : ''} geüpload`)
-    loadOrders()
-    e.target.value = ''
   }
 
   const todayStr   = new Date().toISOString().slice(0, 10)
@@ -592,20 +621,24 @@ function OpleverBon({ order, showToast, onRefresh }) {
     if (!naam.trim()) { showToast('Vul de naam van de klant in', 'error'); return }
     if (!hasSig()) { showToast('Handtekening ontbreekt', 'error'); return }
     setSaving(true)
-    const now    = new Date().toISOString()
-    const sigUrl = canvasRef.current.toDataURL('image/png')
-    await supabase.from('orders').update({ oplevering_naam: naam, oplevering_signed_at: now, oplevering_punten: JSON.stringify(PUNTEN), phase: 7, completed_at: now }).eq('id', order.id)
-    await supabase.from('status_history').insert({ order_id: order.id, to_phase: 7, changed_by: 'monteur-opleverbon' })
-    await notifyCustomer({ ...order, phase: 7, completed_at: now }, 'compleet')
-    const blob = await fetch(sigUrl).then(r => r.blob())
-    const path = `${order.id}/opleverbon-handtekening.png`
-    const { error: upErr } = await supabase.storage.from('order-files').upload(path, blob, { upsert: true })
-    if (!upErr) {
-      const { data: { publicUrl } } = supabase.storage.from('order-files').getPublicUrl(path)
-      await supabase.from('order_files').upsert({ order_id: order.id, filename: 'Opleverbon – handtekening.png', storage_path: path, file_url: publicUrl, file_type: 'image/png' }, { onConflict: 'storage_path' })
+    try {
+      const sigUrl = canvasRef.current.toDataURL('image/png')
+      const blob = await fetch(sigUrl).then(r => r.blob())
+      const form = new FormData()
+      form.append('orderId', order.id)
+      form.append('naam', naam.trim())
+      form.append('punten', JSON.stringify(PUNTEN))
+      form.append('signature', blob, 'opleverbon-handtekening.png')
+      const result = await postMonteurForm('complete_handover', form)
+      await notifyCustomer(result.order || { ...order, phase: 7 }, 'compleet')
+      setDone(true)
+      onRefresh()
+      showToast('Opleverbon opgeslagen, order afgerond & klant genotificeerd!')
+    } catch (err) {
+      showToast('Opleverbon niet opgeslagen: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
     }
-    setSaving(false); setDone(true); onRefresh()
-    showToast('Opleverbon opgeslagen, order afgerond & klant genotificeerd!')
   }
 
   if (done || order.oplevering_signed_at) {
