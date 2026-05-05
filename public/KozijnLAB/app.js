@@ -378,28 +378,40 @@ function applyDoorSubtypeLayout(el) {
   const zijlichtKant = opts.zijlichtKant || (opts.zijlicht ? 'rechts' : null);
   const hasBovenlicht = !!opts.bovenlicht;
   const bovPct = hasBovenlicht ? 20 : 0;
-  const zijlichtGlass = {
+  const zijlichtFill = opts.zijlichtFill === 'panel' ? 'panel' : 'glass';
+  const bovenlichtFill = opts.bovenlichtFill === 'panel' ? 'panel' : 'glass';
+  const zijlichtSpec = {
+    fill: zijlichtFill,
     glassPack: opts.zijlichtGlassPack || 'HR++',
     glassFinish: opts.zijlichtGlassFinish || 'clear',
     gelaagd: !!opts.zijlichtGelaagd,
+    panelPack: opts.zijlichtPanelPack || 'HR++',
   };
-  const glasRow = (pct, extra = {}) => ({
+  const bovenlichtSpec = {
+    fill: bovenlichtFill,
+    glassPack: opts.bovenlichtGlassPack || 'HR++',
+    glassFinish: opts.bovenlichtGlassFinish || 'clear',
+    gelaagd: !!opts.bovenlichtGelaagd,
+    panelPack: opts.bovenlichtPanelPack || 'HR++',
+  };
+  const optionRow = (pct, extra = {}) => ({
     paneType: 'vast',
-    fill: 'glass',
+    fill: extra.fill === 'panel' ? 'panel' : 'glass',
     heightPct: pct,
     glassPack: extra.glassPack || 'HR++',
     glassFinish: extra.glassFinish || 'clear',
     gelaagd: !!extra.gelaagd,
+    panelPack: extra.panelPack || 'HR++',
   });
 
   // Build rows for a column: optional bovenlicht on top, then main row below
   const colRows = (mainRow) => hasBovenlicht
-    ? [glasRow(bovPct), { ...mainRow, heightPct: 100 - bovPct }]
+    ? [optionRow(bovPct, bovenlichtSpec), { ...mainRow, heightPct: 100 - bovPct }]
     : [{ ...mainRow, heightPct: 100 }];
 
   const sidelightRows = () => hasBovenlicht
-    ? [glasRow(bovPct, zijlichtGlass), glasRow(100 - bovPct, zijlichtGlass)]
-    : [glasRow(100, zijlichtGlass)];
+    ? [optionRow(bovPct, bovenlichtSpec), optionRow(100 - bovPct, zijlichtSpec)]
+    : [optionRow(100, zijlichtSpec)];
 
   const sidelightCol = (pct) => ({ widthPct: pct, _isSidelight: true, rows: sidelightRows() });
 
@@ -1556,6 +1568,64 @@ function typeIconSvg(type) {
   return '';
 }
 
+function doorLightFillControls(kind, opts = {}) {
+  const fill = opts[`${kind}Fill`] === 'panel' ? 'panel' : 'glass';
+  const panelPack = opts[`${kind}PanelPack`] || 'HR++';
+  const gelaagd = !!opts[`${kind}Gelaagd`];
+  const label = kind === 'zijlicht' ? 'Zijlicht' : 'Bovenlicht';
+  return `
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <label style="display:flex;align-items:center;gap:4px;">
+        <span>${label} vulling</span>
+        <select class="select" id="${kind}-fill" style="width:auto;padding:4px 8px;font-size:12px;">
+          <option value="glass" ${fill === 'glass' ? 'selected' : ''}>Glas</option>
+          <option value="panel" ${fill === 'panel' ? 'selected' : ''}>Paneel</option>
+        </select>
+      </label>
+      <label id="${kind}-panel-pack-wrap" style="display:${fill === 'panel' ? 'flex' : 'none'};align-items:center;gap:4px;">
+        <span>Paneeltype</span>
+        <select class="select" id="${kind}-panel-pack" style="width:auto;padding:4px 8px;font-size:12px;">
+          <option value="HR++" ${panelPack === 'HR++' ? 'selected' : ''}>HR++ paneel</option>
+          <option value="HR+++" ${panelPack === 'HR+++' ? 'selected' : ''}>HR+++ paneel</option>
+        </select>
+      </label>
+      <label id="${kind}-gelaagd-wrap" style="display:${fill === 'glass' ? 'flex' : 'none'};align-items:center;gap:4px;cursor:pointer;">
+        <input type="checkbox" id="${kind}-gelaagd" ${gelaagd ? 'checked' : ''}/> Gelaagd glas
+      </label>
+    </div>`;
+}
+
+function bindDoorLightFillControls(root, el, kind) {
+  const fillSelect = root.querySelector(`#${kind}-fill`);
+  if (fillSelect) {
+    fillSelect.onchange = () => {
+      el.doorOptions = el.doorOptions || {};
+      el.doorOptions[`${kind}Fill`] = fillSelect.value === 'panel' ? 'panel' : 'glass';
+      if (fillSelect.value === 'panel' && !el.doorOptions[`${kind}PanelPack`]) el.doorOptions[`${kind}PanelPack`] = 'HR++';
+      if (fillSelect.value === 'glass' && !el.doorOptions[`${kind}GlassPack`]) el.doorOptions[`${kind}GlassPack`] = 'HR++';
+      render();
+    };
+  }
+
+  const panelPack = root.querySelector(`#${kind}-panel-pack`);
+  if (panelPack) {
+    panelPack.onchange = () => {
+      el.doorOptions = el.doorOptions || {};
+      el.doorOptions[`${kind}PanelPack`] = panelPack.value;
+      render();
+    };
+  }
+
+  const gelaagd = root.querySelector(`#${kind}-gelaagd`);
+  if (gelaagd) {
+    gelaagd.onchange = () => {
+      el.doorOptions = el.doorOptions || {};
+      el.doorOptions[`${kind}Gelaagd`] = gelaagd.checked;
+      render();
+    };
+  }
+}
+
 // ============================================================
 // CONFIG PANEL
 // ============================================================
@@ -1633,7 +1703,20 @@ function renderConfig() {
             <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="rechts" ${kant==='rechts'?'checked':''}/> Rechts</label>
             <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="links" ${kant==='links'?'checked':''}/> Links</label>
             <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="radio" name="zijlichtKant" value="beide" ${kant==='beide'?'checked':''}/> Beide kanten</label>
-            <label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="zijlicht-gelaagd" ${opts.zijlichtGelaagd ? 'checked' : ''}/> Gelaagd glas</label>
+            ${doorLightFillControls('zijlicht', opts)}
+          </div>
+        </div>`;
+      }
+      if (o.key === 'bovenlicht') {
+        const active = !!opts.bovenlicht;
+        return `<div>
+          <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;">
+            <input type="checkbox" data-door-opt="${o.key}" ${active ? 'checked' : ''}/>
+            <span style="flex:1">${o.label}</span>
+            <span style="color:var(--text-muted);font-size:12px;">+${fmtEuro(o.price)}</span>
+          </label>
+          <div id="bovenlicht-sub" style="display:${active ? 'flex' : 'none'};padding-left:24px;gap:14px;flex-wrap:wrap;font-size:12px;padding-bottom:6px;">
+            ${doorLightFillControls('bovenlicht', opts)}
           </div>
         </div>`;
       }
@@ -1643,11 +1726,9 @@ function renderConfig() {
         <span style="color:var(--text-muted);font-size:12px;">+${fmtEuro(o.price)}</span>
       </label>`;
     }).join('') + (sub === 'tuindeur' && (opts.zijlichtKlein || opts.zijlichtGroot) ? `
-      <label style="display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;font-size:13px;">
-        <input type="checkbox" id="zijlicht-gelaagd" ${opts.zijlichtGelaagd ? 'checked' : ''}/>
-        <span style="flex:1">Zijlicht gelaagd glas</span>
-        <span style="color:var(--text-muted);font-size:12px;">+gelaagd glas</span>
-      </label>` : '');
+      <div style="display:flex;align-items:center;gap:8px;padding:5px 0 7px 24px;font-size:12px;flex-wrap:wrap;">
+        ${doorLightFillControls('zijlicht', opts)}
+      </div>` : '');
 
     const zijlichtToggle = optsList.querySelector('#zijlicht-toggle');
     if (zijlichtToggle) {
@@ -1686,6 +1767,8 @@ function renderConfig() {
         render();
       };
     });
+    bindDoorLightFillControls(optsList, el, 'zijlicht');
+    bindDoorLightFillControls(optsList, el, 'bovenlicht');
   }
 
   // Compute activeCol early for visibility decisions
