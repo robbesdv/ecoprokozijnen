@@ -8,6 +8,7 @@ import { getPhase, formatEuro, formatDate } from '@/lib/phases'
 import { ralName, KozijnSVG } from '@/lib/KozijnSVG'
 import BeheerNav from '@/lib/BeheerNav'
 import { notifyCustomer } from '@/lib/notifyCustomer'
+import { appendNijBegunCodeToDescription, getNijBegunSettingsFromItems } from '@/lib/nijBegun'
 
 const PANE_LABEL = {
   vast: 'vast glas', draai: 'draai', kiep: 'kiep',
@@ -55,7 +56,10 @@ function buildItemDescription(el) {
   const vaksStr = `${nVaks || 1}-vaks`
   const typesStr = seenTypes.join(' / ') || 'vast glas'
   const kleurStr = colorCode + (colorName && colorName !== colorCode ? ` — ${colorName}` : '')
-  return `Premium Schüco Living Variant ${vaksStr}, ${typesStr}, ${w} × ${h}mm bxh, Kleur: ${kleurStr}, ${glassStr}`
+  return appendNijBegunCodeToDescription(
+    `Premium Schüco Living Variant ${vaksStr}, ${typesStr}, ${w} × ${h}mm bxh, Kleur: ${kleurStr}, ${glassStr}`,
+    el
+  )
 }
 
 function buildExtraDescription(ex) {
@@ -276,6 +280,7 @@ export default function VerkoopPage() {
     const elements = items
       .filter(it => it.element_config)
       .map((it, idx) => toExportElement(it.element_config || {}, it, idx))
+    const nijBegun = getNijBegunSettingsFromItems(items)
     return {
       version: 'kozijnlab.v2',
       offerCode: order.crm_reference || `ORD-${String(order.id).slice(0, 8).toUpperCase()}`,
@@ -293,6 +298,7 @@ export default function VerkoopPage() {
         montageEuro: 0,
         discountPct: 0,
         vatRate: 0.21,
+        nijBegun: nijBegun || undefined,
       },
       extras: items
         .filter(it => !it.element_config)

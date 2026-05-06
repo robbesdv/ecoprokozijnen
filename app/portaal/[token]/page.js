@@ -13,6 +13,13 @@ import {
   formatDate,
 } from '@/lib/phases'
 import { KozijnSVG, kozijnSVGString, svgToPngDataUrl, ralName, PANE_NAMES, normalizeEl } from '@/lib/KozijnSVG'
+import {
+  NIJ_BEGUN_CATALOG_VERSION,
+  NIJ_BEGUN_REQUIRED_SENTENCE,
+  NIJ_BEGUN_SOURCE_URL,
+  appendNijBegunCodeToDescription,
+  buildNijBegunSummaryForItems,
+} from '@/lib/nijBegun'
 
 async function postPortalAction(order, action, payload = {}) {
   const res = await fetch('/api/portal/action', {
@@ -46,8 +53,10 @@ function fixDesc(description, element_config) {
   const rawPacks = [...new Set(glassRows.map(r => r.glassPack?.trim()).filter(Boolean))]
   const maxRank = Math.max(0, ...rawPacks.map(p => _PACK_RANK_GLOBAL[p] ?? 0))
   const packs = maxRank > 0 ? rawPacks.filter(p => (_PACK_RANK_GLOBAL[p] ?? 0) === maxRank) : rawPacks
-  if (!packs.length) return description
-  return (description || '').replace(/,\s*HR\+{1,3}(?:\/HR\+{1,3})*\s*$/, `, ${packs.join('/')}`)
+  const fixed = packs.length
+    ? (description || '').replace(/,\s*HR\+{1,3}(?:\/HR\+{1,3})*\s*$/, `, ${packs.join('/')}`)
+    : description
+  return appendNijBegunCodeToDescription(fixed, cfg)
 }
 
 const COMPANY = {
@@ -691,6 +700,7 @@ function Phase0({ order, onRefresh, showToast }) {
   const [termsAccepted, setTermsAccepted] = useState(false)
 
   const items = (order.order_items || []).sort((a, b) => a.sort_order - b.sort_order)
+  const nijBegun = buildNijBegunSummaryForItems(items)
   const expired = order.quote_expires_at && new Date(order.quote_expires_at) < new Date()
   const daysLeft = order.quote_expires_at
     ? Math.ceil((new Date(order.quote_expires_at) - new Date()) / 86400000)
@@ -857,6 +867,60 @@ function Phase0({ order, onRefresh, showToast }) {
     })
 
     y = doc.lastAutoTable.finalY
+
+    if (nijBegun.enabled) {
+      y += 8
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...brand)
+      doc.text('Nij Begun specificatie', M, y)
+      y += 5
+
+      doc.setFontSize(7.8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(70, 70, 70)
+      const nijLines = doc.splitTextToSize(
+        `${NIJ_BEGUN_REQUIRED_SENTENCE} Catalogusversie: ${NIJ_BEGUN_CATALOG_VERSION}. Bestaand kozijnmateriaal: ${nijBegun.settings?.existingFrameMaterial === 'wood' ? 'hout' : nijBegun.settings?.existingFrameMaterial === 'plastic' ? 'kunststof' : 'onbekend'}.`,
+        W - 2 * M
+      )
+      doc.text(nijLines, M, y)
+      y += nijLines.length * 4 + 3
+
+      doc.autoTable({
+        startY: y,
+        head: [['Code', 'Maatregel', 'Aantal', 'Waarde', 'Max. catalogus incl. btw']],
+        body: nijBegun.rows.map(row => [
+          row.code,
+          row.title,
+          row.quantity ? `${row.quantity} ${row.unit}` : '',
+          row.value,
+          row.warning ? 'Controle' : eur(row.maxTotalIncl),
+        ]),
+        headStyles: { fillColor: [30, 94, 72], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7, cellPadding: 2.2 },
+        bodyStyles: { fontSize: 7.2, cellPadding: 2.2 },
+        alternateRowStyles: { fillColor: [244, 249, 246] },
+        columnStyles: {
+          0: { cellWidth: 22 },
+          1: { cellWidth: 62 },
+          2: { cellWidth: 24 },
+          3: { cellWidth: 38 },
+          4: { cellWidth: 36, halign: 'right' },
+        },
+        margin: { left: M, right: M },
+      })
+      y = doc.lastAutoTable.finalY + 3
+
+      const nijTotals = [
+        `Totaal conform catalogus: ${eur(nijBegun.catalogMaxIncl)}`,
+        `Eventuele eigen bijdrage bewoner: ${eur(nijBegun.ownContributionIncl)}`,
+        ...(nijBegun.warnings.length ? [`Controlepunten: ${nijBegun.warnings.join(' ')}`] : []),
+      ]
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...gray)
+      doc.text(doc.splitTextToSize(nijTotals.join('  |  '), W - 2 * M), M, y)
+      y += Math.max(7, doc.splitTextToSize(nijTotals.join('  |  '), W - 2 * M).length * 4)
+    }
 
     const totW = 90
     const totX = W - M - totW
@@ -1259,6 +1323,8 @@ function Phase0({ order, onRefresh, showToast }) {
         </div>
       </div>
 
+      {nijBegun.enabled && <NijBegunQuoteBlock summary={nijBegun} />}
+
       <div className="card" style={{ padding: '16px 20px' }}>
         <div style={S.sectionTitle}>Betalingsschema</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -1523,6 +1589,65 @@ function KozijnElementenSection({ items }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function NijBegunQuoteBlock({ summary }) {
+  if (!summary?.enabled) return null
+  const settings = summary.settings || {}
+  const isolationLabel = settings.isolationPlan === 'yes'
+    ? 'Isolatieplan aanwezig'
+    : settings.isolationPlan === 'no_under_10000'
+      ? 'Geen isolatieplan - route onder EUR 10.000'
+      : 'Isolatieplan nog onbekend'
+  const frameLabel = settings.existingFrameMaterial === 'wood'
+    ? 'bestaand hout naar kunststof'
+    : settings.existingFrameMaterial === 'plastic'
+      ? 'bestaand kunststof naar kunststof'
+      : 'bestaand kozijnmateriaal onbekend'
+
+  return (
+    <div className="card-elevated" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '15px 20px', background: '#ECFDF5', borderBottom: '1px solid #BBF7D0' }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#047857', marginBottom: 6 }}>
+          Nij Begun
+        </div>
+        <div style={{ fontSize: 13, lineHeight: 1.55, color: '#064E3B' }}>
+          {NIJ_BEGUN_REQUIRED_SENTENCE}
+        </div>
+        <div style={{ fontSize: 11, marginTop: 6, color: '#047857' }}>
+          Catalogusversie {NIJ_BEGUN_CATALOG_VERSION} · {isolationLabel} · {frameLabel}
+        </div>
+      </div>
+
+      <div style={{ padding: '8px 0' }}>
+        {summary.rows.map((row, idx) => (
+          <div key={`${row.itemId || idx}-${row.code}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '68px 1fr auto', gap: 10, padding: '10px 20px', borderBottom: idx < summary.rows.length - 1 ? '1px solid var(--border)' : 'none', background: idx % 2 === 0 ? 'white' : '#FAFAF9', alignItems: 'start' }}>
+            <div style={{ fontWeight: 800, color: row.warning ? '#B45309' : 'var(--brand)', fontSize: 12 }}>{row.code}</div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{row.title}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
+                {row.quantity ? `${row.quantity} ${row.unit}` : ''}{row.quantity ? ' · ' : ''}{row.value}
+              </div>
+            </div>
+            <div style={{ color: row.warning ? '#B45309' : 'var(--brand)', fontWeight: 700, fontSize: 12, textAlign: 'right' }}>
+              {row.warning ? 'Controle' : formatEuro(row.maxTotalIncl)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ padding: '12px 20px', background: '#F8FAFC', borderTop: '1px solid var(--border)', display: 'grid', gap: 6, fontSize: 12 }}>
+        <div><strong>Totaal conform catalogus:</strong> {formatEuro(summary.catalogMaxIncl)}</div>
+        <div><strong>Eventuele eigen bijdrage bewoner:</strong> {formatEuro(summary.ownContributionIncl)}</div>
+        {summary.warnings.length > 0 && (
+          <div style={{ color: '#B45309' }}><strong>Controlepunten:</strong> {summary.warnings.join(' ')}</div>
+        )}
+        <a href={NIJ_BEGUN_SOURCE_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'none' }}>
+          Maatregelencatalogus Nij Begun
+        </a>
+      </div>
     </div>
   )
 }

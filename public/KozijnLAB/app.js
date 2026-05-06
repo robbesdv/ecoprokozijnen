@@ -246,11 +246,29 @@ function newProject() {
     discountPct: 0,
     vatRate: 0.21,
     notes: '',
+    nijBegun: defaultNijBegunSettings(),
     extras: [],
   };
 }
 
 let state = newProject();
+
+function defaultNijBegunSettings() {
+  return {
+    enabled: false,
+    isolationPlan: 'unknown',
+    existingFrameMaterial: 'unknown',
+    catalogVersion: '24 november 2025',
+    builtBefore1992: false,
+    notMonument: false,
+    noPreviousPlanSubsidy: false,
+    notes: '',
+  };
+}
+
+function nijBegunSettings() {
+  return { ...defaultNijBegunSettings(), ...(state.nijBegun || {}) };
+}
 
 function loadState() {
   try {
@@ -1534,12 +1552,26 @@ function renderPrintNotes() {
   const div = document.getElementById('print-notes');
   if (!div) return;
   const sections = [];
+  const nij = nijBegunSettings();
+  if (nij.enabled) {
+    const meta = state.elements.map(buildNijBegunElementMeta).filter(Boolean);
+    const codes = [...new Set(meta.flatMap(item => item.codes || []))];
+    const warnings = [...new Set(meta.flatMap(item => item.warnings || []))];
+    const checklist = [
+      `Isolatieplan: ${nij.isolationPlan === 'yes' ? 'aanwezig' : nij.isolationPlan === 'no_under_10000' ? 'geen isolatieplan (< EUR 10.000 route)' : 'nog onbekend'}`,
+      `Bestaand kozijnmateriaal: ${nij.existingFrameMaterial === 'wood' ? 'hout' : nij.existingFrameMaterial === 'plastic' ? 'kunststof' : 'nog onbekend'}`,
+      `Woning gebouwd op/voor 31-12-1991: ${nij.builtBefore1992 ? 'ja' : 'nog controleren'}`,
+      `Geen monument: ${nij.notMonument ? 'ja' : 'nog controleren'}`,
+      `Geen eerdere planplichtige subsidie: ${nij.noPreviousPlanSubsidy ? 'ja' : 'nog controleren'}`,
+    ];
+    sections.push(`<div class="pn-section"><div class="pn-label">Nij Begun</div><div class="pn-text">Deze offerte voldoet aan de voorwaarden van de maximale prijzen zoals deze zijn vastgesteld in de Maatregelencatalogus van de isolatieaanpak Nij Begun.<br>Catalogusversie: ${escHtml(nij.catalogVersion)}<br>Maatregelcodes: ${codes.length ? codes.map(escHtml).join(', ') : 'controle nodig'}<br>${checklist.map(escHtml).join('<br>')}${warnings.length ? `<br>Let op: ${warnings.map(escHtml).join(' ')}` : ''}</div></div>`);
+  }
   if (state.notes?.trim()) {
-    sections.push(`<div class="pn-section"><div class="pn-label">Projectopmerkingen</div><div class="pn-text">${state.notes.trim().replace(/</g,'&lt;')}</div></div>`);
+    sections.push(`<div class="pn-section"><div class="pn-label">Projectopmerkingen</div><div class="pn-text">${escHtml(state.notes.trim())}</div></div>`);
   }
   state.elements.forEach(el => {
     if (el.notes?.trim()) {
-      sections.push(`<div class="pn-section"><div class="pn-label">${(el.name || el.type).replace(/</g,'&lt;')}</div><div class="pn-text">${el.notes.trim().replace(/</g,'&lt;')}</div></div>`);
+      sections.push(`<div class="pn-section"><div class="pn-label">${escHtml(el.name || el.type)}</div><div class="pn-text">${escHtml(el.notes.trim())}</div></div>`);
     }
   });
   if (sections.length) {
@@ -1558,6 +1590,105 @@ function renderDrawingOnly() {
   renderTotals();
   renderPreview();
   saveState();
+}
+
+function escHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function rowIsDoorLeaf(el, row) {
+  return el?.type === 'deur' && isDoorPaneType(row?.paneType);
+}
+
+function collectNijGlassRows(el) {
+  const rows = [];
+  (el.columns || []).forEach(col => {
+    (col.rows || []).forEach(row => {
+      if (rowIsDoorLeaf(el, row)) {
+        const panels = (Array.isArray(row.doorPanels) && row.doorPanels.length)
+          ? row.doorPanels
+          : (Array.isArray(el.doorPanels) && el.doorPanels.length ? el.doorPanels : []);
+        panels.forEach(panel => {
+          if (panel.fill === 'glass') rows.push(panel);
+        });
+        return;
+      }
+      if (row.fill !== 'panel' && row.paneType !== 'vent') rows.push(row);
+    });
+  });
+  return rows;
+}
+
+function hasNijPanel(el) {
+  return !!el.columns?.some(col => col.rows?.some(row => {
+    if (rowIsDoorLeaf(el, row)) return false;
+    return row.fill === 'panel';
+  }));
+}
+
+function buildNijBegunElementMeta(el) {
+  const settings = nijBegunSettings();
+  if (!settings.enabled) return undefined;
+
+  const glassRows = collectNijGlassRows(el);
+  const hasTriple = glassRows.some(row => ['HR+++', 'Triple'].includes(String(row.glassPack || '').trim()));
+  const codes = [];
+  const warnings = [];
+
+  if (el.type === 'deur') {
+    codes.push((el.doorSubtype || 'voordeur') === 'voordeur' ? 'V2-1-B1' : 'V2-1-A1');
+  } else if (hasTriple) {
+    if (settings.existingFrameMaterial === 'wood') codes.push('V2-4-D1');
+    else if (settings.existingFrameMaterial === 'plastic') codes.push('V2-4-B1');
+    else warnings.push('Bestaand kozijnmateriaal ontbreekt voor automatische V2-4-code.');
+  } else if (glassRows.length) {
+    warnings.push('Geen automatische hoofdcode: kies HR+++ / Triple glas of controleer de catalogus handmatig.');
+  }
+
+  if (hasNijPanel(el)) codes.push('V2-2-A1');
+  if (glassRows.some(row => row.gelaagd)) codes.push('V2-3-X9');
+  if (glassRows.some(row => ['satinato', 'milk', 'melkglas'].includes(String(row.glassFinish || '').toLowerCase()))) codes.push('V2-3-X8');
+  if (el.columns?.some(col => col.rows?.some(row => row.paneType === 'vent'))) codes.push('V2-3-X7');
+
+  return {
+    enabled: true,
+    catalogVersion: settings.catalogVersion,
+    isolationPlan: settings.isolationPlan,
+    existingFrameMaterial: settings.existingFrameMaterial,
+    builtBefore1992: !!settings.builtBefore1992,
+    notMonument: !!settings.notMonument,
+    noPreviousPlanSubsidy: !!settings.noPreviousPlanSubsidy,
+    notes: settings.notes || '',
+    codes: [...new Set(codes)],
+    warnings,
+  };
+}
+
+function renderNijBegunSummary() {
+  const settings = nijBegunSettings();
+  if (!settings.enabled) return '<div style="font-size:12px;color:var(--text-muted);">Zet aan voor Nij Begun-codes en checklist op de offerte.</div>';
+
+  const meta = state.elements.map(buildNijBegunElementMeta).filter(Boolean);
+  const codes = [...new Set(meta.flatMap(item => item.codes || []))];
+  const warnings = [...new Set(meta.flatMap(item => item.warnings || []))];
+  const checks = [
+    settings.builtBefore1992 ? 'Bouwjaarcheck ingevuld' : 'Bouwjaarcheck open',
+    settings.notMonument ? 'Monumentencheck ingevuld' : 'Monumentencheck open',
+    settings.noPreviousPlanSubsidy ? 'Eerdere subsidiecheck ingevuld' : 'Eerdere subsidiecheck open',
+  ];
+
+  return `
+    <div style="display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--text-muted);">
+      <div><strong style="color:var(--text);">Codes:</strong> ${codes.length ? codes.map(escHtml).join(', ') : 'controle nodig'}</div>
+      <div><strong style="color:var(--text);">Catalogus:</strong> versie ${escHtml(settings.catalogVersion)}</div>
+      <div><strong style="color:var(--text);">Bestaand kozijn:</strong> ${settings.existingFrameMaterial === 'wood' ? 'hout naar kunststof' : settings.existingFrameMaterial === 'plastic' ? 'kunststof naar kunststof' : 'nog onbekend'}</div>
+      <div>${checks.map(escHtml).join(' · ')}</div>
+      ${warnings.length ? `<div style="color:#b45309;">${warnings.map(escHtml).join(' ')}</div>` : ''}
+    </div>`;
 }
 
 function typeIconSvg(type) {
@@ -1952,6 +2083,18 @@ function renderConfig() {
 
   if (document.activeElement?.id !== 'montage') root.querySelector('#montage').value = state.montageEuro;
   if (document.activeElement?.id !== 'discount') root.querySelector('#discount').value = state.discountPct;
+  const nij = nijBegunSettings();
+  const nijOptions = root.querySelector('#nij-options');
+  root.querySelector('#nij-enabled').checked = !!nij.enabled;
+  if (nijOptions) nijOptions.style.display = nij.enabled ? '' : 'none';
+  root.querySelector('#nij-isolation-plan').value = nij.isolationPlan || 'unknown';
+  root.querySelector('#nij-existing-frame-material').value = nij.existingFrameMaterial || 'unknown';
+  root.querySelector('#nij-built-before-1992').checked = !!nij.builtBefore1992;
+  root.querySelector('#nij-not-monument').checked = !!nij.notMonument;
+  root.querySelector('#nij-no-previous-plan-subsidy').checked = !!nij.noPreviousPlanSubsidy;
+  if (document.activeElement?.id !== 'nij-notes') root.querySelector('#nij-notes').value = nij.notes || '';
+  const nijSummary = root.querySelector('#nij-summary');
+  if (nijSummary) nijSummary.innerHTML = renderNijBegunSummary();
   if (document.activeElement?.id !== 'project-notes') root.querySelector('#project-notes').value = state.notes || '';
   if (document.activeElement?.id !== 'elem-notes') root.querySelector('#elem-notes').value = el.notes || '';
 
@@ -2192,8 +2335,52 @@ function buildConfigShell() {
       </div>
     </div>
 
+    <div class="section is-open" data-sec="nijbegun">
+      <div class="section-head"><span class="section-title"><span class="step-num">7</span>Nij Begun</span><span class="section-chev">▾</span></div>
+      <div class="section-body">
+        <div class="field">
+          <label class="check-label"><input type="checkbox" id="nij-enabled"/> Nij Begun proof offerte</label>
+        </div>
+        <div id="nij-options" style="display:none">
+          <div class="field">
+            <label class="label">Isolatieplan</label>
+            <select class="select" id="nij-isolation-plan">
+              <option value="unknown">Nog onbekend</option>
+              <option value="yes">Isolatieplan aanwezig</option>
+              <option value="no_under_10000">Geen isolatieplan - route onder EUR 10.000</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="label">Bestaand kozijnmateriaal</label>
+            <select class="select" id="nij-existing-frame-material">
+              <option value="unknown">Nog onbekend</option>
+              <option value="wood">Hout naar kunststof kozijn</option>
+              <option value="plastic">Kunststof naar kunststof kozijn</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="check-label"><input type="checkbox" id="nij-built-before-1992"/> Woning gebouwd op of voor 31-12-1991</label>
+          </div>
+          <div class="field">
+            <label class="check-label"><input type="checkbox" id="nij-not-monument"/> Woning is geen rijks-, provinciaal of gemeentelijk monument</label>
+          </div>
+          <div class="field">
+            <label class="check-label"><input type="checkbox" id="nij-no-previous-plan-subsidy"/> Nog niet eerder subsidie aangevraagd waarvoor een isolatieplan verplicht was</label>
+          </div>
+          <div class="field">
+            <label class="label">Nij Begun notities</label>
+            <textarea class="input" id="nij-notes" rows="3" placeholder="Bijv. isolatieplan referentie, adviseur, aanvullende categorie-2-kosten..." style="resize:vertical;min-height:58px;font-size:12px;"></textarea>
+          </div>
+          <div class="field">
+            <label class="label">Automatische controle</label>
+            <div id="nij-summary" style="border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:10px 12px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="section is-open" data-sec="notes">
-      <div class="section-head"><span class="section-title"><span class="step-num">7</span>Opmerkingen</span><span class="section-chev">▾</span></div>
+      <div class="section-head"><span class="section-title"><span class="step-num">8</span>Opmerkingen</span><span class="section-chev">▾</span></div>
       <div class="section-body">
         <div class="field">
           <label class="label">Projectopmerkingen <span class="label-hint">· verschijnen op de offerte</span></label>
@@ -2302,6 +2489,11 @@ function bindConfigShell() {
     if (t.id === 'montage') { state.montageEuro = +t.value || 0; render(); return; }
     if (t.id === 'discount') { state.discountPct = +t.value || 0; render(); return; }
     if (t.id === 'project-notes') { state.notes = t.value; saveState(); return; }
+    if (t.id === 'nij-notes') {
+      state.nijBegun = { ...nijBegunSettings(), notes: t.value };
+      saveState();
+      return;
+    }
     if (t.id === 'elem-notes') { el.notes = t.value; saveState(); return; }
     if (t.id?.startsWith('cust-')) { state.customer[t.id.replace('cust-', '')] = t.value; render(); return; }
     if (t.closest('#hinge-field')) { el.columns[el._activeColIdx].rows[el._activeRowIdx].hinge = t.value; render(); return; }
@@ -2368,6 +2560,30 @@ function bindConfigShell() {
     if (e.target.id === 'door-panel-glass-gelaagd') {
       normalizeDoorPanels(el);
       el.doorPanels[el._activeDoorPanelIdx || 0].gelaagd = e.target.checked;
+      render(); return;
+    }
+    if (e.target.id === 'nij-enabled') {
+      state.nijBegun = { ...nijBegunSettings(), enabled: e.target.checked };
+      render(); return;
+    }
+    if (e.target.id === 'nij-isolation-plan') {
+      state.nijBegun = { ...nijBegunSettings(), isolationPlan: e.target.value };
+      render(); return;
+    }
+    if (e.target.id === 'nij-existing-frame-material') {
+      state.nijBegun = { ...nijBegunSettings(), existingFrameMaterial: e.target.value };
+      render(); return;
+    }
+    if (e.target.id === 'nij-built-before-1992') {
+      state.nijBegun = { ...nijBegunSettings(), builtBefore1992: e.target.checked };
+      render(); return;
+    }
+    if (e.target.id === 'nij-not-monument') {
+      state.nijBegun = { ...nijBegunSettings(), notMonument: e.target.checked };
+      render(); return;
+    }
+    if (e.target.id === 'nij-no-previous-plan-subsidy') {
+      state.nijBegun = { ...nijBegunSettings(), noPreviousPlanSubsidy: e.target.checked };
       render(); return;
     }
     if (e.target.closest('#hinge-style-field')) {
@@ -2650,10 +2866,11 @@ function buildExportPayload() {
   return {
     version: 'kozijnlab.v2', offerCode: state.offerCode, editOrderId: state.editOrderId, createdAt: new Date().toISOString(),
     customer: state.customer,
-    project: { notes: state.notes, montageEuro: state.montageEuro, discountPct: state.discountPct, vatRate: state.vatRate },
+    project: { notes: state.notes, montageEuro: state.montageEuro, discountPct: state.discountPct, vatRate: state.vatRate, nijBegun: nijBegunSettings() },
     extras: (state.extras || []).map(ex => ({ id: ex.id, name: ex.name, qty: ex.qty, unitPrice: ex.unitPrice })),
     elements: state.elements.map(el => ({
       id: el.id, name: el.name, type: el.type, qty: el.qty,
+      nijBegun: buildNijBegunElementMeta(el),
       doorSubtype: el.type === 'deur' ? (el.doorSubtype || 'voordeur') : undefined,
       doorOptions: el.type === 'deur' ? (el.doorOptions || {}) : undefined,
       doorPanels: el.type === 'deur' ? exportDoorPanels(el.doorPanels, 'panel') : undefined,
@@ -2720,6 +2937,7 @@ function importFromJSON(data) {
       finishOutside: finish.finishOutside || e.finishOutside || 'smooth',
       finishInside: finish.finishInside || e.finishInside || 'smooth',
       hardware: e.hardware || 'siegenia',
+      nijBegun: e.nijBegun,
       slideSystem: e.type === 'hefschuif' ? 'hst' : (e.slideSystem || 'hst'),
       doorSubtype: e.doorSubtype || 'voordeur',
       doorOptions: e.doorOptions || {},
@@ -2756,6 +2974,7 @@ function importFromJSON(data) {
     discountPct: proj.discountPct || 0,
     vatRate: proj.vatRate || 0.21,
     notes: proj.notes || '',
+    nijBegun: { ...defaultNijBegunSettings(), ...(proj.nijBegun || elements.find(e => e.nijBegun?.enabled)?.nijBegun || {}) },
     extras: (data.extras || []).map(ex => ({ id: ex.id || uid(), name: ex.name || '', qty: ex.qty || 1, unitPrice: ex.unitPrice || 0 })),
   };
 

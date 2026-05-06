@@ -1,6 +1,7 @@
 import { createServiceSupabaseClient } from '@/lib/supabase-server'
 import { verifyInternalRequest } from '@/lib/internal-auth'
 import { LEAD_STATUSES } from '@/lib/lead-normalize'
+import { appendNijBegunCodeToDescription } from '@/lib/nijBegun'
 
 const LEADLAB_WEBHOOK_URL =
   process.env.LEADLAB_WEBHOOK_URL ||
@@ -44,7 +45,10 @@ function buildItemDescription(el) {
   const w = el.dimensions?.widthMM
   const h = el.dimensions?.heightMM
   const colorCode = el.finish?.colorOutside || ''
-  return `Premium Schuco Living Variant ${doorPanels.length || allRows.length || 1}-vaks, ${seenTypes.join(' / ') || 'vast glas'}, ${w} x ${h}mm bxh, Kleur: ${colorCode}, ${glassStr}`
+  return appendNijBegunCodeToDescription(
+    `Premium Schuco Living Variant ${doorPanels.length || allRows.length || 1}-vaks, ${seenTypes.join(' / ') || 'vast glas'}, ${w} x ${h}mm bxh, Kleur: ${colorCode}, ${glassStr}`,
+    el
+  )
 }
 
 function buildExtraDescription(ex) {

@@ -1,5 +1,6 @@
 import { createServiceSupabaseClient } from '@/lib/supabase-server'
 import { verifyInternalRequest } from '@/lib/internal-auth'
+import { appendNijBegunCodeToDescription } from '@/lib/nijBegun'
 
 const PANE_LABEL = {
   vast: 'vast glas',
@@ -53,7 +54,10 @@ function buildItemDescription(el) {
   const height = el.dimensions?.heightMM
   const colorCode = el.finish?.colorOutside || ''
 
-  return `Premium Schuco Living Variant ${nVaks}-vaks, ${seenTypes.join(' / ') || 'vast glas'}, ${width} x ${height}mm bxh, Kleur: ${colorCode}, ${glassStr}`
+  return appendNijBegunCodeToDescription(
+    `Premium Schuco Living Variant ${nVaks}-vaks, ${seenTypes.join(' / ') || 'vast glas'}, ${width} x ${height}mm bxh, Kleur: ${colorCode}, ${glassStr}`,
+    el
+  )
 }
 
 function buildExtraDescription(extra) {
