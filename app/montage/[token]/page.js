@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 async function postMontageAction(action, payload = {}) {
@@ -120,8 +120,9 @@ export default function MontagePage({ params: paramsPromise }) {
   const isVandaag    = order.installation_date?.startsWith(todayStr)
 
   const TABS = [
-    { key: 'info',  label: 'Opdracht' },
-    { key: 'fotos', label: `Foto's${montageFiles.length > 0 ? ` (${montageFiles.length})` : ''}` },
+    { key: 'info',     label: 'Opdracht' },
+    { key: 'fotos',    label: `Foto's${montageFiles.length > 0 ? ` (${montageFiles.length})` : ''}` },
+    ...(order.phase >= 5 ? [{ key: 'opleveren', label: order.oplevering_signed_at ? '✓ Opleverbon' : 'Opleveren' }] : []),
   ]
 
   return (
@@ -229,6 +230,10 @@ export default function MontagePage({ params: paramsPromise }) {
             </div>
           )}
 
+          {tab === 'opleveren' && (
+            <OpleverTab order={order} onDone={refresh} showToast={showToast} />
+          )}
+
           {tab === 'fotos' && (
             <DCard title="Foto's uploaden" icon="📷">
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>
@@ -286,6 +291,161 @@ export default function MontagePage({ params: paramsPromise }) {
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </Shell>
+  )
+}
+
+const CHECKLIST = [
+  'Alle kozijnen zijn geplaatst conform de offerte',
+  'Kozijnen openen en sluiten goed',
+  'Afdichting rondom de kozijnen is aangebracht',
+  'Werkplek is schoongemaakt en opgeruimd',
+  'Klant is akkoord met het resultaat',
+]
+
+function SignatureCanvas({ canvasRef, onChange }) {
+  const drawing = useRef(false)
+  const last = useRef({ x: 0, y: 0 })
+  const drawn = useRef(false)
+
+  function getPos(e) {
+    const canvas = canvasRef.current
+    const r = canvas.getBoundingClientRect()
+    const src = e.touches?.[0] ?? e
+    return {
+      x: (src.clientX - r.left) * (canvas.width / r.width),
+      y: (src.clientY - r.top) * (canvas.height / r.height),
+    }
+  }
+
+  function onDown(e) { e.preventDefault(); drawing.current = true; last.current = getPos(e) }
+
+  function onMove(e) {
+    if (!drawing.current) return
+    e.preventDefault()
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const p = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(last.current.x, last.current.y)
+    ctx.lineTo(p.x, p.y)
+    ctx.strokeStyle = '#1A3A2A'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.stroke()
+    last.current = p
+    if (!drawn.current) { drawn.current = true; onChange?.(true) }
+  }
+
+  function onUp() { drawing.current = false }
+
+  function clear() {
+    const canvas = canvasRef.current
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height)
+    drawn.current = false
+    onChange?.(false)
+  }
+
+  return (
+    <div>
+      <canvas
+        ref={canvasRef}
+        width={600} height={160}
+        onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+        onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+        style={{ width: '100%', height: 140, border: '2px dashed var(--border)', borderRadius: 10, cursor: 'crosshair', display: 'block', touchAction: 'none', background: '#FAFAFA' }}
+      />
+      <div style={{ textAlign: 'right', marginTop: 4 }}>
+        <button type="button" onClick={clear} style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px' }}>✕ Wissen</button>
+      </div>
+    </div>
+  )
+}
+
+function OpleverTab({ order, onDone, showToast }) {
+  const [naam, setNaam] = useState('')
+  const [checks, setChecks] = useState(CHECKLIST.map(() => false))
+  const [hasSigned, setHasSigned] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const sigRef = useRef(null)
+
+  if (order.oplevering_signed_at) {
+    return (
+      <div style={{ padding: '24px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12, padding: '18px 20px' }}>
+          <div style={{ fontWeight: 700, color: '#15803D', fontSize: 15, marginBottom: 8 }}>✓ Opleverbon ondertekend</div>
+          <div style={{ fontSize: 13, color: '#166534' }}>
+            Door: <strong>{order.oplevering_naam}</strong><br />
+            Op: {formatDate(order.oplevering_signed_at)}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  async function handleSubmit() {
+    if (!naam.trim()) { showToast('Vul de naam van de klant in', 'error'); return }
+    if (!hasSigned) { showToast('Laat de klant de handtekening zetten', 'error'); return }
+
+    const punten = CHECKLIST.filter((_, i) => checks[i])
+    const blob = await new Promise(r => sigRef.current.toBlob(r, 'image/png'))
+
+    const formData = new FormData()
+    formData.append('orderId', order.id)
+    formData.append('naam', naam.trim())
+    formData.append('punten', JSON.stringify(punten))
+    formData.append('signature', blob, 'handtekening.png')
+
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/montage/action?action=complete_handover', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Mislukt')
+      showToast('Opleverbon ondertekend!')
+      onDone()
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 40 }}>
+      <DCard title="Controlelijst" icon="☑">
+        {CHECKLIST.map((item, i) => (
+          <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: i < CHECKLIST.length - 1 ? '1px solid var(--border)' : 'none', cursor: 'pointer' }}>
+            <input type="checkbox" checked={checks[i]} onChange={e => { const n = [...checks]; n[i] = e.target.checked; setChecks(n) }}
+              style={{ marginTop: 2, flexShrink: 0, width: 16, height: 16, accentColor: 'var(--brand)' }} />
+            <span style={{ fontSize: 14, color: checks[i] ? 'var(--brand)' : 'var(--text)', fontWeight: checks[i] ? 600 : 400 }}>{item}</span>
+          </label>
+        ))}
+      </DCard>
+
+      <DCard title="Naam klant" icon="👤">
+        <input
+          type="text" value={naam} onChange={e => setNaam(e.target.value)}
+          placeholder={order.customer_name}
+          style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        />
+      </DCard>
+
+      <DCard title="Handtekening klant" icon="✍">
+        <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10, margin: '0 0 10px' }}>Laat de klant hieronder tekenen om de oplevering te bevestigen.</p>
+        <SignatureCanvas canvasRef={sigRef} onChange={setHasSigned} />
+        {hasSigned && <p style={{ fontSize: 12, color: 'var(--brand)', marginTop: 6, fontWeight: 600 }}>✓ Handtekening gezet</p>}
+      </DCard>
+
+      <button
+        onClick={handleSubmit} disabled={submitting}
+        style={{ padding: '14px', background: submitting ? '#ccc' : 'var(--brand)', color: 'white', border: 'none', borderRadius: 'var(--radius)', fontSize: 15, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        {submitting ? '⏳ Opslaan…' : '✓ Oplevering afronden'}
+      </button>
+    </div>
   )
 }
 

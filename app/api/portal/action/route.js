@@ -88,6 +88,28 @@ export async function POST(request) {
         })
 
         await sendLeadLabAkkoord(order)
+
+        // Store signature image if provided
+        const signatureImage = String(body.signatureImage || '')
+        if (signatureImage) {
+          try {
+            const buf = Buffer.from(signatureImage, 'base64')
+            const path = `${order.id}/offerte-handtekening.png`
+            const { error: uploadErr } = await supabase.storage
+              .from('order-files')
+              .upload(path, buf, { upsert: true, contentType: 'image/png' })
+            if (!uploadErr) {
+              const { data: pub } = supabase.storage.from('order-files').getPublicUrl(path)
+              await supabase.from('order_files').upsert({
+                order_id: order.id,
+                filename: 'Offerte - handtekening.png',
+                storage_path: path,
+                file_url: pub.publicUrl,
+                file_type: 'image/png',
+              }, { onConflict: 'storage_path' })
+            }
+          } catch {}
+        }
       }
 
       return Response.json({ success: true })

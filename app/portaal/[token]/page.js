@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { LOGO_BASE64 } from '@/lib/logo-base64'
 import {
@@ -698,6 +698,8 @@ function Phase0({ order, onRefresh, showToast }) {
   const [signName, setSignName] = useState('')
   const [signError, setSignError] = useState('')
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [hasSigned, setHasSigned] = useState(false)
+  const sigRef = useRef(null)
 
   const items = (order.order_items || []).sort((a, b) => a.sort_order - b.sort_order)
   const nijBegun = buildNijBegunSummaryForItems(items)
@@ -1205,6 +1207,11 @@ function Phase0({ order, onRefresh, showToast }) {
       return
     }
 
+    if (!hasSigned) {
+      setSignError('Zet uw handtekening in het vak hieronder')
+      return
+    }
+
     if (!termsAccepted) {
       setSignError('Ga akkoord met de algemene voorwaarden om door te gaan')
       return
@@ -1212,9 +1219,18 @@ function Phase0({ order, onRefresh, showToast }) {
 
     setAccepting(true)
     try {
+      const signatureImage = await new Promise(resolve => {
+        sigRef.current.toBlob(blob => {
+          const reader = new FileReader()
+          reader.onload = e => resolve(e.target.result.split(',')[1])
+          reader.readAsDataURL(blob)
+        }, 'image/png')
+      })
+
       await postPortalAction(order, 'accept_quote', {
         signatureName: signName.trim(),
         termsAccepted,
+        signatureImage,
       })
 
       showToast('Akkoord bevestigd! U wordt doorgestuurd naar de betalingspagina.')
@@ -1451,6 +1467,12 @@ function Phase0({ order, onRefresh, showToast }) {
                 }}
               />
 
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>Zet hieronder uw handtekening:</div>
+                <SignatureCanvas canvasRef={sigRef} onChange={setHasSigned} />
+                {hasSigned && <div style={{ fontSize: 12, color: 'var(--brand)', marginTop: 4, fontWeight: 600 }}>✓ Handtekening gezet</div>}
+              </div>
+
               <label
                 style={{
                   display: 'flex',
@@ -1509,6 +1531,7 @@ function Phase0({ order, onRefresh, showToast }) {
                     setSignName('')
                     setSignError('')
                     setTermsAccepted(false)
+                    setHasSigned(false)
                   }}
                 >
                   Annuleren
@@ -2708,6 +2731,65 @@ function WarmtefondsLink({ order }) {
       </div>
       <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600, flexShrink: 0 }}>↓ PDF</div>
     </a>
+  )
+}
+
+function SignatureCanvas({ canvasRef, onChange }) {
+  const drawing = useRef(false)
+  const last = useRef({ x: 0, y: 0 })
+  const drawn = useRef(false)
+
+  function getPos(e) {
+    const canvas = canvasRef.current
+    const r = canvas.getBoundingClientRect()
+    const src = e.touches?.[0] ?? e
+    return {
+      x: (src.clientX - r.left) * (canvas.width / r.width),
+      y: (src.clientY - r.top) * (canvas.height / r.height),
+    }
+  }
+
+  function onDown(e) { e.preventDefault(); drawing.current = true; last.current = getPos(e) }
+
+  function onMove(e) {
+    if (!drawing.current) return
+    e.preventDefault()
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const p = getPos(e)
+    ctx.beginPath()
+    ctx.moveTo(last.current.x, last.current.y)
+    ctx.lineTo(p.x, p.y)
+    ctx.strokeStyle = '#1A3A2A'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.stroke()
+    last.current = p
+    if (!drawn.current) { drawn.current = true; onChange?.(true) }
+  }
+
+  function onUp() { drawing.current = false }
+
+  function clear() {
+    canvasRef.current.getContext('2d').clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+    drawn.current = false
+    onChange?.(false)
+  }
+
+  return (
+    <div>
+      <canvas
+        ref={canvasRef}
+        width={600} height={160}
+        onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp}
+        onTouchStart={onDown} onTouchMove={onMove} onTouchEnd={onUp}
+        style={{ width: '100%', height: 140, border: '2px dashed var(--border)', borderRadius: 10, cursor: 'crosshair', display: 'block', touchAction: 'none', background: '#FAFAFA' }}
+      />
+      <div style={{ textAlign: 'right', marginTop: 4 }}>
+        <button type="button" onClick={clear} style={{ fontSize: 12, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 8px' }}>✕ Wissen</button>
+      </div>
+    </div>
   )
 }
 
