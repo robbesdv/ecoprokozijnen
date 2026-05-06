@@ -108,7 +108,7 @@ export default function PortaalPage({ params: paramsPromise }) {
   async function loadOrder() {
     const { data } = await supabase
       .from('orders')
-      .select('*, order_items(*), defects(*), order_files(*)')
+      .select('*, order_items(*), defects(*), order_files(*), montage_files(*)')
       .eq('portal_token', token)
       .single()
 
@@ -131,7 +131,7 @@ export default function PortaalPage({ params: paramsPromise }) {
   async function refresh() {
     const { data } = await supabase
       .from('orders')
-      .select('*, order_items(*), defects(*), order_files(*)')
+      .select('*, order_items(*), defects(*), order_files(*), montage_files(*)')
       .eq('portal_token', token)
       .single()
 
@@ -1375,6 +1375,8 @@ function Phase0({ order, onRefresh, showToast }) {
         </div>
       </div>
 
+      <StatusTimeline phase={0} order={order} />
+
       <ContactCard />
 
       {!expired && (
@@ -2220,8 +2222,10 @@ function Phase6({ order, onRefresh, showToast }) {
         </div>
       </div>
 
+      <StatusTimeline phase={6} order={order} />
       <InvoiceLinks order={order} />
       <ContactCard />
+      <MontagePhotos order={order} />
       <OrderFiles order={order} />
     </div>
   )
@@ -2462,6 +2466,7 @@ function Phase7({ order, showToast }) {
 
       <InvoiceLinks order={order} />
       <ContactCard />
+      <MontagePhotos order={order} />
       <OrderFiles order={order} />
     </div>
   )
@@ -2706,6 +2711,39 @@ function WarmtefondsLink({ order }) {
   )
 }
 
+function MontagePhotos({ order }) {
+  const photos = (order.montage_files || []).filter(f => f.file_url)
+  if (!photos.length) return null
+
+  return (
+    <div className="card" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontWeight: 600, fontSize: 15 }}>Foto&apos;s montage</div>
+        <span className="badge badge-montage">{photos.length}</span>
+      </div>
+      <div style={{ padding: '14px 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+          {photos.map(f => {
+            const isImg = f.file_type?.startsWith('image/')
+            return (
+              <a key={f.id} href={f.file_url} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'block', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', textDecoration: 'none', background: 'white' }}>
+                {isImg
+                  ? <img src={f.file_url} alt={f.filename || 'Foto'} style={{ width: '100%', height: 100, objectFit: 'cover', display: 'block' }} />
+                  : <div style={{ width: '100%', height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, background: 'var(--bg)' }}>📄</div>
+                }
+                <div style={{ padding: '6px 10px', fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {formatDate(f.uploaded_at)}
+                </div>
+              </a>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function OrderFiles({ order }) {
   const files = (order.order_files || []).filter((f) => f.file_url)
   const totalCount = files.length + 1 // +1 for warmtefonds
@@ -2824,7 +2862,7 @@ function StatusTimeline({ phase, order }) {
     },
     { label: 'Montage afgerond', done: phase >= 6 },
     { label: 'Oplevering compleet', done: phase >= 7 },
-  ].filter((_, i) => i <= phase + 1)
+  ]
 
   return (
     <div className="card" style={{ padding: '16px 20px' }}>
