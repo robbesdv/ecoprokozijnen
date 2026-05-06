@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 const MONTEURS = ['rudy', 'vida', 'matthew', 'kay']
 const MONTEUR_NAMEN = { rudy: 'Rudy en team', vida: 'Vida Kozijnen', matthew: 'Matthew', kay: 'Kay' }
+const VERKOPER_NAMEN = { matthew: 'Matthew', rob: 'Rob', kay: 'Kay' }
 import { supabase } from '@/lib/supabase'
 import { PHASES, getPhase, formatEuro, formatDate, formatDateShort, calcDeposit } from '@/lib/phases'
 
@@ -76,6 +77,7 @@ export default function BeheerPage() {
   const [loading, setLoading]           = useState(true)
   const [toast, setToast]               = useState(null)
   const [activeView, setActiveView]     = useState('orders')
+  const [showOmzetModal, setShowOmzetModal] = useState(false)
   const [query, setQuery]               = useState({ view: '', order: '' })
 
   const loadOrders = useCallback(async () => {
@@ -107,7 +109,7 @@ export default function BeheerPage() {
 
   useEffect(() => {
     if (query.order) return
-    setActiveView(query.view === 'klanten' ? 'klanten' : 'orders')
+    setActiveView(['klanten', 'verkopers'].includes(query.view) ? query.view : 'orders')
   }, [query.view, query.order])
 
   useEffect(() => {
@@ -138,8 +140,9 @@ export default function BeheerPage() {
 
   function setView(view) {
     setActiveView(view)
-    window.history.replaceState(null, '', view === 'klanten' ? '/beheer?view=klanten' : '/beheer')
-    setQuery({ view: view === 'klanten' ? 'klanten' : '', order: '' })
+    const inPageViews = ['klanten', 'verkopers']
+    window.history.replaceState(null, '', inPageViews.includes(view) ? `/beheer?view=${view}` : '/beheer')
+    setQuery({ view: inPageViews.includes(view) ? view : '', order: '' })
   }
 
   const stats = {
@@ -194,7 +197,7 @@ export default function BeheerPage() {
       <div style={{ background: 'white', borderBottom: '1px solid var(--border)', padding: '0 28px', height: 58, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>
-            {activeView === 'orders' ? 'Dashboard' : activeView === 'klanten' ? 'Klanten' : ''}
+            {activeView === 'orders' ? 'Dashboard' : activeView === 'klanten' ? 'Klanten' : activeView === 'verkopers' ? 'Verkopers' : ''}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
             {new Date().toLocaleDateString('nl-NL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -211,7 +214,7 @@ export default function BeheerPage() {
             { label: 'Actie vereist',     value: stats.urgent,            icon: '⚠',  sub: 'Wacht op aandacht', accent: stats.urgent > 0 ? '#f59e0b' : '#cbd5e1', warn: stats.urgent > 0, onClick: () => setFilterUrgent(u => !u) },
             { label: 'Montage plannen',   value: stats.inplannen,         icon: '🔧', sub: 'Datum instellen',    accent: stats.inplannen > 0 ? '#3b82f6' : '#cbd5e1', warn: stats.inplannen > 0, onClick: () => setFilterPhase(4) },
             { label: 'Openstaande omzet', value: formatEuro(stats.omzet), icon: '💶', sub: 'Potentieel incl. BTW', accent: 'var(--brand)',  isText: true },
-            { label: 'Gerealiseerde omzet', value: formatEuro(stats.gerealiseerd), icon: '✓', sub: `${stats.realisatiePct}% van totaal`, accent: 'var(--success)', isText: true, progress: stats.realisatiePct },
+            { label: 'Gerealiseerde omzet', value: formatEuro(stats.gerealiseerd), icon: '✓', sub: `${stats.realisatiePct}% van totaal`, accent: 'var(--success)', isText: true, progress: stats.realisatiePct, onClick: () => setShowOmzetModal(true), actionLabel: 'Bekijk details →' },
           ].map(s => (
             <div key={s.label} onClick={s.onClick}
               style={{ position: 'relative', background: '#FAFAFA', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px 14px', cursor: s.onClick ? 'pointer' : 'default', overflow: 'hidden', transition: 'box-shadow 0.15s', borderLeft: `4px solid ${s.accent}` }}
@@ -229,7 +232,7 @@ export default function BeheerPage() {
                   <div style={{ width: `${Math.min(100, Math.max(0, s.progress))}%`, height: '100%', background: s.accent }} />
                 </div>
               )}
-              {s.onClick && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: s.accent, marginTop: 5, opacity: 0.8 }}>Filteren →</div>}
+              {s.onClick && <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: s.accent, marginTop: 5, opacity: 0.8 }}>{s.actionLabel || 'Filteren →'}</div>}
             </div>
           ))}
         </div>
@@ -294,6 +297,8 @@ export default function BeheerPage() {
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {activeView === 'klanten' ? (
           <KlantenView orders={orders} getPhase={getPhase} />
+        ) : activeView === 'verkopers' ? (
+          <VerkoopersView orders={orders} />
         ) : (
         <div style={{ height: '100%', overflowY: 'auto', background: 'white' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '44px 2fr 1.3fr 1fr 36px', padding: '8px 20px', background: '#F8FAFC', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, zIndex: 1 }}>
@@ -381,6 +386,10 @@ export default function BeheerPage() {
         />
       )}
 
+      {showOmzetModal && (
+        <OmzetBreakdownModal orders={orders} onClose={() => setShowOmzetModal(false)} />
+      )}
+
       {toast && (
         <div className="animate-fade" style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: toast.type === 'error' ? 'var(--danger)' : '#1A1A1A', color: 'white', padding: '11px 20px', borderRadius: 10, fontSize: 14, fontWeight: 500, zIndex: 9999, whiteSpace: 'nowrap', boxShadow: '0 8px 24px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: 8 }}>
           {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
@@ -393,8 +402,9 @@ export default function BeheerPage() {
 
 function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
   const NAV_TOP = [
-    { key: 'orders',   icon: '▣', label: 'Dashboard',  inPage: true },
-    { key: 'klanten',  icon: '👥', label: 'Klanten',    inPage: true },
+    { key: 'orders',    icon: '▣',  label: 'Dashboard',  inPage: true },
+    { key: 'klanten',   icon: '👥', label: 'Klanten',    inPage: true },
+    { key: 'verkopers', icon: '👤', label: 'Verkopers',  inPage: true },
   ]
   const NAV_LINKS = [
     { href: '/beheer/verkoop',    icon: '💼', label: 'Verkoop' },
@@ -1150,6 +1160,216 @@ function NewOrderModal({ onClose, onCreated, showToast }) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function OmzetBreakdownModal({ orders, onClose }) {
+  const rows = orders
+    .map(o => ({ ...o, realized: getRealizedRevenue(o) }))
+    .filter(o => o.realized > 0)
+    .sort((a, b) => b.realized - a.realized)
+
+  const byVerkoper = rows.reduce((acc, o) => {
+    const key = o.sales_owner || '__geen__'
+    if (!acc[key]) acc[key] = { name: VERKOPER_NAMEN[key] || (key === '__geen__' ? 'Onbekend / EcoPro' : key), orders: [], total: 0 }
+    acc[key].orders.push(o)
+    acc[key].total += o.realized
+    return acc
+  }, {})
+
+  const totalRealized = rows.reduce((s, o) => s + o.realized, 0)
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 680, maxHeight: '88vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+        <div style={{ background: 'linear-gradient(135deg, #152318, #1e3a28)', color: 'white', padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 18 }}>Gerealiseerde omzet</div>
+            <div style={{ fontSize: 13, opacity: 0.65, marginTop: 3 }}>Ontvangen betalingen per order en verkoper</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 11, opacity: 0.6 }}>Totaal</div>
+              <div style={{ fontWeight: 800, fontSize: 20 }}>{formatEuro(totalRealized)}</div>
+            </div>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 26px' }}>
+          {rows.length === 0 && (
+            <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '32px 0' }}>Nog geen gerealiseerde omzet.</p>
+          )}
+          {Object.entries(byVerkoper).map(([key, group]) => (
+            <div key={key} style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-muted)' }}>
+                  {group.name}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--success)' }}>{formatEuro(group.total)}</div>
+              </div>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
+                {group.orders.map((o, i) => {
+                  const p = getPhase(o.phase)
+                  return (
+                    <div key={o.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, padding: '10px 14px', borderBottom: i < group.orders.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center', fontSize: 13 }}>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{o.customer_name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{o.customer_address || '—'}</div>
+                      </div>
+                      <span className={`badge ${p.badgeClass}`}>{p.adminLabel}</span>
+                      <div style={{ textAlign: 'right', minWidth: 90 }}>
+                        <div style={{ fontWeight: 700, color: 'var(--success)', fontSize: 14 }}>{formatEuro(o.realized)}</div>
+                        {o.realized < o.total_amount && (
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>van {formatEuro(o.total_amount)}</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: '14px 26px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0, background: '#FAFAFA' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>{rows.length} orders met gerealiseerde omzet</span>
+          <button onClick={onClose} className="btn btn-secondary btn-sm">Sluiten</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function VerkoopersView({ orders }) {
+  const [selectedVerkoper, setSelectedVerkoper] = useState(null)
+
+  const verkopers = Object.values(
+    (orders || []).reduce((acc, o) => {
+      const key = o.sales_owner || '__geen__'
+      const name = VERKOPER_NAMEN[key] || (key === '__geen__' ? 'Onbekend / EcoPro' : key)
+      if (!acc[key]) acc[key] = { key, name, orders: [], totalValue: 0, realized: 0 }
+      acc[key].orders.push(o)
+      acc[key].totalValue += Number(o.total_amount) || 0
+      acc[key].realized += getRealizedRevenue(o)
+      return acc
+    }, {})
+  ).sort((a, b) => b.totalValue - a.totalValue)
+
+  const knownVerkopers = Object.keys(VERKOPER_NAMEN).filter(
+    u => !verkopers.find(v => v.key === u)
+  ).map(u => ({ key: u, name: VERKOPER_NAMEN[u], orders: [], totalValue: 0, realized: 0 }))
+
+  const allVerkopers = [...verkopers, ...knownVerkopers]
+
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: '24px 28px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
+        {allVerkopers.map(v => {
+          const active = v.orders.filter(o => o.phase < 7).length
+          const conv = v.orders.filter(o => o.phase >= 2).length
+          const initColor = `hsl(${((v.name?.charCodeAt(0) || 65) * 137 + 200) % 360},40%,38%)`
+          return (
+            <div key={v.key} onClick={() => setSelectedVerkoper(v)}
+              style={{ background: 'white', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+            >
+              <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 12, borderBottom: '1px solid var(--border)', background: 'linear-gradient(135deg, #152318 0%, #1e3a28 100%)' }}>
+                <div style={{ width: 42, height: 42, borderRadius: '50%', background: initColor, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, fontWeight: 700, flexShrink: 0, border: '2px solid rgba(255,255,255,0.15)' }}>
+                  {(v.name || '?')[0].toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: 'white' }}>{v.name}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>@{v.key}</div>
+                </div>
+              </div>
+              <div style={{ padding: '14px 18px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {[
+                  { label: 'Orders', value: v.orders.length },
+                  { label: 'Actief', value: active, accent: active > 0 },
+                  { label: 'Omzet', value: `€ ${Math.round(v.totalValue).toLocaleString('nl-NL')}`, wide: true },
+                  { label: 'Gerealiseerd', value: `€ ${Math.round(v.realized).toLocaleString('nl-NL')}`, wide: true, accent: v.realized > 0 },
+                ].map((s, i) => (
+                  <div key={i} style={{ background: 'var(--bg)', borderRadius: 8, padding: '8px 10px', gridColumn: s.wide ? 'span 2' : undefined, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>{s.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: s.accent ? 'var(--success)' : 'var(--text)' }}>{s.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: '0 18px 12px', fontSize: 11, color: 'var(--text-muted)' }}>Klik voor details →</div>
+            </div>
+          )
+        })}
+      </div>
+
+      {selectedVerkoper && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+          onClick={e => e.target === e.currentTarget && setSelectedVerkoper(null)}>
+          <div style={{ background: 'white', borderRadius: 18, width: '100%', maxWidth: 580, maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+            <div style={{ background: 'linear-gradient(135deg, #152318, #1e3a28)', color: 'white', padding: '22px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 52, height: 52, borderRadius: '50%', background: `hsl(${((selectedVerkoper.name?.charCodeAt(0)||65)*137+200)%360},40%,38%)`, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, flexShrink: 0, border: '2px solid rgba(255,255,255,0.15)' }}>
+                {(selectedVerkoper.name||'?')[0].toUpperCase()}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 800, fontSize: 18 }}>{selectedVerkoper.name}</div>
+                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>@{selectedVerkoper.key} · Verkoper</div>
+              </div>
+              <button onClick={() => setSelectedVerkoper(null)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', width: 32, height: 32, borderRadius: '50%', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '14px 24px', borderBottom: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+              {[
+                { label: 'Orders', value: selectedVerkoper.orders.length },
+                { label: 'Actief', value: selectedVerkoper.orders.filter(o => o.phase < 7).length },
+                { label: 'Omzet', value: formatEuro(selectedVerkoper.totalValue) },
+                { label: 'Gerealiseerd', value: formatEuro(selectedVerkoper.realized), accent: true },
+              ].map(s => (
+                <div key={s.label} style={{ background: '#F8FAFC', borderRadius: 10, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 4 }}>{s.label}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: s.accent ? 'var(--success)' : 'var(--text)' }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '14px 24px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>
+                Ordergeschiedenis ({selectedVerkoper.orders.length})
+              </div>
+              {selectedVerkoper.orders.length === 0 && (
+                <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>Nog geen orders.</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedVerkoper.orders.map(o => {
+                  const p = getPhase(o.phase)
+                  const realized = getRealizedRevenue(o)
+                  return (
+                    <div key={o.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, border: '1px solid var(--border)' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{o.customer_name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{o.customer_address || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-light)', marginTop: 1 }}>{formatDate(o.created_at)}</div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <span className={`badge ${p.badgeClass}`}>{p.adminLabel}</span>
+                        <div style={{ fontWeight: 700, fontSize: 13, marginTop: 4 }}>{formatEuro(o.total_amount)}</div>
+                        {realized > 0 && realized < o.total_amount && (
+                          <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 600 }}>✓ {formatEuro(realized)}</div>
+                        )}
+                        {realized > 0 && realized >= o.total_amount && (
+                          <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 700 }}>✓ Volledig betaald</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

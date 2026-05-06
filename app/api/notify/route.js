@@ -277,9 +277,6 @@ export async function POST(request) {
       return Response.json({ error: `Onbekend type: ${type}` }, { status: 400 })
     }
 
-    console.log('Sending email to:', order.customer_email, 'type:', type, 'from:', FROM)
-    console.log('RESEND_API_KEY exists:', !!process.env.RESEND_API_KEY)
-
     const resend = new Resend(process.env.RESEND_API_KEY)
     const { data, error } = await resend.emails.send({
       from: FROM,
@@ -287,8 +284,6 @@ export async function POST(request) {
       subject: template.subject,
       html: wrapEmail(template.body),
     })
-
-    console.log('Resend response - data:', JSON.stringify(data), 'error:', JSON.stringify(error))
 
     if (error) {
       console.error('Resend fout:', error)

@@ -1,12 +1,9 @@
 import createMollieClient from '@mollie/api-client'
 import { createServiceSupabaseClient } from '@/lib/supabase-server'
+import { calcDeposit, calcMain, calcFinal } from '@/lib/phases'
 
 const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app').replace(/^http:/, 'https:')
 const WEBHOOK_URL = (process.env.MOLLIE_WEBHOOK_BASE_URL || BASE_URL).replace(/\/$/, '')
-
-function calcDeposit(total)     { return Math.round(total * 0.20 * 100) / 100 }
-function calcMain(total, split) { return Math.round(total * (split === 'split_70_10' ? 0.70 : 0.80) * 100) / 100 }
-function calcFinal(total)       { return Math.round(total * 0.10 * 100) / 100 }
 
 export async function POST(request) {
   try {

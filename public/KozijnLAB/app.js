@@ -396,7 +396,11 @@ function applyDoorSubtypeLayout(el) {
   const zijlichtKant = opts.zijlichtKant || (opts.zijlicht ? 'rechts' : null);
   const hasBovenlicht = !!opts.bovenlicht;
   const bovPct = hasBovenlicht ? 20 : 0;
-  const zijlichtFill = opts.zijlichtFill === 'panel' ? 'panel' : 'glass';
+  const zijlichtFillRaw = opts.zijlichtFill || 'glass';
+  const zijlichtIsSplit = zijlichtFillRaw === 'split-glas-boven' || zijlichtFillRaw === 'split-paneel-boven';
+  const zijlichtFill = zijlichtIsSplit ? 'glass' : (zijlichtFillRaw === 'panel' ? 'panel' : 'glass');
+  const zijlichtTopFill = zijlichtIsSplit ? (zijlichtFillRaw === 'split-glas-boven' ? 'glass' : 'panel') : zijlichtFill;
+  const zijlichtBottomFill = zijlichtIsSplit ? (zijlichtTopFill === 'glass' ? 'panel' : 'glass') : zijlichtFill;
   const bovenlichtFill = opts.bovenlichtFill === 'panel' ? 'panel' : 'glass';
   const zijlichtSpec = {
     fill: zijlichtFill,
@@ -427,9 +431,19 @@ function applyDoorSubtypeLayout(el) {
     ? [optionRow(bovPct, bovenlichtSpec), { ...mainRow, heightPct: 100 - bovPct }]
     : [{ ...mainRow, heightPct: 100 }];
 
+  const buildZijlichtRows = (totalPct) => {
+    if (zijlichtIsSplit) {
+      const half = totalPct / 2;
+      return [
+        optionRow(half, { ...zijlichtSpec, fill: zijlichtTopFill }),
+        optionRow(half, { ...zijlichtSpec, fill: zijlichtBottomFill }),
+      ];
+    }
+    return [optionRow(totalPct, zijlichtSpec)];
+  };
   const sidelightRows = () => hasBovenlicht
-    ? [optionRow(bovPct, bovenlichtSpec), optionRow(100 - bovPct, zijlichtSpec)]
-    : [optionRow(100, zijlichtSpec)];
+    ? [optionRow(bovPct, bovenlichtSpec), ...buildZijlichtRows(100 - bovPct)]
+    : buildZijlichtRows(100);
 
   const sidelightCol = (pct) => ({ widthPct: pct, _isSidelight: true, rows: sidelightRows() });
 
@@ -1700,10 +1714,13 @@ function typeIconSvg(type) {
 }
 
 function doorLightFillControls(kind, opts = {}) {
-  const fill = opts[`${kind}Fill`] === 'panel' ? 'panel' : 'glass';
+  const fill = opts[`${kind}Fill`] || 'glass';
   const panelPack = opts[`${kind}PanelPack`] || 'HR++';
   const gelaagd = !!opts[`${kind}Gelaagd`];
   const label = kind === 'zijlicht' ? 'Zijlicht' : 'Bovenlicht';
+  const isSplit = fill === 'split-glas-boven' || fill === 'split-paneel-boven';
+  const showPanel = fill === 'panel' || isSplit;
+  const showGelaagd = fill === 'glass' || isSplit;
   return `
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <label style="display:flex;align-items:center;gap:4px;">
@@ -1711,16 +1728,20 @@ function doorLightFillControls(kind, opts = {}) {
         <select class="select" id="${kind}-fill" style="width:auto;padding:4px 8px;font-size:12px;">
           <option value="glass" ${fill === 'glass' ? 'selected' : ''}>Glas</option>
           <option value="panel" ${fill === 'panel' ? 'selected' : ''}>Paneel</option>
+          ${kind === 'zijlicht' ? `
+          <option value="split-glas-boven" ${fill === 'split-glas-boven' ? 'selected' : ''}>Splitsen: boven glas / beneden paneel</option>
+          <option value="split-paneel-boven" ${fill === 'split-paneel-boven' ? 'selected' : ''}>Splitsen: boven paneel / beneden glas</option>
+          ` : ''}
         </select>
       </label>
-      <label id="${kind}-panel-pack-wrap" style="display:${fill === 'panel' ? 'flex' : 'none'};align-items:center;gap:4px;">
+      <label id="${kind}-panel-pack-wrap" style="display:${showPanel ? 'flex' : 'none'};align-items:center;gap:4px;">
         <span>Paneeltype</span>
         <select class="select" id="${kind}-panel-pack" style="width:auto;padding:4px 8px;font-size:12px;">
           <option value="HR++" ${panelPack === 'HR++' ? 'selected' : ''}>HR++ paneel</option>
           <option value="HR+++" ${panelPack === 'HR+++' ? 'selected' : ''}>HR+++ paneel</option>
         </select>
       </label>
-      <label id="${kind}-gelaagd-wrap" style="display:${fill === 'glass' ? 'flex' : 'none'};align-items:center;gap:4px;cursor:pointer;">
+      <label id="${kind}-gelaagd-wrap" style="display:${showGelaagd ? 'flex' : 'none'};align-items:center;gap:4px;cursor:pointer;">
         <input type="checkbox" id="${kind}-gelaagd" ${gelaagd ? 'checked' : ''}/> Gelaagd glas
       </label>
     </div>`;
@@ -1731,9 +1752,9 @@ function bindDoorLightFillControls(root, el, kind) {
   if (fillSelect) {
     fillSelect.onchange = () => {
       el.doorOptions = el.doorOptions || {};
-      el.doorOptions[`${kind}Fill`] = fillSelect.value === 'panel' ? 'panel' : 'glass';
-      if (fillSelect.value === 'panel' && !el.doorOptions[`${kind}PanelPack`]) el.doorOptions[`${kind}PanelPack`] = 'HR++';
-      if (fillSelect.value === 'glass' && !el.doorOptions[`${kind}GlassPack`]) el.doorOptions[`${kind}GlassPack`] = 'HR++';
+      el.doorOptions[`${kind}Fill`] = fillSelect.value;
+      if (!el.doorOptions[`${kind}PanelPack`]) el.doorOptions[`${kind}PanelPack`] = 'HR++';
+      if (!el.doorOptions[`${kind}GlassPack`]) el.doorOptions[`${kind}GlassPack`] = 'HR++';
       render();
     };
   }

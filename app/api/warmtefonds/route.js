@@ -104,7 +104,6 @@ export async function GET(request) {
     const form = pdfDoc.getForm()
     const fields = form.getFields()
     if (fields.length > 0) {
-      console.log('Warmtefonds fields:', fields.map(f => f.getName()))
       const textMapping = {
         Naam: order.customer_name, naam: order.customer_name,
         'Straat en huisnummer': street, straat: street, adres: street,

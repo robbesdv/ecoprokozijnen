@@ -3,8 +3,8 @@ import { Resend } from 'resend'
 import { internalApiHeaders } from '@/lib/internal-auth'
 import { createServiceSupabaseClient } from '@/lib/supabase-server'
 
-const FROM = 'EcoPro Kozijnen <onboarding@resend.dev>'
-const ADMIN_EMAIL = 'robbesdv@gmail.com'
+const FROM = process.env.MOLLIE_FROM_EMAIL || 'EcoPro Kozijnen <noreply@send.ecoprokozijnen.nl>'
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'robbesdv@gmail.com'
 const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || 'https://ecoprokozijnen.vercel.app').replace(/^http:/, 'https:')
 
 const PAYMENT_LABELS = {
