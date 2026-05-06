@@ -736,6 +736,7 @@ function Phase0({ order, onRefresh, showToast }) {
     const dark = [30, 30, 30]
     const W = 210
     const M = 14
+    const CONTENT_BOTTOM = 270
 
     const eur = (v) =>
       '\u20ac\u00a0' +
@@ -759,6 +760,39 @@ function Phase0({ order, onRefresh, showToast }) {
     const hasKorting = kortingIncl > 0.01
     const exclBTW = Math.round((inclBTW / 1.21) * 100) / 100
     const btwBedrag = Math.round((inclBTW - exclBTW) * 100) / 100
+    const footerText = `${COMPANY.name}  ·  ${COMPANY.fullAddress}  ·  ${COMPANY.email}  ·  ${COMPANY.phone}  ·  KVK: ${COMPANY.kvk}`
+
+    function drawQuoteFooter() {
+      doc.setFillColor(...brand)
+      doc.rect(0, 282, W, 15, 'F')
+      doc.setFillColor(...gold)
+      doc.rect(0, 282, W, 1.5, 'F')
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(200, 220, 205)
+      doc.text(footerText, W / 2 - doc.getTextWidth(footerText) / 2, 291)
+    }
+
+    function drawContinuationHeader(title = 'Offerte vervolg') {
+      doc.setFillColor(...brand)
+      doc.rect(0, 0, W, 22, 'F')
+      doc.setFillColor(...gold)
+      doc.rect(0, 20, W, 1.5, 'F')
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255)
+      doc.text('EcoPro Kozijnen', M, 14)
+      doc.setFont('helvetica', 'normal')
+      doc.text(title, W - M - doc.getTextWidth(title), 14)
+    }
+
+    function ensureQuoteSpace(currentY, requiredHeight, title = 'Offerte vervolg') {
+      if (currentY + requiredHeight <= CONTENT_BOTTOM) return currentY
+      drawQuoteFooter()
+      doc.addPage()
+      drawContinuationHeader(title)
+      return 32
+    }
 
     doc.setFillColor(...brand)
     doc.rect(0, 0, W, 42, 'F')
@@ -863,13 +897,14 @@ function Phase0({ order, onRefresh, showToast }) {
         3: { cellWidth: 14, halign: 'center' },
         4: { cellWidth: 34, halign: 'right', fontStyle: 'bold' },
       },
-      margin: { left: M, right: M },
+      margin: { left: M, right: M, bottom: 28 },
     })
 
     y = doc.lastAutoTable.finalY
 
     if (nijBegun.enabled) {
       y += 8
+      y = ensureQuoteSpace(y, 48, 'Nij Begun specificatie')
       doc.setFontSize(9)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(...brand)
@@ -906,7 +941,7 @@ function Phase0({ order, onRefresh, showToast }) {
           3: { cellWidth: 38 },
           4: { cellWidth: 36, halign: 'right' },
         },
-        margin: { left: M, right: M },
+        margin: { left: M, right: M, bottom: 28 },
       })
       y = doc.lastAutoTable.finalY + 3
 
@@ -925,6 +960,7 @@ function Phase0({ order, onRefresh, showToast }) {
     const totW = 90
     const totX = W - M - totW
     y += 4
+    y = ensureQuoteSpace(y, 36, 'Offerte totalen')
 
     doc.autoTable({
       startY: y,
@@ -943,7 +979,7 @@ function Phase0({ order, onRefresh, showToast }) {
         1: { cellWidth: 34, halign: 'right' },
         2: { cellWidth: 34, halign: 'right' },
       },
-      margin: { left: M, right: W - M - 90 },
+      margin: { left: M, right: W - M - 90, bottom: 28 },
       tableWidth: 90,
     })
 
@@ -977,6 +1013,7 @@ function Phase0({ order, onRefresh, showToast }) {
     doc.text(totStr, W - M - doc.getTextWidth(totStr), totY + 22)
 
     y = Math.max(doc.lastAutoTable.finalY, totY + 28) + 8
+    y = ensureQuoteSpace(y, 90, 'Betalingsschema')
 
     doc.setFillColor(250, 243, 232)
     doc.rect(M, y, W - 2 * M, 20, 'F')
@@ -1005,6 +1042,8 @@ function Phase0({ order, onRefresh, showToast }) {
       W - 2 * M
     )
 
+    y = ensureQuoteSpace(y, slotLines.length * 5 + 38, 'Offerte afronding')
+
     doc.setFontSize(8.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(60, 60, 60)
@@ -1030,21 +1069,13 @@ function Phase0({ order, onRefresh, showToast }) {
 
     const disclaimerText = 'Aan deze offerte kunnen geen rechten worden ontleend. Afbeeldingen en tekeningen zijn indicatief en fictief van aard. Na het inmeten worden de definitieve productietekeningen vrijgegeven; maatvoering kan hiervan afwijken.'
     const disclaimerLines = doc.splitTextToSize(disclaimerText, W - 2 * M)
+    y = ensureQuoteSpace(y, disclaimerLines.length * 3.5 + 6, 'Offerte afronding')
     doc.setFontSize(6.5)
     doc.setFont('helvetica', 'italic')
     doc.setTextColor(160, 160, 160)
-    doc.text(disclaimerLines, M, Math.min(y, 273))
+    doc.text(disclaimerLines, M, y)
 
-    doc.setFillColor(...brand)
-    doc.rect(0, 282, W, 15, 'F')
-    doc.setFillColor(...gold)
-    doc.rect(0, 282, W, 1.5, 'F')
-    doc.setFontSize(7.5)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(200, 220, 205)
-
-    const footerText = `${COMPANY.name}  ·  ${COMPANY.fullAddress}  ·  ${COMPANY.email}  ·  ${COMPANY.phone}  ·  KVK: ${COMPANY.kvk}`
-    doc.text(footerText, W / 2 - doc.getTextWidth(footerText) / 2, 291)
+    drawQuoteFooter()
 
     // ── Tekeningen per element (eigen pagina per kozijn) ────────────────────
     const elemItems = items.filter(i => i.element_config)
@@ -1141,7 +1172,7 @@ function Phase0({ order, onRefresh, showToast }) {
         bodyStyles: { fontSize: 8.5, cellPadding: 3 },
         alternateRowStyles: { fillColor: [247, 250, 248] },
         columnStyles: { 0: { cellWidth: 55, fontStyle: 'bold' }, 1: { cellWidth: W - 2 * M - 55 } },
-        margin: { left: M, right: M },
+        margin: { left: M, right: M, bottom: 28 },
       })
 
       // Pagina-footer
