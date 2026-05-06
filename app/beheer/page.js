@@ -456,7 +456,17 @@ function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
             <span style={{ fontSize: 15, width: 18, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
             {item.label}
           </Link>
-          {item.href === '/beheer/verkoop' && navItem(activeView === 'verkopers', () => setActiveView('verkopers'), '👤', 'Verkopers')}
+          {item.href === '/beheer/verkoop' && (
+            <div onClick={() => setActiveView('verkopers')}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px 6px 38px', borderRadius: 9, marginBottom: 2, cursor: 'pointer', fontSize: 12, fontWeight: activeView === 'verkopers' ? 600 : 400, color: activeView === 'verkopers' ? 'white' : 'rgba(255,255,255,0.38)', background: activeView === 'verkopers' ? 'rgba(255,255,255,0.10)' : 'transparent', transition: 'all 0.13s' }}
+              onMouseEnter={e => activeView !== 'verkopers' && (e.currentTarget.style.background = 'rgba(255,255,255,0.05)', e.currentTarget.style.color = 'rgba(255,255,255,0.65)')}
+              onMouseLeave={e => activeView !== 'verkopers' && (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'rgba(255,255,255,0.38)')}
+            >
+              <span style={{ fontSize: 11, opacity: 0.5 }}>└</span>
+              <span style={{ fontSize: 13, width: 16, textAlign: 'center', flexShrink: 0 }}>👤</span>
+              Verkopers
+            </div>
+          )}
           </React.Fragment>
         ))}
       </nav>
