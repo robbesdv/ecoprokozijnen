@@ -402,9 +402,8 @@ export default function BeheerPage() {
 
 function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
   const NAV_TOP = [
-    { key: 'orders',    icon: '▣',  label: 'Dashboard',  inPage: true },
-    { key: 'klanten',   icon: '👥', label: 'Klanten',    inPage: true },
-    { key: 'verkopers', icon: '👤', label: 'Verkopers',  inPage: true },
+    { key: 'orders',  icon: '▣',  label: 'Dashboard', inPage: true },
+    { key: 'klanten', icon: '👥', label: 'Klanten',   inPage: true },
   ]
   const NAV_LINKS = [
     { href: '/beheer/verkoop',    icon: '💼', label: 'Verkoop' },
@@ -449,13 +448,16 @@ function BeheerSidebar({ activeView, setActiveView, onLogout, onNewOrder }) {
         <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '14px 4px' }} />
         <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'rgba(255,255,255,0.28)', padding: '0 14px 8px' }}>Werkplekken</div>
         {NAV_LINKS.map(item => (
-          <Link key={item.href} href={item.href} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 14px', borderRadius: 9, marginBottom: 2, fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.52)', textDecoration: 'none', transition: 'all 0.13s' }}
+          <React.Fragment key={item.href}>
+          <Link href={item.href} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 14px', borderRadius: 9, marginBottom: 2, fontSize: 13, fontWeight: 400, color: 'rgba(255,255,255,0.52)', textDecoration: 'none', transition: 'all 0.13s' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)', e.currentTarget.style.color = 'white')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'rgba(255,255,255,0.52)')}
           >
             <span style={{ fontSize: 15, width: 18, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
             {item.label}
           </Link>
+          {item.href === '/beheer/verkoop' && navItem(activeView === 'verkopers', () => setActiveView('verkopers'), '👤', 'Verkopers')}
+          </React.Fragment>
         ))}
       </nav>
 
